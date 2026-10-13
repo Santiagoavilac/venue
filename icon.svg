@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Venue: negro pleno, V blanca. Sin degradados, sin color. -->
+  <rect width="512" height="512" rx="96" fill="#000000"/>
+  <path d="M132 132h58l66 190 66-190h58L282 388h-52z" fill="#ffffff"/>
+</svg>

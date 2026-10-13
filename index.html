@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Venue — Event Management Platform</title>
+<meta name="description" content="Venue — Event Management Platform. Listas, entradas QR, mesas y control de acceso.">
+<!-- vista previa al compartir el link (WhatsApp y afines) -->
+<meta property="og:title" content="Venue — Event Management Platform">
+<meta property="og:description" content="Listas, entradas QR, mesas y control de acceso.">
+<meta property="og:image" content="https://udhkvqdoqbuiwcfzeoqu.supabase.co/storage/v1/object/public/app/icon-512.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Chakra+Petch:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+/* Ajustes propios de esta pantalla. El resto vive en styles.css:
+   duplicar reglas acá las haría pisar el diseño por orden de cascada. */
+.stats.pares{grid-template-columns:repeat(2,1fr);margin-bottom:16px;padding:0}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login" id="login">
+  <div class="login-brand">
+    <h1 class="vn-logo">VENUE</h1>
+    <p class="vn-sub">Event Management Platform</p>
+  </div>
+  <div class="login-card" id="loginCard">
+    <div id="loginErr"></div>
+    <div class="field"><label>Usuario</label><input id="lgUser" autocomplete="username" autocapitalize="none"></div>
+    <div class="field"><label>Contraseña</label>
+      <div class="pw-wrap"><input id="lgPass" type="password" autocomplete="current-password"><button type="button" class="pw-eye" id="lgEye" aria-label="Ver contraseña">👁</button></div></div>
+    <button class="btn primary" id="btnLogin">Ingresar</button>
+  </div>
+  <div class="login-foot">Acceso solo para personal autorizado.</div>
+</div>
+
+<!-- APP -->
+<div class="app hidden" id="app">
+
+  <!-- Barra lateral (escritorio) · navegación permanente -->
+  <aside class="nav" id="nav">
+    <div class="nav-top">
+      <button class="nav-club" id="clubBtn" aria-label="Cambiar de boliche">
+        <span class="club-mark" id="clubMark">·</span>
+        <span class="nav-club-txt">
+          <span class="club-name" id="clubName">Cargando…</span>
+          <span class="nav-club-sub">Cambiar local</span>
+        </span>
+        <svg class="chev" viewBox="0 0 24 24" id="clubChev"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+
+    <nav class="nav-items" id="tabbar" aria-label="Secciones"></nav>
+
+    <div class="nav-bottom">
+      <button class="nav-user" id="avatar" aria-label="Cuenta">
+        <span class="avatar" id="avatarIni">·</span>
+        <span class="nav-user-txt">
+          <span class="nav-user-nm" id="userNm"></span>
+          <span class="nav-user-rol" id="clubSub"></span>
+        </span>
+      </button>
+      <button class="nav-toggle" id="navToggle" title="Contraer el menú" aria-label="Contraer el menú">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Zona de trabajo -->
+  <div class="work">
+    <header class="topbar">
+      <button class="tb-menu" id="tbMenu" aria-label="Abrir el menú">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+
+      <div class="tb-ctx">
+        <button class="tb-club" id="tbClub" aria-label="Cambiar de boliche">
+          <span class="club-mark sm" id="tbClubMark">·</span>
+          <span id="tbClubName">Cargando…</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <span class="tb-sep" aria-hidden="true"></span>
+        <button class="tb-ev" id="tbEv">
+          <span class="tb-ev-nm" id="tbEvNm">Sin evento</span>
+          <span class="tb-ev-meta" id="tbEvMeta"></span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
+
+      <div class="tb-acc">
+        <button class="tb-search" id="btnBuscar" title="Buscar persona, entrada o mesa (/)">
+          <svg viewBox="0 0 24 24" class="ic"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <span>Buscar…</span>
+          <kbd>/</kbd>
+        </button>
+        <button class="iconbtn" id="btnAlertas" title="Alertas" aria-label="Alertas">
+          <svg viewBox="0 0 24 24" class="ic"><path d="M12 3a6 6 0 0 0-6 6c0 4-1.5 5.5-1.5 5.5h15S18 13 18 9a6 6 0 0 0-6-6ZM10 18.5a2 2 0 0 0 4 0"/></svg>
+          <span class="badge hidden" id="alertasN"></span>
+        </button>
+        <button class="avatar tb-avatar" id="avatarM" aria-label="Cuenta">·</button>
+      </div>
+    </header>
+
+    <div class="evsel" id="evsel"></div>
+
+    <main id="main" class="screen"></main>
+
+  <!-- ESCÁNER (portero) -->
+  <main class="scanwrap hidden" id="scanwrap">
+    <div class="viewfinder" id="viewfinder">
+      <video id="cam" playsinline muted class="hidden"></video>
+      <div class="vf-frame"></div>
+      <div class="vf-flash" id="vfFlash"></div>
+      <div class="vf-hint" id="vfHint">Apuntá al QR de la entrada</div>
+    </div>
+    <div class="scan-actions">
+      <button class="btn primary" id="btnCam">Iniciar cámara</button>
+      <button class="btn ghost2 hidden" id="btnTorch" title="Encender la linterna del celular">Linterna</button>
+      <button class="btn ghost2" id="btnSonido" title="Silenciar el pitido del escáner" aria-label="Silenciar el pitido del escáner" aria-pressed="false">🔊</button>
+      <button class="btn ghost2" id="btnFiltro" title="Modo filtro: rechaza sin consumir la entrada" aria-label="Modo filtro">⚡</button>
+    </div>
+    <div class="manual">
+      <label for="scanCode" class="sr-only">Código de la entrada</label>
+      <input id="scanCode" placeholder="o escribí el código · ej. A2F9B1" autocomplete="off" autocapitalize="characters" enterkeyhint="go">
+      <button id="btnVal">Validar</button>
+    </div>
+    <div id="scanResult"></div>
+    <div class="sh-h" style="margin-top:20px">Ingresos<span class="r-sub" id="scanCount"></span></div>
+    <div id="scanHist"></div>
+  </main>
+
+  </div><!-- /.work -->
+
+  <!-- Navegación inferior (móvil) · se llena desde el mismo tabsFor() -->
+  <nav class="botnav" id="botnav" aria-label="Secciones"></nav>
+
+  <div class="nav-scrim" id="navScrim"></div>
+  <div class="scrim" id="scrim"></div>
+  <section class="sheet" id="sheet" role="dialog" aria-modal="true">
+    <div class="grab"></div>
+    <button class="sheet-x" id="sheetX" aria-label="Cerrar" title="Cerrar (Esc)">
+      <svg viewBox="0 0 24 24" class="ic"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div id="sheetBody"></div>
+  </section>
+</div>
+
+<div class="club-menu" id="clubMenu">
+  <!-- Poblado en runtime por renderClubMenu() en app.js, desde la tabla
+       `clubs` — con boliches creados dinámicamente no hay una cantidad
+       fija de botones que se pueda escribir acá a mano. -->
+  <div class="cm-card" id="cmCardBody"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="config.js"></script>
+<script src="contabilidad.js"></script>
+<script src="app.js"></script>
+<script>/* dev-login.js es opcional: si no está, la app usa el login normal.
+   Se comprueba antes de inyectarlo para no dejar un 404 en cada carga. */
+if (["localhost", "127.0.0.1"].includes(location.hostname)) {
+  fetch("dev-login.js", { method: "HEAD" })
+    .then(r => { if (r.ok) { const s = document.createElement("script"); s.src = "dev-login.js"; document.body.appendChild(s); } })
+    .catch(() => {});
+}</script>
+</body>
+</html>

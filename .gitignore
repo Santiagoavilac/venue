@@ -1,0 +1,25 @@
+# credenciales y configuración local
+config.js
+dev-login.js
+.env
+.env.local
+venue_mobile/env/*.json
+!venue_mobile/env/example.json
+
+# sistema / editores
+.DS_Store
+.idea/
+.vscode/
+
+# node
+node_modules/
+
+# flutter / builds
+venue_mobile/build/
+venue_mobile/.dart_tool/
+venue_mobile/ios/Pods/
+venue_mobile/android/.gradle/
+venue_mobile/android/local.properties
+*.jks
+*.keystore
+key.properties

@@ -1,0 +1,3153 @@
+/* ===================================================================
+   VENUE · PUERTA Y RESERVAS
+   Sistema de diseño · boliches dinámicos
+
+   Una sola plataforma, identidad configurable por boliche.
+
+   Cómo funciona
+   -------------
+   Todo el color sale de tokens. La estructura, las medidas y los
+   componentes son idénticos para cualquier boliche: al crear uno nuevo
+   o cambiar de local, app.js inyecta los tokens de marca directo sobre
+   #app (función aplicarTemaClub) a partir de los colores guardados en
+   la base, y la interfaz entera se adapta al instante.
+
+   Regla que sostiene el sistema
+   -----------------------------
+   Ningún componente escribe un color literal de marca. Si un color
+   aparece suelto en una regla, ese componente deja de acompañar al
+   tema y rompe la identidad de los demás boliches.
+
+   Proporción de color (70-80 / 15-20 / 5-10)
+   ------------------------------------------
+   La mayoría de la pantalla es neutra. La marca vive en los acentos:
+   acciones principales, navegación activa, bordes de selección y
+   pequeños resplandores. Los colores funcionales aparecen sólo cuando
+   comunican un estado.
+
+   Semántica compartida
+   --------------------
+   Verde, ámbar y rojo de error significan lo mismo en todos los
+   boliches. El portero no debería reaprender el semáforo al cambiar
+   de puerta.
+   =================================================================== */
+
+:root{
+  /* ---------- SUPERFICIES ---------- */
+  /* Cuatro niveles, nunca un negro plano: la profundidad es lo que
+     separa una interfaz premium de una pantalla apagada. */
+  --background:#070709;
+  --surface:#0D0D10;
+  --surface-2:#121217;
+  --surface-elevated:#18181F;
+
+  /* Alias heredados: app.js y reglas antiguas siguen usando estos
+     nombres. Se mantienen apuntando a los tokens nuevos. */
+  --bg:var(--background);
+  --bg-2:var(--surface);
+  --surface-3:var(--surface-elevated);
+
+  /* ---------- TEXTO ---------- */
+  /* Cuatro pesos de información. Todo con el mismo peso visual es lo
+     que vuelve ilegible una pantalla operativa. */
+  --text-primary:#F5F5F7;
+  --text-secondary:#A8A8B8;
+  --text-muted:#82829A;
+  --text-faint:#5E5E70;
+
+  --text:var(--text-primary);
+  --text-2:var(--text-secondary);
+  --text-3:var(--text-muted);
+
+  /* ---------- BORDES ---------- */
+  /* Discretos por defecto: el borde separa, no decora. */
+  --border:rgba(255,255,255,.07);
+  --border-strong:rgba(255,255,255,.13);
+  --line:var(--border);
+  --line-2:var(--border-strong);
+
+  /* ---------- COLORES FUNCIONALES ---------- */
+  /* Idénticos en ambos locales. Son el idioma operativo, no la marca. */
+
+  /* Verde · ingresó, válido, pagado, confirmado */
+  --success:#2ED573;
+  --success-bg:rgba(46,213,115,.13);
+  --success-bd:rgba(46,213,115,.34);
+
+  /* Ámbar · pendiente, falta, requiere atención, stock bajo */
+  --warning:#FFB020;
+  --warning-bg:rgba(255,176,32,.13);
+  --warning-bd:rgba(255,176,32,.32);
+
+  /* Rojo de error · error, bloqueo, cancelación, crítico.
+     Deliberadamente más brillante y anaranjado que cualquier color de
+     marca: sobre un fondo oscuro, un rojo apagado se leería como marca y
+     no como alarma. Nunca aparece solo — siempre con ícono o texto. */
+  --danger:#FF3B30;
+  --danger-bg:rgba(255,59,48,.14);
+  --danger-bd:rgba(255,59,48,.38);
+
+  /* Azul · información neutra, sin connotación de éxito ni de alerta */
+  --info:#3B9EFF;
+  --info-bg:rgba(59,158,255,.12);
+  --info-bd:rgba(59,158,255,.32);
+
+  --ok:var(--success);
+  --warn:var(--warning);
+  --ok-bg:var(--success-bg);
+  --ok-bd:var(--success-bd);
+  --warn-bg:var(--warning-bg);
+  --warn-bd:var(--warning-bd);
+
+  /* ---------- CATEGORÍAS DE PLANO ---------- */
+  /* Mesa mantiene un frío propio en ambos locales para que nunca se
+     confunda con lounge, que sí sigue al acento de la marca. */
+  --mesa:#22D3EE;
+  --mesa-bg:rgba(34,211,238,.1);
+  --mesa-bd:rgba(34,211,238,.35);
+
+  /* ---------- RELACIONADORES ---------- */
+  /* Colores de identificación de personas, no de marca. */
+  --rel-christian:#8B5CF6;
+  --rel-eduardo:#22D3EE;
+  --rel-horacio:#FFB020;
+
+  /* ---------- TIPOGRAFÍA ---------- */
+  /* Sans limpia para todo lo operativo; la display expresiva se reserva
+     a nombres de evento y branding, nunca a datos que hay que leer con
+     apuro. Los números van en mono con cifras tabulares. */
+  --ui:"Sora",system-ui,-apple-system,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",monospace;
+
+  /* ---------- MEDIDAS ---------- */
+  --col:540px;
+  --nav-h:68px;
+  --r:16px;
+  --r-sm:12px;
+  --r-lg:22px;
+  /* Altura mínima táctil: se opera a oscuras y con apuro. */
+  --tap:48px;
+
+  /* ---------- MOVIMIENTO ---------- */
+  /* Corto y funcional: confirma la acción, no la decora. */
+  --t-fast:150ms;
+  --t:200ms;
+  --t-slow:250ms;
+  --ease:cubic-bezier(.4,0,.2,1);
+
+  /* ---------- MARCA (default neutro) ---------- */
+  /* Valor antes de elegir boliche (login) o si todavía no existe
+     ninguno. aplicarTemaClub() lo sobreescribe en runtime por boliche. */
+  --brand-primary:#7C3AED;
+  --brand-secondary:#A855F7;
+  --brand-accent:#22D3EE;
+  --brand-soft:rgba(124,58,237,.14);
+  --brand-glow:rgba(124,58,237,.34);
+  --brand-tint:rgba(124,58,237,.05);
+  --display:"Chakra Petch",var(--ui);
+  --display-tr:.01em;
+  --display-w:700;
+
+  --accent:var(--brand-primary);
+  --accent-2:var(--brand-secondary);
+  --accent-3:var(--brand-accent);
+  --accent-soft:var(--brand-soft);
+  --glow:var(--brand-glow);
+  --lounge:#C4B5FD;
+  --lounge-bg:var(--brand-soft);
+  --lounge-bd:rgba(124,58,237,.38);
+}
+
+/* ===================================================================
+   TEMA POR BOLICHE
+   Con boliches creados dinámicamente, los tokens de marca ya no se
+   redefinen acá por selector de atributo — los inyecta aplicarTemaClub()
+   en app.js directo como inline style sobre #app, leyendo los colores
+   guardados en la tabla `clubs`. Los alias siguen apuntando a los
+   tokens de marca (no a valores literales) así se recalculan solos.
+   =================================================================== */
+.app{
+  --bg:var(--background);
+  --bg-2:var(--surface);
+  --surface-3:var(--surface-elevated);
+  --accent:var(--brand-primary);
+  --accent-2:var(--brand-secondary);
+  --accent-3:var(--brand-accent);
+  --accent-soft:var(--brand-soft);
+  --glow:var(--brand-glow);
+  --lounge-bg:var(--brand-soft);
+}
+
+/* El cambio de boliche se percibe como una transición de ambiente, no
+   como una recarga. Sólo el fondo se anima: animar cada componente
+   volvería lento algo que debe sentirse instantáneo. */
+.app{transition:background-color var(--t-slow) var(--ease)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--ui);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  /* El fondo acompaña el cambio de local sin parpadeo. */
+  transition:background-color .3s ease;
+}
+body{min-height:100dvh}
+button{font-family:inherit;cursor:pointer;color:inherit;-webkit-tap-highlight-color:transparent}
+svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.hidden{display:none!important}
+
+/* Foco visible: la app se opera con guantes y apuro; el foco de teclado
+   nunca debe desaparecer. */
+:focus-visible{outline:2px solid var(--accent-3);outline-offset:2px;border-radius:4px}
+
+/* Cifras alineadas donde importa: caja, listas, contadores. */
+.v,.kpi .v,.stat .v,.cat-price input,.tk-code,.r-id,.com-total{
+  font-variant-numeric:tabular-nums;
+}
+
+/* ---------- LOGIN ---------- */
+.login{
+  min-height:100dvh;display:flex;flex-direction:column;
+  justify-content:center;align-items:center;padding:28px;
+  background:
+    radial-gradient(88% 52% at 50% 0%,var(--accent-soft),transparent 64%),
+    var(--bg);
+}
+.login-brand{display:flex;flex-direction:column;align-items:center;gap:14px;margin-bottom:32px}
+.login-logo{
+  width:64px;height:64px;border-radius:20px;display:grid;place-items:center;
+  background:linear-gradient(145deg,var(--accent),var(--accent-2));
+  font-family:var(--display);font-weight:var(--display-w);
+  letter-spacing:var(--display-tr);font-size:32px;color:#fff;
+  box-shadow:0 14px 34px -8px var(--glow);
+}
+.login-brand h1{
+  font-family:var(--display);font-weight:var(--display-w);
+  letter-spacing:var(--display-tr);font-size:30px;line-height:1.1;
+}
+.login-brand p{color:var(--text-2);font-size:14px;text-align:center}
+.login-card{
+  width:100%;max-width:400px;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r-lg);padding:22px 20px;
+}
+.login-card .field{margin-bottom:14px}
+.login-card .btn{width:100%;margin-top:4px}
+.seg2{display:flex;gap:5px;background:var(--bg-2);border:1px solid var(--line);padding:5px;border-radius:var(--r-sm);margin-bottom:16px}
+.seg2 button{flex:1;border:none;background:none;padding:10px 4px;border-radius:9px;font-size:12.5px;font-weight:500;color:var(--text-2);transition:background .15s,color .15s}
+.seg2 button.on{background:var(--surface-3);color:var(--text)}
+.login-foot{text-align:center;color:var(--text-3);font-size:12px;margin-top:20px;max-width:340px;line-height:1.55}
+
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:46px}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;padding:8px;font-size:15px;opacity:.55;line-height:1}
+.pw-eye:hover{opacity:.9}
+
+.lg-loc{width:100%;max-width:420px;margin-bottom:16px}
+.lg-loc button{display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px}
+.roles{display:flex;flex-direction:column;gap:11px;width:100%;max-width:420px}
+.rolecard{
+  display:flex;align-items:center;gap:14px;background:var(--surface);
+  border:1px solid var(--line);border-radius:18px;padding:16px 15px;
+  text-align:left;transition:transform .1s,border-color .15s,background .15s;
+}
+.rolecard:hover{border-color:var(--line-2);background:var(--surface-2)}
+.rolecard:active{transform:scale(.98)}
+.rc-ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex-shrink:0}
+.rc-ic .ic{width:23px;height:23px}
+.rc-admin{background:var(--accent-soft);color:var(--accent-2)}
+.rc-rel{background:var(--mesa-bg);color:var(--mesa)}
+.rc-guardia{background:var(--ok-bg);color:var(--ok)}
+.rc-body{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.rc-t{font-family:var(--display);font-weight:var(--display-w);letter-spacing:var(--display-tr);font-size:18px}
+.rc-d{font-size:12.5px;color:var(--text-2);line-height:1.45}
+.rc-chev{width:17px;height:17px;color:var(--text-3);flex-shrink:0}
+.switchrow{display:flex;gap:9px;margin-top:10px}
+.switchrow .btn{flex:1;margin-top:0;padding:12px}
+
+/* ---------- MARCA DEL BOLICHE ---------- */
+/* Firma genérica: el color sale siempre de los tokens de marca
+   (inyectados en runtime por aplicarTemaClub), nunca de un literal. */
+.wm-club{
+  font-family:var(--display);font-weight:var(--display-w);
+  color:var(--brand-secondary);letter-spacing:var(--display-tr);
+  text-shadow:0 0 18px var(--brand-glow);
+}
+.mk-ic{width:18px;height:18px;flex-shrink:0}
+.club-mark .mk-ic{width:22px;height:22px}
+.club-name .wm-club{font-size:23px}
+.cm-card .mk-club{background:var(--brand-soft);border:1px solid var(--brand-primary)}
+.cm-card .wm-club{font-size:18px}
+
+/* ---------- APP SHELL ---------- */
+.app{
+  max-width:var(--col);margin:0 auto;position:relative;min-height:100dvh;
+  padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(100% 40% at 50% 0%,var(--accent-soft),transparent 60%),
+    var(--bg);
+}
+@media(min-width:600px){.app{border-inline:1px solid var(--line)}}
+
+.appbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(env(safe-area-inset-top) + 18px) 18px 14px;
+  position:sticky;top:0;z-index:20;
+  background:linear-gradient(var(--bg) 74%,transparent);
+}
+.club{display:flex;align-items:center;gap:12px;background:none;border:none;padding:0;min-width:0}
+.club-mark{
+  width:44px;height:44px;border-radius:14px;flex-shrink:0;
+  display:grid;place-items:center;color:#fff;
+  font-family:var(--display);font-weight:var(--display-w);
+  letter-spacing:var(--display-tr);font-size:21px;
+  background:linear-gradient(145deg,var(--accent),var(--accent-2));
+  box-shadow:0 8px 22px -6px var(--glow);
+}
+.club-txt{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;gap:1px;min-width:0}
+.club-name{
+  font-family:var(--display);font-weight:var(--display-w);
+  letter-spacing:var(--display-tr);font-size:22px;
+  display:flex;align-items:center;gap:6px;
+}
+.club-name .chev{width:15px;height:15px;color:var(--text-3)}
+.club-sub{font-size:12.5px;color:var(--text-2)}
+.avatar{
+  width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
+  font-size:13px;font-weight:600;background:var(--surface-3);
+  border:1px solid var(--line-2);color:var(--text);flex-shrink:0;
+}
+
+.floors{display:flex;position:relative;margin:4px 18px 16px;background:var(--surface);padding:5px;border-radius:14px;border:1px solid var(--line)}
+.floors button{flex:1;border:none;background:none;padding:11px;border-radius:10px;font-size:14px;font-weight:500;color:var(--text-2);z-index:1;transition:color .2s}
+.floors button.on{color:var(--text)}
+.floors .ind{position:absolute;top:5px;bottom:5px;left:5px;width:calc(50% - 5px);background:var(--surface-3);border-radius:10px;transition:transform .24s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.floors.baja .ind{transform:translateX(100%)}
+
+.evsel{display:flex;gap:8px;padding:0 18px 14px;overflow-x:auto;scrollbar-width:thin}
+.evsel button{flex-shrink:0;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:9px 15px;font-size:13px;color:var(--text-2);font-weight:500;transition:background .15s,border-color .15s,color .15s}
+.evsel button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-2)}
+
+/* Indicadores: el dato manda, la etiqueta acompaña. */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;padding:0 18px 16px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 12px 11px;display:flex;flex-direction:column;gap:5px}
+.stat .k{font-size:10.5px;color:var(--text-3);display:flex;align-items:center;gap:4px;text-transform:uppercase;letter-spacing:.06em}
+.stat .k .ic{width:12px;height:12px;opacity:.7}
+.stat .v{font-family:var(--mono);font-size:21px;font-weight:700;line-height:1}
+.stat .v.ok{color:var(--ok)}
+
+/* ---------- PLAN ---------- */
+.planwrap{padding:0 14px}
+.plan-head{display:flex;align-items:center;justify-content:space-between;padding:0 6px 11px;gap:8px}
+.plan-head .pt{font-size:14px;font-weight:500;color:var(--text-2);flex-shrink:0}
+.ph-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.ghost{background:var(--surface);border:1px solid var(--line);border-radius:11px;color:var(--text);font-size:12.5px;font-weight:500;padding:9px 13px;display:inline-flex;align-items:center;gap:6px;transition:background .15s,border-color .15s}
+.ghost:hover{border-color:var(--line-2)}
+.ghost:active{background:var(--surface-2)}
+.ghost .ic{width:15px;height:15px}
+.ghost.editing-on{border-color:var(--accent);color:var(--accent-2);background:var(--accent-soft)}
+.canvas.editmode{border-style:dashed;border-color:var(--accent)}
+.canvas.editmode .chip{cursor:grab;touch-action:none}
+.canvas.editmode .chip:active{cursor:grabbing}
+input[type=range]{padding:0;height:36px;accent-color:var(--accent);border:none;background:transparent}
+
+.canvas-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r-lg);scrollbar-width:thin}
+.canvas-wrap::-webkit-scrollbar{height:6px}
+.canvas-wrap::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px}
+.canvas{
+  position:relative;width:100%;aspect-ratio:1000/420;min-width:600px;
+  border-radius:var(--r-lg);overflow:hidden;border:2px solid var(--line-2);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.02),inset 0 2px 60px rgba(0,0,0,.5);
+  background:
+    radial-gradient(130% 90% at 50% -20%,var(--accent-soft),transparent 55%),
+    linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px),
+    linear-gradient(180deg,var(--surface),var(--bg-2));
+  background-size:auto,27px 27px,27px 27px,auto;
+}
+.watermark{
+  position:absolute;left:0;right:0;bottom:14px;text-align:center;
+  font-family:var(--display);font-weight:var(--display-w);font-size:32px;
+  letter-spacing:.2em;color:rgba(255,255,255,.045);
+  text-transform:uppercase;pointer-events:none;
+}
+
+.room{position:absolute;border-radius:11px;background:linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1.5px solid var(--line-2);color:var(--text-3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;padding:4px;font-size:9.5px;font-weight:500;line-height:1.15;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.room .ic{width:16px;height:16px;opacity:.7}
+.room.stairs{background:repeating-linear-gradient(58deg,transparent,transparent 5px,rgba(255,255,255,.07) 5px,rgba(255,255,255,.07) 6px);border-color:var(--line-2)}
+
+.seats{position:absolute;left:5px;right:5px;display:flex;justify-content:space-around;pointer-events:none;z-index:1}
+.seats.top{top:-8px}
+.seats.bottom{bottom:-8px}
+.seat{width:9px;height:5px;border-radius:3px;background:var(--line-2)}
+.chip.lounge .seat{background:var(--lounge-bd)}
+.chip.mesa .seat{background:var(--mesa-bd)}
+
+.chip{position:absolute;height:52px;border-radius:14px;border:1px solid var(--line);padding:7px 9px;display:flex;flex-direction:column;justify-content:center;gap:2px;background:var(--surface-2);transition:transform .1s,box-shadow .12s}
+.chip:active{transform:scale(.95)}
+.chip.sel{box-shadow:0 0 0 2px var(--accent),0 10px 26px var(--glow);z-index:8}
+.chip.sel .seat{background:var(--accent-2)}
+.chip .id,.chip .nm,.chip .num{position:relative;z-index:2}
+.chip .id{font-size:9px;font-weight:600;letter-spacing:.04em;opacity:.7}
+.chip .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.lounge{background:linear-gradient(160deg,var(--lounge-bg),transparent);border-color:var(--lounge-bd);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 4px 14px var(--accent-soft)}
+.chip.lounge .id,.chip.lounge .nm{color:var(--lounge)}
+.chip.mesa{background:linear-gradient(160deg,var(--mesa-bg),transparent);border-color:var(--mesa-bd);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 4px 14px rgba(34,211,238,.1)}
+.chip.mesa .id,.chip.mesa .nm{color:var(--mesa)}
+.chip.free{background:rgba(255,255,255,.018);border-style:dashed;border-color:var(--line-2)}
+.chip.free .id{color:var(--text-3)}
+.chip.free .nm{color:var(--text-2);font-weight:500}
+.chip.narrow{align-items:center;justify-content:center;gap:0}
+.chip .num{font-family:var(--mono);font-weight:700;font-size:16px}
+.chip .num.sm{font-size:13px;font-weight:600}
+.chip.free .num{color:var(--text-2)}
+.chip .relmark{position:absolute;top:-7px;right:-7px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:#0A0A10;box-shadow:0 0 0 2px var(--bg-2),0 2px 4px rgba(0,0,0,.45);z-index:5}
+.chip .cat-dot{position:absolute;top:7px;right:8px;width:6px;height:6px;border-radius:50%}
+.chip.free.l .cat-dot{background:var(--lounge)}
+.chip.free.m .cat-dot{background:var(--mesa)}
+
+.legend{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:13px 8px 4px;font-size:12px;color:var(--text-2)}
+.legend .sw{display:inline-block;width:11px;height:11px;border-radius:4px;margin-right:5px;vertical-align:-1px}
+.sw.lounge{background:var(--lounge-bg);border:1px solid var(--lounge-bd)}
+.sw.mesa{background:var(--mesa-bg);border:1px solid var(--mesa-bd)}
+.sw.free{border:1px dashed var(--line-2)}
+.legend .hint{margin-left:auto;color:var(--text-3);font-size:11.5px}
+
+/* ---------- TABBAR ---------- */
+.tabbar{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:var(--col);
+  height:calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);display:flex;
+  background:color-mix(in srgb,var(--bg) 90%,transparent);
+  backdrop-filter:blur(16px);border-top:1px solid var(--line);z-index:30;
+}
+.tabbar button{flex:1;border:none;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;font-weight:500;color:var(--text-3);transition:color .15s}
+.tabbar button .ic{width:22px;height:22px}
+.tabbar button.on{color:var(--accent-2)}
+
+/* ---------- SHEET ---------- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:.2s;z-index:40}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(103%);
+  width:100%;max-width:var(--col);background:var(--surface-2);
+  border:1px solid var(--line);border-bottom:none;border-radius:24px 24px 0 0;
+  padding:8px 20px calc(26px + env(safe-area-inset-bottom));z-index:50;
+  transition:transform .28s cubic-bezier(.32,.72,0,1);max-height:82dvh;overflow-y:auto;
+}
+.sheet.open{transform:translateX(-50%) translateY(0)}
+.grab{width:42px;height:4px;border-radius:2px;background:var(--line-2);margin:4px auto 16px}
+
+.sh-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sh-tag{font-size:12px;color:var(--text-2)}
+.pill{font-size:11px;padding:4px 11px;border-radius:20px;font-weight:600}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.free{background:var(--accent-soft);color:var(--accent-2)}
+.sh-name{font-family:var(--display);font-size:24px;font-weight:var(--display-w);letter-spacing:var(--display-tr);margin:2px 0 6px}
+.sh-meta{font-size:14px;color:var(--text-2)}
+.sh-rel{font-size:13px;color:var(--text-3);margin:4px 0 16px;display:flex;align-items:center;gap:7px}
+.sh-rel .relmark{position:static;width:20px;height:20px;font-size:10px}
+
+.field label{display:block;font-size:12px;color:var(--text-2);margin-bottom:6px;font-weight:500}
+input,select,textarea{
+  width:100%;background:var(--bg-2);border:1px solid var(--line-2);
+  border-radius:var(--r-sm);padding:13px 14px;color:var(--text);
+  font-size:15px;font-family:inherit;transition:border-color .15s,box-shadow .15s;
+}
+textarea{min-height:74px;resize:vertical}
+input::placeholder{color:var(--text-3)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field{margin-bottom:12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+/* min-width:0 — sin esto las celdas de un grid usan `auto`, que es el ANCHO
+   MÍNIMO DEL CONTENIDO: un input date/time nativo pide bastante más que
+   media pantalla de celular y empuja la columna fuera del sheet. */
+.row2>.field{margin-bottom:0;min-width:0}
+.row2>.field input,.row2>.field select{min-width:0}
+
+/* Un datetime-local no entra en media columna de celular: su contenido
+   nativo (dd/mm/aaaa --:--) tiene ancho propio y se sale de la hoja.
+   En pantallas chicas los pares Desde/Hasta pasan a una sola columna. */
+@media(max-width:520px){
+  .row2:has(input[type="datetime-local"]),
+  .row2:has(input[type="date"]),
+  .row2:has(input[type="time"]){grid-template-columns:1fr;gap:12px}
+  .row2:has(input[type="datetime-local"])>.field{margin-bottom:0}
+}
+/* Respaldo para navegadores sin :has() — que el input nunca desborde. */
+input[type="datetime-local"],input[type="date"],input[type="time"]{
+  max-width:100%;min-width:0;
+}
+
+.btn{
+  width:100%;border:none;border-radius:14px;padding:15px;font-size:15px;
+  font-weight:600;font-family:var(--ui);letter-spacing:.005em;
+  transition:transform .1s,filter .15s;
+}
+.btn.primary{
+  background:linear-gradient(145deg,var(--accent),var(--accent-2));
+  color:#fff;box-shadow:0 10px 26px -10px var(--glow);
+}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.primary:active{filter:brightness(.95);transform:scale(.99)}
+.btn.danger{background:var(--danger-bg);color:var(--danger);border:1px solid rgba(251,113,133,.32)}
+.btn.ghost2{background:var(--surface);color:var(--text);border:1px solid var(--line-2);box-shadow:none}
+.btn.wa{background:#1FAA53;color:#fff;box-shadow:0 8px 20px -8px rgba(31,170,83,.6)}
+.assigned{background:var(--accent-soft);border:1px solid var(--lounge-bd);border-radius:var(--r-sm);padding:12px 14px;font-size:13.5px;color:var(--accent-2);margin-bottom:14px;display:flex;align-items:center;gap:9px}
+
+.sh-h{font-family:var(--display);font-weight:var(--display-w);letter-spacing:var(--display-tr);font-size:19px;margin:2px 0 10px;display:flex;justify-content:space-between;align-items:center}
+.sh-h .r-sub{font-size:12.5px;color:var(--text-2);font-weight:400;font-family:var(--ui);letter-spacing:0}
+.screen{padding:0 18px 24px}
+.list-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 4px;border-bottom:1px solid var(--line);font-size:14px}
+.list-row:last-child{border-bottom:none}
+.list-row .r-l{display:flex;align-items:center;gap:11px;min-width:0}
+.r-l>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list-row .r-id{font-family:var(--mono);font-weight:600;font-size:12px;color:var(--text-3);min-width:30px}
+.list-row .r-sub{color:var(--text-2);font-size:12.5px;text-align:right;flex-shrink:0}
+.relmark{
+  width:22px;height:22px;border-radius:50%;display:grid;place-items:center;
+  font-size:10px;font-weight:700;color:#0A0A10;flex-shrink:0;
+  background:linear-gradient(140deg,var(--accent),var(--accent-2));
+}
+.empty{color:var(--text-3);text-align:center;padding:26px 10px;font-size:13.5px}
+.empty .ic{width:34px;height:34px;margin:0 auto 10px;display:block;color:var(--text-3);opacity:.55}
+
+.checkin{
+  background:var(--ok-bg);border:1px solid var(--ok-bd);color:var(--ok);
+  border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:600;
+  flex-shrink:0;transition:filter .15s;
+}
+.checkin:active{filter:brightness(1.15)}
+.xdel{background:none;border:none;color:var(--text-3);padding:6px;display:grid;place-items:center}
+.xdel .ic{width:15px;height:15px}
+.guest-add{display:flex;gap:9px;margin-bottom:14px}
+.guest-add input{flex:1}
+.guest-add button{background:linear-gradient(145deg,var(--accent),var(--accent-2));border:none;border-radius:var(--r-sm);color:#fff;width:50px;display:grid;place-items:center;flex-shrink:0}
+.guest-add button .ic{width:20px;height:20px;stroke-width:2.2}
+.chipname{display:inline-flex;align-items:center;gap:7px;background:var(--surface-3);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:0 0 8px;justify-content:space-between}
+.chipname button{background:none;border:none;color:var(--text-3);display:grid;place-items:center}
+.chipname button .ic{width:15px;height:15px}
+
+.acct{text-align:center;padding:12px 0 4px}
+.acct .avatar{width:56px;height:56px;font-size:17px;margin:0 auto 12px;background:var(--accent-soft);color:var(--accent-2);border-color:var(--lounge-bd)}
+.acct .an{font-family:var(--display);font-weight:var(--display-w);letter-spacing:var(--display-tr);font-size:20px}
+.acct .as{font-size:13px;color:var(--text-2);margin-top:3px}
+.acct .btn{margin-top:20px;background:var(--surface-3);color:var(--text);box-shadow:none}
+
+.err{background:var(--danger-bg);color:var(--danger);border:1px solid rgba(251,113,133,.3);border-radius:11px;padding:11px 14px;font-size:13px;margin-bottom:12px}
+.setupbox{background:var(--surface);border:1px solid var(--warn);border-radius:14px;padding:16px;font-size:13px;color:var(--text-2);max-width:420px;line-height:1.6}
+.setupbox code{color:var(--warn);font-size:12px;font-family:var(--mono)}
+
+/* ---------- SCANNER (guardia) ---------- */
+.scanwrap{padding:0 18px}
+.viewfinder{position:relative;height:250px;border-radius:var(--r-lg);background:#05050A;border:2px solid var(--line-2);overflow:hidden;display:grid;place-items:center;margin-bottom:12px}
+.viewfinder video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.vf-frame{position:absolute;width:150px;height:150px;border-radius:18px;border:2px solid var(--ok);box-shadow:0 0 0 9999px rgba(0,0,0,.55)}
+.vf-frame::before{content:"";position:absolute;left:10px;right:10px;height:2px;border-radius:2px;background:var(--ok);opacity:.75;animation:scanline 2.4s ease-in-out infinite}
+@keyframes scanline{0%,100%{top:10%}50%{top:86%}}
+.vf-hint{position:absolute;bottom:13px;left:0;right:0;text-align:center;font-size:12px;color:var(--text-2);z-index:2;padding:0 16px}
+.vf-flash{position:absolute;inset:0;opacity:0;transition:opacity .18s;pointer-events:none;z-index:3}
+.vf-flash.ok{background:rgba(52,211,153,.5);opacity:1}
+.vf-flash.warn{background:rgba(251,191,36,.5);opacity:1}
+.vf-flash.bad{background:rgba(251,113,133,.5);opacity:1}
+.scan-actions{display:flex;gap:9px}
+.scan-actions .btn.primary{flex:2}
+.scan-actions .btn.ghost2{flex:1;display:flex;align-items:center;justify-content:center;gap:6px}
+.manual{display:flex;gap:9px;margin:12px 0 4px}
+.manual input{flex:1;text-transform:uppercase;font-family:var(--mono);letter-spacing:.08em}
+.manual button{background:var(--surface-3);border:1px solid var(--line-2);border-radius:var(--r-sm);color:var(--text);font-size:14px;font-weight:600;padding:0 18px}
+.res{border-radius:var(--r);padding:14px 15px;display:flex;gap:12px;align-items:center;margin-top:10px;animation:pop .18s ease-out}
+@keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+.res .ic{width:26px;height:26px;flex-shrink:0}
+.res .big{font-size:16.5px;font-weight:600}
+.res .sub{font-size:12.5px;color:var(--text-2);margin-top:1px}
+.res.ok{background:var(--ok-bg);border:1px solid var(--ok-bd);color:var(--ok)}
+.res.warn{background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--warn)}
+.res.bad{background:var(--danger-bg);border:1px solid rgba(251,113,133,.35);color:var(--danger)}
+.demo-tk{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:8px}
+.demo-tk button{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:10px 13px;font-size:12.5px;color:var(--text-2);display:flex;align-items:center;gap:8px}
+.st{display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.st.ok{background:var(--ok)}
+.st.used,.st.warn{background:var(--warn)}
+.st.bad{background:var(--danger)}
+
+/* ---------- TICKET QR ---------- */
+/* La entrada es lo único que el cliente se lleva: es donde la identidad
+   del local se expresa con más fuerza. */
+.ticket{position:relative;border-radius:20px;overflow:hidden;margin:2px 0 12px;border:1px solid var(--line-2);box-shadow:0 16px 38px rgba(0,0,0,.5)}
+.tk-head{display:flex;align-items:center;justify-content:space-between;padding:15px 18px}
+.tk-brand{display:flex;align-items:center;gap:9px;font-size:21px}
+.tk-brand .mk-ic{width:22px;height:22px}
+.tk-when{font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;opacity:.85}
+.tk-strip{display:flex;align-items:center;gap:12px;padding:13px 20px 0}
+.tk-strip::before,.tk-strip::after{content:"";flex:1;height:1px;background:currentColor;opacity:.28}
+.tk-strip span{font-size:10px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;opacity:.8;padding-left:.42em}
+.tk-body{position:relative;display:flex;flex-direction:column;align-items:center;gap:11px;padding:14px 26px 20px}
+.tk-wm{position:absolute;left:-34px;bottom:-14px;opacity:.07;transform:rotate(12deg);pointer-events:none}
+.tk-wm .mk-ic{width:170px;height:170px}
+.tk-serial{position:absolute;right:8px;top:50%;transform:translateY(-50%);writing-mode:vertical-rl;font-family:var(--mono);font-size:8.5px;letter-spacing:.3em;color:rgba(255,255,255,.32);white-space:nowrap}
+.tk-combo{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:20px;border:1px dashed;margin-top:2px}
+.tk-combo .ic{width:15px;height:15px}
+.qrbox{background:#fff;padding:12px;border-radius:14px;line-height:0}
+.qrbox svg{display:block}
+.tk-code{font-family:var(--mono);font-weight:700;font-size:21px;letter-spacing:.16em}
+.tk-nm{font-size:15.5px;color:#fff;font-weight:600;margin-top:-4px}
+.cmini{font-style:normal;color:var(--text-3);font-size:12px;margin-left:5px}
+.tk-perf{position:relative;height:0;border-top:2px dashed rgba(255,255,255,.22)}
+.tk-perf::before,.tk-perf::after{content:"";position:absolute;top:-11px;width:22px;height:22px;border-radius:50%;background:var(--surface-2)}
+.tk-perf::before{left:-11px}
+.tk-perf::after{right:-11px}
+.tk-stub{display:flex;align-items:center;justify-content:space-between;padding:12px 18px 14px;font-size:11.5px}
+.tk-seal{display:flex;align-items:center;gap:6px;font-weight:600}
+.tk-seal .ic{width:15px;height:15px}
+.tk-by{color:rgba(255,255,255,.6)}
+
+/* Identidad del boliche en el ticket: el color sale de los tokens de
+   marca (ya inyectados en #app por aplicarTemaClub), no de un literal
+   por nombre de local. */
+.ticket.t-club{background:linear-gradient(180deg,var(--surface-elevated),var(--background))}
+.ticket.t-club .tk-head{background:linear-gradient(135deg,var(--brand-tint),var(--brand-soft));border-bottom:2px solid var(--brand-primary)}
+.ticket.t-club .tk-brand{font-family:var(--display);font-weight:var(--display-w);letter-spacing:var(--display-tr)}
+.ticket.t-club .tk-when{color:var(--brand-secondary)}
+.ticket.t-club .qrbox{box-shadow:0 0 0 3px var(--brand-primary),0 0 0 6px var(--brand-glow)}
+.ticket.t-club .tk-code{color:var(--brand-secondary)}
+.ticket.t-club .tk-seal{color:var(--brand-accent)}
+.ticket.t-club .tk-strip{color:var(--brand-secondary)}
+.ticket.t-club .tk-combo{color:var(--brand-accent);border-color:var(--brand-glow);background:var(--brand-tint)}
+
+.tk-actions{display:flex;gap:9px;width:100%;margin-bottom:6px}
+.tk-actions .btn{flex:1;padding:12px;display:flex;align-items:center;justify-content:center;gap:7px}
+.tk-actions .btn .ic{width:17px;height:17px}
+.tkst{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
+.tkst.ok{background:var(--ok-bg);color:var(--ok)}
+.tkst.used{background:var(--warn-bg);color:var(--warn)}
+
+/* ---------- BARRA · resumen de botellas ---------- */
+.botgrid{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 4px}
+.botpill{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:9px 13px 9px 9px;font-size:13.5px;font-weight:500}
+.botpill .bq{min-width:24px;height:24px;padding:0 6px;border-radius:8px;background:var(--accent-soft);color:var(--accent-2);font-family:var(--mono);font-weight:700;font-size:13px;display:grid;place-items:center}
+
+/* ---------- CATÁLOGO / PRECIOS ---------- */
+.cat-note{font-size:12.5px;color:var(--text-2);margin:0 2px 14px;line-height:1.5}
+.cat-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px 15px;margin-bottom:9px}
+.cat-nm{font-size:15px;font-weight:600}
+.cat-sub{font-size:12px;color:var(--text-2);margin-top:2px}
+.cat-price{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.cat-price input{width:92px;text-align:right;padding:10px 11px;font-family:var(--mono);font-weight:700;font-size:15px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;color:var(--text)}
+.cat-price span{color:var(--text-2);font-size:13px;font-weight:600}
+
+/* ---------- TOASTS ---------- */
+.toast-wrap{position:fixed;left:50%;bottom:calc(var(--nav-h) + 18px);transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{background:var(--surface-3);border:1px solid var(--line-2);color:var(--text);font-size:13.5px;font-weight:500;padding:11px 17px;border-radius:var(--r-sm);box-shadow:0 12px 30px rgba(0,0,0,.5);opacity:0;transform:translateY(12px);transition:.24s;display:flex;align-items:center;gap:9px}
+.toast.show{opacity:1;transform:none}
+.toast .ic{width:17px;height:17px}
+.toast.ok{border-color:var(--ok-bd)}
+.toast.ok .ic{color:var(--ok)}
+.toast.warn{border-color:var(--warn-bd)}
+.toast.warn .ic{color:var(--warn)}
+@media(min-width:900px){.toast-wrap{bottom:26px}}
+
+/* ---------- SELECTOR DE LOCAL ---------- */
+.club-menu{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding-top:calc(env(safe-area-inset-top) + 82px)}
+.club-menu.show{display:flex}
+.cm-card{width:min(90%,var(--col));background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:8px}
+.cm-card button{display:flex;align-items:center;gap:13px;width:100%;background:none;border:none;padding:15px 13px;border-radius:13px;font-size:16px;font-weight:500;color:var(--text);transition:background .15s}
+.cm-card button:hover,.cm-card button:active{background:var(--surface-3)}
+.cm-card small{color:var(--text-3);font-size:12px;font-weight:400;margin-left:auto}
+.cm-card .mk{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-family:var(--display);font-weight:var(--display-w);color:#fff;background:linear-gradient(145deg,var(--mk-p,var(--brand-primary)),var(--mk-s,var(--brand-secondary)))}
+
+/* ---------- ESCRITORIO (≥900px) ---------- */
+@media(min-width:900px){
+  .app{max-width:1240px;border:none;padding-left:254px;padding-right:28px;padding-bottom:40px}
+
+  .tabbar{
+    position:absolute;left:0;right:auto;top:0;bottom:0;transform:none;
+    width:230px;max-width:none;height:auto;flex-direction:column;
+    justify-content:flex-start;align-items:stretch;gap:5px;
+    padding:92px 14px 24px;background:transparent;backdrop-filter:none;
+    border-top:none;border-right:1px solid var(--line);
+  }
+  .tabbar::before{content:"Puerta";position:absolute;top:30px;left:28px;font-family:var(--display);font-weight:var(--display-w);letter-spacing:var(--display-tr);font-size:22px;color:var(--text)}
+  .tabbar::after{content:"Venue";position:absolute;top:60px;left:28px;font-size:11.5px;color:var(--text-3)}
+  .tabbar button{flex:0 0 auto;flex-direction:row;justify-content:flex-start;gap:12px;padding:12px 15px;border-radius:var(--r-sm);font-size:14px;font-weight:500;color:var(--text-2);transition:background .15s,color .15s}
+  .tabbar button:hover{background:var(--surface)}
+  .tabbar button.on{background:var(--accent-soft);color:var(--accent-2)}
+  .tabbar button .ic{width:20px;height:20px}
+
+  .appbar{padding-top:26px;background:none}
+
+  .sheet{left:auto;right:0;top:0;bottom:0;width:460px;max-width:460px;transform:translateX(105%);border-radius:0;border-top:none;border-left:1px solid var(--line-2);max-height:none;padding:26px 26px 30px;box-shadow:-24px 0 60px rgba(0,0,0,.5)}
+  .sheet.open{transform:translateX(0)}
+  .grab{display:none}
+
+  .canvas{min-width:0}
+  .watermark{font-size:48px;bottom:20px}
+  .chip{height:56px;border-radius:15px}
+  .chip .nm{font-size:12.5px}
+  .planwrap{padding:0}
+  .plan-head{padding:2px 4px 12px}
+  .stats{padding:0 0 18px;gap:12px}
+  .stat .v{font-size:26px}
+  .floors{margin:6px 0 18px;max-width:460px}
+
+  .scanwrap{max-width:620px;margin:0 auto;padding:0}
+  .viewfinder{height:360px}
+
+  .login-brand h1{font-size:34px}
+  .roles{max-width:980px;flex-direction:row;align-items:stretch;gap:16px}
+  .rolecard{flex:1;flex-direction:column;text-align:center;gap:14px;padding:30px 20px}
+  .rc-body{align-items:center;gap:6px}
+  .rc-d{font-size:13px;max-width:230px}
+  .rc-ic{width:54px;height:54px;border-radius:16px}
+  .rc-ic .ic{width:26px;height:26px}
+  .rc-chev{display:none}
+  .club-menu{padding-top:120px}
+}
+
+/* ---------- LISTAS · PAGOS · COMISIONES ---------- */
+.hint{font-size:12px;color:var(--text-3);line-height:1.5}
+.hoy-badge{background:var(--ok);color:#052E1F;font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;margin-left:2px;letter-spacing:.04em}
+.lst-card{border:1px solid var(--line-2);border-radius:14px;margin-bottom:10px;background:var(--surface-2);overflow:hidden}
+.lst-card.open{border-color:var(--accent)}
+
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+
+/* ===================================================================
+   LISTAS · PAGOS · COMISIONES · EVENTOS
+   =================================================================== */
+
+.lst-head{display:flex;align-items:center;gap:8px;padding:13px 14px;cursor:pointer;user-select:none}
+.lst-head:active{background:var(--surface-3)}
+.lst-nm{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lst-cnt{font-size:11.5px;color:var(--text-2);background:var(--surface-3);border-radius:20px;padding:3px 9px;white-space:nowrap;flex-shrink:0}
+.lst-cnt.ok{color:var(--ok)}
+.lst-cnt b{font-size:13px;font-family:var(--mono);font-weight:700}
+.lst-tar{font-size:10.5px;color:var(--warn);border:1px solid var(--warn-bd);border-radius:20px;padding:2px 8px;flex-shrink:0}
+.lst-body{padding:10px 14px 14px;border-top:1px solid var(--line-2)}
+.lst-ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex-shrink:0;background:var(--accent-soft);color:var(--accent-2)}
+.lst-ic svg{width:20px;height:20px}
+.lst-menu{background:none;border:none;color:var(--text-3);font-size:21px;line-height:1;padding:2px 4px 6px;flex-shrink:0;font-weight:700;border-radius:8px}
+.lst-menu:active{color:var(--text);background:var(--surface-3)}
+
+/* Estado de pago: rojo hasta verificar, verde una vez confirmado. */
+.pago-chip{font-size:10.5px;font-weight:700;border-radius:20px;padding:3px 9px;flex-shrink:0;letter-spacing:.03em}
+.pago-chip.pendiente{background:var(--warn-bg);color:var(--warn)}
+.pago-chip.pagado{background:rgba(251,113,133,.16);color:var(--danger)}
+.pago-chip.verificado{background:var(--ok-bg);color:var(--ok)}
+
+/* El voucher es papel: fondo claro a propósito, se imprime y se comparte. */
+.voucher{background:#F7F3EE;color:#1C1720;border-radius:var(--r);padding:18px;text-align:center}
+.voucher .v-head{font-weight:700;font-size:12px;letter-spacing:.1em;color:#8A8378;text-transform:uppercase}
+.voucher .v-monto{font-family:var(--mono);font-size:34px;font-weight:700;margin:4px 0 14px;font-variant-numeric:tabular-nums}
+.voucher .v-line{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:8px 0;border-top:1px dashed #D8D2CA;color:#8A8378}
+.voucher .v-line b{color:#1C1720;text-align:right;font-weight:600}
+.com-total{background:rgba(251,113,133,.14);color:var(--danger);border:1px solid rgba(251,113,133,.35);border-radius:var(--r-sm);padding:12px;text-align:center;font-weight:700;margin-top:12px;font-family:var(--mono)}
+.com-row input{width:78px;padding:8px 6px;border-radius:9px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text);text-align:center;font-size:14px;flex-shrink:0;font-family:var(--mono)}
+
+/* ---------- EVENTO (hero) ---------- */
+.ev-hero{position:relative;border-radius:20px;padding:20px;border:1px solid var(--line-2);background:linear-gradient(150deg,var(--surface-2),var(--surface));overflow:hidden}
+.ev-hero::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(130% 95% at 88% -12%,var(--accent-soft),transparent 55%)}
+.ev-hero>*{position:relative}
+.eh-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.eh-mark .mk-ic{width:26px;height:26px}
+.eh-name{
+  font-family:var(--display);font-weight:var(--display-w);
+  font-size:30px;line-height:1.04;letter-spacing:var(--display-tr);
+  margin-bottom:6px;word-break:break-word;text-transform:uppercase;
+}
+.eh-meta{font-size:12.5px;color:var(--text-2);margin-bottom:15px}
+.eh-counts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.eh-cnt{
+  position:relative;overflow:hidden;display:flex;flex-direction:column;gap:3px;
+  align-items:center;background:var(--surface-3);border:1px solid var(--line-2);
+  border-radius:var(--r-sm);padding:12px 3px 10px;font-size:9px;font-weight:700;
+  letter-spacing:.07em;color:var(--text-3);cursor:pointer;text-transform:uppercase;
+}
+.eh-cnt b{font-size:20px;font-family:var(--mono);font-weight:700;color:var(--text)}
+.eh-cnt:active{transform:scale(.97)}
+.eh-cnt::after{content:"";position:absolute;left:20%;right:20%;bottom:0;height:2px;border-radius:2px;background:currentColor;opacity:.55;filter:blur(1.2px)}
+.eh-ic{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;margin:0 auto 5px;background:var(--accent-soft);color:var(--accent-2)}
+.eh-ic svg{width:17px;height:17px}
+.eh-cnt.vio{border-color:var(--lounge-bd);background:linear-gradient(180deg,var(--accent-soft),transparent);color:var(--accent-2)}
+.eh-cnt.vio b{color:#fff}
+.eh-cnt.amber{border-color:var(--warn-bd);background:linear-gradient(180deg,var(--warn-bg),transparent);color:var(--warn)}
+.eh-cnt.amber b{color:var(--warn)}
+.eh-cnt.amber .eh-ic{background:var(--warn-bg);color:var(--warn)}
+.eh-cnt.ok{border-color:var(--ok-bd);background:linear-gradient(180deg,var(--ok-bg),transparent);color:var(--ok)}
+.eh-cnt.ok b{color:var(--ok)}
+.eh-cnt.ok .eh-ic{background:var(--ok-bg);color:var(--ok)}
+
+/* ---------- NUEVO CLIENTE (2 pasos) ---------- */
+.nc-lista{display:flex;justify-content:space-between;align-items:center;width:100%;padding:16px;margin-bottom:9px;border-radius:14px;border:1px solid var(--line-2);background:var(--surface-2);color:var(--text);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+.nc-lista:active{transform:scale(.985)}
+.nc-cnt{background:var(--warn-bg);color:var(--warn);border-radius:20px;padding:4px 13px;font-weight:700;font-size:14px;font-family:var(--mono)}
+.nc-steps{display:flex;gap:6px;flex-wrap:wrap}
+.nc-steps button{width:41px;height:41px;border-radius:11px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-2);font-size:15px;font-weight:600;cursor:pointer;font-family:var(--mono)}
+.nc-steps button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
+.nc-back{background:var(--surface-3);border:1px solid var(--line-2);border-radius:9px;color:var(--text);width:30px;height:30px;cursor:pointer;margin-right:8px;font-size:15px}
+
+/* ---------- CHECK-IN EN PUERTA ---------- */
+/* Objetivo tactil grande: se toca a oscuras, con apuro y a veces con guantes. */
+.cebox{width:32px;height:32px;border-radius:9px;border:1.9px solid var(--line-2);background:var(--surface-3);display:grid;place-items:center;font-size:16px;font-weight:800;color:transparent;flex-shrink:0;cursor:pointer;padding:0;transition:transform .1s,background .15s}
+.cebox:active{transform:scale(.9)}
+.cebox.on{background:rgba(52,211,153,.2);border-color:var(--ok);color:var(--ok)}
+.ce-time{font-size:10.5px;color:var(--ok);margin-right:2px;font-family:var(--mono)}
+
+.live-badge{background:var(--ok);color:#052E1F;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;margin-left:2px;letter-spacing:.03em;animation:livePulse 1.6s ease-in-out infinite}
+@keyframes livePulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+.ordbtn{width:26px;height:20px;border:1px solid var(--line-2);background:var(--surface-3);color:var(--text-2);border-radius:6px;font-size:10px;line-height:1;cursor:pointer;padding:0}
+.ordbtn:disabled{opacity:.3;cursor:default}
+.ordbtn:active:not(:disabled){background:var(--surface)}
+
+#btnFiltro{position:relative}
+#btnFiltro.filtro-on::after{content:"";position:absolute;top:7px;right:9px;width:5px;height:5px;border-radius:50%;background:var(--text-3);opacity:.6}
+
+/* Marca de atencion en puerta: rojo, y tambien con simbolo, nunca solo color. */
+.flagbtn{background:var(--surface-3);border:1px solid var(--line-2);color:var(--text-3);border-radius:10px;padding:7px 11px;font-size:14px;line-height:1;flex-shrink:0}
+.flagbtn.on{background:var(--danger-bg);border-color:rgba(251,113,133,.4);color:var(--danger)}
+.flagbtn:active{filter:brightness(1.15)}
+.row-filtro{background:var(--danger-bg);border-radius:var(--r-sm)}
+.flag-badge{font-size:10.5px;font-weight:700;color:var(--danger);background:var(--danger-bg);border:1px solid rgba(251,113,133,.35);padding:2px 7px;border-radius:20px;white-space:nowrap}
+.pill-club{font-size:11px;font-weight:600;color:var(--text-2);background:var(--surface-3);border:1px solid var(--line-2);padding:6px 10px;border-radius:10px;align-self:center;flex-shrink:0}
+
+.seg{display:flex;gap:6px}
+.segbtn{flex:1;background:var(--surface-2);border:1px solid var(--line-2);color:var(--text-2);border-radius:10px;padding:11px;font-size:13px;font-weight:600;font-family:var(--ui);transition:background .15s,border-color .15s,color .15s}
+.segbtn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-2)}
+
+/* Lista de checkboxes para elegir N boliches (reemplaza el segmented
+   control de 3 opciones fijas, que solo alcanzaba para 2 locales). */
+.chk-group{display:flex;flex-direction:column;gap:8px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:10px;padding:10px 12px}
+.chk-group .chk{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--text);cursor:pointer}
+.chk-group .chk input{width:17px;height:17px;accent-color:var(--accent)}
+
+/* Inicial del boliche en texto, dentro de .club-mark (reemplaza el SVG
+   a medida que antes cubría solo 2 locales fijos). */
+.club-mark-txt{line-height:1}
+
+.cv-fondo{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;object-position:center;opacity:.55;pointer-events:none;user-select:none}
+.canvas.editmode .cv-fondo{opacity:.65}
+
+/* ---------- ELEGIR BOLICHE ---------- */
+/* Cada tarjeta muestra su propia identidad: con varios boliches, cada
+   uno tiene que distinguirse solo por su color. */
+/* Selector de boliche en la identidad VENUE: negro pleno, marca arriba,
+   tarjetas neutras que se ENCIENDEN con el color propio de cada boliche
+   al pasar/enfocar (via --mk-p/--mk-s inline, ver .cp-card) — el color
+   vive en el boliche, no en el fondo de la plataforma. */
+.clubpick{
+  position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:#000;
+}
+.cp-inner{width:100%;max-width:412px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.cp-brand{display:flex;flex-direction:column;align-items:center;margin-bottom:34px}
+.cp-logo{
+  font-family:var(--ui);font-size:30px;font-weight:700;color:#fff;
+  letter-spacing:.42em;margin-right:-.42em;line-height:1;
+}
+.cp-tag{
+  font-size:9.5px;font-weight:500;color:#7a7a83;text-transform:uppercase;
+  letter-spacing:.24em;margin-right:-.24em;margin-top:9px;
+}
+.cp-h{font-family:var(--ui);font-weight:700;font-size:23px;margin-bottom:5px;letter-spacing:-.02em;color:#fff}
+.cp-sub{color:#7a7a83;font-size:13.5px;margin-bottom:26px}
+.cp-cards{display:flex;flex-direction:column;gap:12px;width:100%}
+.cp-card{
+  position:relative;display:flex;align-items:center;gap:16px;
+  padding:18px 18px;border-radius:16px;border:1px solid #232329;
+  background:#0c0c0f;text-align:left;overflow:hidden;cursor:pointer;
+  transition:transform .12s var(--ease),border-color .2s,background .2s,box-shadow .25s;
+}
+.cp-card:active{transform:scale(.985)}
+.cp-txt{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.cp-mark{
+  width:46px;height:46px;flex-shrink:0;display:grid;place-items:center;
+  border-radius:12px;background:#161619;transition:background .2s;
+}
+.cp-mark svg{width:30px;height:30px}
+.cp-name{font-size:27px;line-height:1;color:#fff}
+.cp-cs{font-size:12.5px;color:#6a6a73}
+.cp-arrow{width:20px;height:20px;flex-shrink:0;fill:none;stroke:#3a3a40;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;transition:stroke .2s,transform .2s}
+.cp-card:hover .cp-arrow,.cp-card:focus-visible .cp-arrow{transform:translateX(3px)}
+
+/* Encendido genérico: cada card trae su color propio inline (--mk-p/
+   --mk-s, seteados por JS desde los datos del boliche en clubsDisponibles). */
+.cp-card{--mk-p:var(--brand-primary);--mk-s:var(--brand-secondary)}
+.cp-card:hover,.cp-card:focus-visible{
+  border-color:var(--mk-p);background:linear-gradient(120deg,color-mix(in srgb,var(--mk-p) 16%,transparent),#0c0c0f 70%);
+  box-shadow:0 12px 40px -14px color-mix(in srgb,var(--mk-p) 60%,transparent);
+}
+.cp-card:hover .cp-mark,.cp-card:focus-visible .cp-mark{background:color-mix(in srgb,var(--mk-p) 22%,transparent)}
+.cp-card:hover .cp-arrow,.cp-card:focus-visible .cp-arrow{stroke:var(--mk-s)}
+.cp-name{font-family:var(--display);font-weight:var(--display-w);letter-spacing:var(--display-tr)}
+.cp-card:hover .cp-name,.cp-card:focus-visible .cp-name{color:var(--mk-s)}
+
+.cp-out{margin-top:28px;background:none;border:none;color:#5c5c66;font-size:13px;font-weight:600;cursor:pointer}
+.cp-out:hover{color:#9a9aa3}
+
+/* ---------- VENTA DE MESAS EN GRUPO ---------- */
+.chip-pick{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+.mchip{background:var(--surface-2);border:1.5px solid var(--line-2);color:var(--text-2);border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600;font-family:var(--mono);min-width:44px}
+.mchip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-2)}
+.mchip:active{filter:brightness(1.15)}
+
+.qty{display:flex;align-items:center;gap:14px;margin-top:6px}
+.qbtn{width:44px;height:44px;border-radius:var(--r-sm);background:var(--surface-2);border:1.5px solid var(--line-2);color:var(--text);font-size:22px;font-weight:600;display:grid;place-items:center;line-height:1}
+.qbtn:active{filter:brightness(1.2)}
+.qval{font-family:var(--mono);font-weight:700;font-size:22px;min-width:26px;text-align:center}
+.qtot{color:var(--ok);font-weight:600;font-size:14px;margin-left:6px;font-family:var(--mono)}
+
+.row-checked{background:rgba(52,211,153,.08);border-radius:var(--r-sm)}
+
+/* ---------- ICONOS ---------- */
+.ic{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+.stat.st-ok,.stat.st-vio,.stat.st-warn{position:relative}
+.st-ic{position:absolute;top:11px;right:11px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center}
+.st-ic svg{width:16px;height:16px}
+.st-ic.ok{background:var(--ok-bg);color:var(--ok)}
+.st-ic.vio{background:var(--accent-soft);color:var(--accent-2)}
+.st-ic.warn{color:var(--warn)}
+.st-ok{border-color:var(--ok-bd)}
+.st-vio{border-color:var(--lounge-bd)}
+.stat.st-warn{border-color:var(--warn-bd)}
+
+.accbtn{display:flex;align-items:center;justify-content:center;gap:9px}
+.acc-ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#fff;flex-shrink:0}
+.acc-ic svg{width:15px;height:15px}
+
+/* ---------- FILAS COMO TARJETAS ---------- */
+.rc{background:var(--surface-2);border:1px solid var(--line-2)!important;border-radius:15px;padding:12px 13px!important;margin-bottom:9px}
+.rc:active{border-color:var(--accent)!important}
+.rc .r-l{gap:9px!important}
+.code-chip{font-family:var(--mono);font-size:10.5px;color:var(--text-2);background:var(--surface-3);border:1px solid var(--line-2);border-radius:8px;padding:5px 7px;flex-shrink:0;align-self:flex-start;letter-spacing:.04em}
+.rc-body{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+.rc-nm{font-weight:600;font-size:14.5px;line-height:1.2;overflow-wrap:anywhere;white-space:normal}
+.rc-sub{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-3);min-width:0}
+.rc-sub svg{width:12px;height:12px;flex-shrink:0;opacity:.85}
+.rc-sub span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc .ce-time{font-size:11.5px}
+
+/* El nombre completo tiene que leerse: el plano se comparte como foto. */
+.chip{height:auto;min-height:52px}
+.chip .nm{white-space:normal;overflow-wrap:anywhere;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:clip}
+.chip.narrow .nm{font-size:10.5px}
+.chip.e-reservada{border-color:var(--warn-bd)}
+.chip.e-pagada{border-color:var(--ok-bd)}
+.chip.e-pagada.no-verif{border-style:dashed;border-color:var(--warn-bd)}
+.st-dot{position:absolute;top:5px;right:5px;width:9px;height:9px;border-radius:50%}
+.st-dot.reservada{background:var(--warn)}
+.st-dot.pagada{background:var(--ok)}
+.st-dot.ocupada{background:var(--accent-2)}
+.st-dot.no-verif{background:var(--warn)!important}
+
+/* ---------- ENTRADAS INNEGABLES ---------- */
+/* El dorado se mantiene igual en los dos locales: es una categoria de
+   acceso, no una marca. El portero la reconoce sin pensar. */
+.ticket.t-oro{position:relative;box-shadow:0 0 0 3px #E8B530,0 18px 44px -14px rgba(232,181,48,.6)}
+.ticket.t-oro .qrbox{box-shadow:0 0 0 3px #E8B530,0 0 0 6px rgba(255,223,122,.45)}
+.oro-sello{
+  position:absolute;top:-11px;left:50%;transform:translateX(-50%);z-index:3;
+  background:linear-gradient(135deg,#FFE9A3,#E8B530 55%,#FFDF7A);color:#2A1C00;
+  font:800 10px/1 var(--ui);letter-spacing:.18em;padding:7px 15px;border-radius:99px;
+  box-shadow:0 4px 14px rgba(232,181,48,.5);white-space:nowrap;
+}
+.oro-chip{
+  display:inline-block;vertical-align:middle;margin-left:6px;
+  background:rgba(232,181,48,.16);border:1px solid rgba(232,181,48,.5);color:#E8B530;
+  font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  padding:2px 7px;border-radius:99px;
+}
+.code-chip.oro{background:rgba(232,181,48,.16);border-color:rgba(232,181,48,.5);color:#E8B530}
+.list-row.row-oro{border-color:rgba(232,181,48,.4);background:linear-gradient(140deg,rgba(232,181,48,.08),transparent 60%)}
+.amber,.oro{color:#E8B530}
+
+/* ---------- ENVIO POR TANDA ---------- */
+.tk-pick{display:flex;align-items:center;padding:0 2px 0 0;flex-shrink:0;cursor:pointer}
+.tk-pick input{width:20px;height:20px;accent-color:var(--accent);cursor:pointer}
+.tk-tanda{
+  position:sticky;top:6px;z-index:20;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin:0 0 10px;padding:9px 10px 9px 14px;border-radius:14px;
+  background:linear-gradient(140deg,var(--accent-soft),var(--surface-2));
+  border:1px solid var(--lounge-bd);backdrop-filter:blur(8px);
+}
+.tk-tanda.hidden{display:none}
+.tk-tanda span{font:700 13px var(--ui);color:var(--text)}
+.tk-tanda .btn{width:auto;margin:0}
+
+.fase-chip{
+  display:inline-block;vertical-align:middle;margin-left:6px;background:var(--accent-soft);
+  border:1px solid var(--lounge-bd);color:var(--accent-2);font-size:10px;font-weight:800;
+  letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:99px;
+}
+.fase-sello{
+  position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);z-index:3;
+  background:var(--surface-3);border:1px solid var(--line-2);color:var(--text-2);
+  font:800 10px/1 var(--ui);letter-spacing:.16em;padding:6px 13px;border-radius:99px;
+  text-transform:uppercase;white-space:nowrap;
+}
+
+.tag-estado{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
+.tag-estado.proximo{background:var(--accent-soft);color:var(--accent-2)}
+.tag-estado.activo{background:var(--ok-bg);color:var(--ok)}
+.tag-estado.cerrado{background:var(--surface-3);color:var(--text-3)}
+
+/* ===================================================================
+   REFINAMIENTO OPERATIVO
+   Ajustes de jerarquía, legibilidad y superficie táctil.
+   Van al final para ganar por cascada sin tocar las reglas anteriores.
+   =================================================================== */
+
+/* ---------- JERARQUÍA DE ACCIÓN ----------------------------------- */
+/* Nivel 1 · la acción principal de la pantalla. Una sola por vista:
+   si todo pesa igual, nada resalta. */
+.btn{
+  min-height:var(--tap);
+  font-size:15.5px;
+  letter-spacing:.01em;
+  transition:transform var(--t-fast) var(--ease),
+             filter var(--t-fast) var(--ease),
+             box-shadow var(--t) var(--ease);
+}
+.btn.primary{
+  background:linear-gradient(145deg,var(--brand-primary),var(--brand-secondary));
+  color:#fff;
+  box-shadow:0 10px 28px -12px var(--brand-glow),
+             inset 0 1px 0 rgba(255,255,255,.12);
+}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.primary:active{transform:scale(.985);filter:brightness(.95)}
+
+/* El botón de escaneo es el gesto que más se repite en la noche:
+   más alto, con la etiqueta en versalitas para leerse de un vistazo. */
+#btnScan,.btn.scan{
+  min-height:58px;
+  font-size:16px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+/* Nivel 2 · acciones secundarias: presentes, nunca compitiendo. */
+.ghost,.btn.ghost2{
+  min-height:42px;
+  transition:background var(--t-fast) var(--ease),
+             border-color var(--t-fast) var(--ease);
+}
+
+/* ---------- ESTADÍSTICAS ------------------------------------------ */
+/* El número manda; la etiqueta acompaña. Se leen de reojo, en
+   movimiento y con poca luz. */
+.stat{
+  padding:13px 13px 12px;
+  transition:border-color var(--t) var(--ease);
+}
+.stat .k{
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--text-muted);
+}
+.stat .v{
+  font-family:var(--mono);
+  font-size:27px;
+  font-weight:700;
+  line-height:1.05;
+  letter-spacing:-.02em;
+  color:var(--text-primary);
+  font-variant-numeric:tabular-nums;
+}
+.stat .v.ok{color:var(--success)}
+.stat .v.warn{color:var(--warning)}
+
+/* ---------- TARJETA DE PERSONA ------------------------------------ */
+/* Lo que el portero necesita en segundos: nombre, estado, mesa.
+   Nada por debajo de 12px: la pantalla se usa a oscuras y con apuro. */
+.rc{
+  padding:13px 14px!important;
+  border-radius:var(--r);
+  transition:border-color var(--t-fast) var(--ease),
+             background var(--t-fast) var(--ease);
+}
+.rc-nm{
+  font-size:16px;
+  font-weight:600;
+  line-height:1.25;
+  color:var(--text-primary);
+  letter-spacing:-.005em;
+}
+.rc-sub{
+  font-size:12.5px;
+  color:var(--text-secondary);
+  gap:6px;
+}
+/* La metadata (nivel 4) baja de peso, no de tamaño: sigue siendo
+   legible, pero no compite con el nombre. */
+.rc-sub span{color:var(--text-muted)}
+
+/* Estados: siempre color + palabra, nunca color solo. Un portero con
+   daltonismo tiene que poder operar la puerta igual. */
+.pago-chip,.tkst,.pill,.tag-estado{
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  padding:5px 11px;
+  border-radius:20px;
+  white-space:nowrap;
+}
+.pago-chip.verificado{background:var(--success-bg);color:var(--success);border:1px solid var(--success-bd)}
+.pago-chip.pendiente{background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-bd)}
+.pago-chip.pagado{background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-bd)}
+
+/* Hora de ingreso: dato de apoyo, en mono para que alinee entre filas. */
+.ce-time{
+  font-family:var(--mono);
+  font-size:12px;
+  font-weight:500;
+  color:var(--success);
+  font-variant-numeric:tabular-nums;
+}
+
+/* Casilla de check-in: el objetivo táctil más importante de la noche. */
+.cebox{
+  width:var(--tap);
+  height:var(--tap);
+  border-radius:13px;
+  font-size:20px;
+  transition:transform var(--t-fast) var(--ease),
+             background var(--t-fast) var(--ease),
+             border-color var(--t-fast) var(--ease);
+}
+.cebox:active{transform:scale(.92)}
+.cebox.on{
+  background:var(--success-bg);
+  border-color:var(--success);
+  color:var(--success);
+  box-shadow:0 0 0 3px rgba(46,213,115,.12);
+}
+
+/* ---------- EVENTO ACTUAL ----------------------------------------- */
+/* La única pieza donde la marca habla fuerte: es la identidad de la
+   noche. El resplandor queda contenido en la tarjeta. */
+.ev-hero{
+  border-radius:var(--r-lg);
+  padding:22px;
+  background:linear-gradient(150deg,var(--surface-2),var(--surface));
+  border:1px solid var(--border-strong);
+}
+.ev-hero::before{
+  background:radial-gradient(120% 90% at 85% -15%,var(--brand-soft),transparent 58%);
+}
+.eh-name{
+  font-size:clamp(28px,7vw,36px);
+  line-height:1.02;
+  color:var(--text-primary);
+  margin-bottom:7px;
+}
+.eh-meta{font-size:13px;color:var(--text-secondary);margin-bottom:16px}
+.eh-cnt b{font-size:23px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.eh-cnt{
+  padding:13px 4px 11px;
+  font-size:9.5px;
+  letter-spacing:.09em;
+  transition:transform var(--t-fast) var(--ease),
+             border-color var(--t-fast) var(--ease);
+}
+
+/* ---------- NAVEGACIÓN -------------------------------------------- */
+/* El activo se marca por color y por una barra superior: dos señales,
+   no una. */
+.tabbar button{
+  min-height:var(--tap);
+  transition:color var(--t-fast) var(--ease);
+}
+.tabbar button.on{color:var(--brand-secondary)}
+.tabbar button.on::before{
+  content:"";position:absolute;top:0;width:26px;height:2px;border-radius:0 0 3px 3px;
+  background:var(--brand-primary);box-shadow:0 0 12px var(--brand-glow);
+}
+.tabbar button{position:relative}
+
+/* ---------- SELECTOR DE LOCAL ------------------------------------- */
+/* Cuál está activo tiene que leerse sin pensar. */
+.club{
+  border-radius:14px;
+  padding:4px 8px 4px 4px;
+  margin-left:-4px;
+  transition:background var(--t-fast) var(--ease);
+}
+.club:hover{background:var(--brand-tint)}
+.club-mark{
+  box-shadow:0 8px 20px -8px var(--brand-glow),
+             inset 0 1px 0 rgba(255,255,255,.14);
+}
+.cm-card button{min-height:56px;transition:background var(--t-fast) var(--ease)}
+/* La marca del local seleccionado queda anillada en su propio color. */
+.cm-card button[aria-current="true"],.cm-card button.on{
+  background:var(--brand-soft);
+  box-shadow:inset 0 0 0 1px var(--brand-primary);
+}
+
+/* ---------- SUPERFICIES ------------------------------------------- */
+/* Las tarjetas se tiñen apenas con la marca: suficiente para que el
+   local se sienta, lejos de pintar la pantalla. */
+.stat,.rc,.lst-card,.cat-row{
+  background:linear-gradient(160deg,var(--brand-tint),transparent),var(--surface);
+}
+.sheet{background:var(--surface-elevated)}
+.canvas{
+  background:
+    radial-gradient(130% 90% at 50% -20%,var(--brand-soft),transparent 55%),
+    linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px),
+    linear-gradient(180deg,var(--surface-2),var(--background));
+  background-size:auto,27px 27px,27px 27px,auto;
+}
+
+/* ---------- FORMULARIOS ------------------------------------------- */
+input,select,textarea{min-height:var(--tap);transition:border-color var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
+input:focus,select:focus,textarea:focus{border-color:var(--brand-primary);box-shadow:0 0 0 3px var(--brand-soft)}
+
+/* ---------- CONFIRMACIÓN DE ESCANEO ------------------------------- */
+/* El resultado tiene que leerse a un metro de distancia. */
+.res{padding:16px;border-radius:var(--r);gap:13px}
+.res .big{font-size:17.5px;font-weight:700;letter-spacing:-.01em}
+.res .sub{font-size:13px}
+.res.ok{background:var(--success-bg);border-color:var(--success-bd);color:var(--success)}
+.res.warn{background:var(--warning-bg);border-color:var(--warning-bd);color:var(--warning)}
+.res.bad{background:var(--danger-bg);border-color:var(--danger-bd);color:var(--danger)}
+.vf-flash.ok{background:rgba(46,213,115,.45)}
+.vf-flash.warn{background:rgba(255,176,32,.45)}
+.vf-flash.bad{background:rgba(255,59,48,.45)}
+.vf-frame{border-color:var(--success)}
+.vf-frame::before{background:var(--success)}
+
+/* ---------- ESCRITORIO -------------------------------------------- */
+/* No es la versión móvil estirada: el espacio extra se usa para ver
+   más de un dato a la vez. */
+@media(min-width:900px){
+  .stats{grid-template-columns:repeat(4,1fr);gap:13px}
+  .stat{padding:16px}
+  .stat .v{font-size:33px}
+  .stat .k{font-size:10.5px}
+  .eh-name{font-size:42px}
+  .rc{padding:15px 16px!important}
+  .rc-nm{font-size:16.5px}
+  .tabbar button.on::before{top:auto;left:0;width:2px;height:22px;border-radius:0 3px 3px 0}
+  #btnScan,.btn.scan{max-width:340px}
+}
+
+/* ---------- ACCESIBILIDAD ----------------------------------------- */
+:focus-visible{outline:2px solid var(--brand-accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+
+/* ---------- CONFIRMACIÓN DE ACCIONES DESTRUCTIVAS ------------------ */
+/* Un solo diálogo para toda la app. Nombra el elemento y sus
+   consecuencias: el usuario decide con información, no a ciegas. */
+.cfm-scrim{
+  position:fixed;inset:0;z-index:300;
+  display:flex;align-items:flex-end;justify-content:center;
+  padding:16px;
+  background:rgba(0,0,0,.62);
+  backdrop-filter:blur(3px);
+  opacity:0;transition:opacity var(--t) var(--ease);
+}
+.cfm-scrim.show{opacity:1}
+
+.cfm{
+  width:100%;max-width:420px;
+  background:var(--surface-elevated);
+  border:1px solid var(--border-strong);
+  border-radius:var(--r-lg);
+  padding:22px 20px 18px;
+  box-shadow:0 26px 60px rgba(0,0,0,.6);
+  transform:translateY(14px);
+  transition:transform var(--t-slow) var(--ease);
+}
+.cfm-scrim.show .cfm{transform:none}
+
+.cfm-t{
+  font-size:19px;font-weight:700;line-height:1.25;
+  letter-spacing:-.01em;color:var(--text-primary);
+  text-wrap:balance;
+}
+
+/* Qué contiene el elemento: la razón para detenerse a mirar. */
+.cfm-d{list-style:none;margin:13px 0 0;display:flex;flex-direction:column;gap:6px}
+.cfm-d li{
+  font-size:13.5px;color:var(--text-secondary);line-height:1.45;
+  padding-left:15px;position:relative;
+}
+.cfm-d li::before{
+  content:"";position:absolute;left:0;top:8px;
+  width:5px;height:5px;border-radius:50%;background:var(--text-muted);
+}
+
+/* Sólo aparece cuando hay plata o borrado en cascada de por medio. */
+.cfm-w{
+  margin-top:14px;padding:11px 13px;
+  background:var(--danger-bg);
+  border:1px solid var(--danger-bd);
+  border-radius:var(--r-sm);
+  font-size:13px;line-height:1.5;color:var(--danger);
+}
+
+/* En móvil se apilan (el destructivo abajo, lejos del pulgar en reposo);
+   en pantallas más anchas van en fila. */
+.cfm-btns{display:flex;flex-direction:column-reverse;gap:9px;margin-top:20px}
+.cfm-btns button{
+  min-height:var(--tap);
+  border:none;border-radius:var(--r-sm);
+  font-family:var(--ui);font-size:15px;font-weight:600;
+  cursor:pointer;
+  transition:filter var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.cfm-no{background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border-strong)!important}
+.cfm-no:hover{background:var(--surface-elevated)}
+/* El destructivo es rojo funcional, nunca el carmesí de marca: no debe
+   parecer la acción principal de la pantalla. */
+.cfm-si{background:var(--danger);color:#fff}
+.cfm-si:hover{filter:brightness(1.08)}
+.cfm-si:active{filter:brightness(.94)}
+
+@media(min-width:520px){
+  .cfm-scrim{align-items:center}
+  .cfm-btns{flex-direction:row;justify-content:flex-end}
+  .cfm-btns button{min-width:132px;flex:0 0 auto}
+}
+
+
+/* ---------- RESULTADO DEL ESCANEO --------------------------------- */
+/* Se mira, no se lee. El veredicto ocupa la primera línea a tamaño de
+   cartel, el nombre va debajo, y el resto son etiquetas sueltas que el
+   portero consulta sólo si hace falta. */
+.res.res-v2{
+  display:block;
+  padding:16px 17px 15px;
+  border-radius:var(--r-lg);
+  border-width:1.5px;
+}
+.res-top{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.res-ic{width:26px;height:26px;flex-shrink:0;stroke-width:2.6}
+.res-vd{
+  font-size:22px;font-weight:800;line-height:1;
+  letter-spacing:.09em;text-transform:uppercase;
+  /* Hereda el color del estado (.res.ok / .warn / .bad). */
+}
+.res-top .flagbtn{margin-left:auto}
+
+/* El nombre es lo segundo que se busca: quién es esta persona. */
+.res-nm{
+  font-size:25px;font-weight:700;line-height:1.12;
+  letter-spacing:-.015em;color:var(--text-primary);
+  margin-bottom:5px;
+  overflow-wrap:anywhere;
+}
+/* Qué tipo de acceso es, o la hora en que ya ingresó. */
+.res-tp{font-size:14.5px;font-weight:600;line-height:1.3}
+
+/* Mesa, RRPP, lista: datos de apoyo, separados para poder saltearlos. */
+.res-datos{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+.res-dato{
+  font-size:12px;font-weight:600;
+  padding:5px 10px;border-radius:20px;
+  background:rgba(255,255,255,.06);
+  border:1px solid var(--border-strong);
+  color:var(--text-secondary);
+  white-space:nowrap;
+}
+/* La aclaración de por qué no pasa: importa, pero después del veredicto. */
+.res-nota{
+  margin-top:11px;font-size:13px;line-height:1.45;
+  color:var(--text-secondary);
+}
+
+/* En pantalla grande el veredicto se agranda: la puerta suele tener el
+   celular apoyado y se mira de lejos. */
+@media(min-width:900px){
+  .res.res-v2{padding:20px 22px 18px}
+  .res-vd{font-size:26px}
+  .res-nm{font-size:30px}
+}
+
+/* Etiqueta sólo para lectores de pantalla: el campo del código necesita
+   nombre accesible, pero en pantalla ya lo explica el placeholder. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,1px);white-space:nowrap;border:0}
+
+/* Botón de silencio activo: se distingue del resto de acciones. */
+.scan-actions .btn.ghost2.on{background:var(--surface-elevated);border-color:var(--brand-primary);color:var(--brand-secondary)}
+
+/* ---------- ESQUELETO DE CARGA ------------------------------------ */
+/* Toma la forma del contenido real: cuatro indicadores arriba y filas
+   de lista debajo. El barrido es lento a propósito — un parpadeo rápido
+   compite con la información que está por aparecer. */
+.sk-wrap{padding:0 18px 24px;display:flex;flex-direction:column;gap:9px}
+.sk-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:7px}
+.sk{
+  background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 37%,var(--surface) 63%);
+  background-size:400% 100%;
+  border-radius:8px;
+  animation:sk-barrido 1.5s ease-in-out infinite;
+}
+@keyframes sk-barrido{0%{background-position:100% 0}100%{background-position:0 0}}
+.sk-stat{height:66px;border-radius:var(--r)}
+.sk-row{display:flex;align-items:center;gap:11px;padding:13px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)}
+.sk-av{width:32px;height:32px;border-radius:50%;flex-shrink:0}
+.sk-lines{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0}
+.sk-l1{height:13px;width:58%}
+.sk-l2{height:10px;width:34%}
+.sk-tag{width:62px;height:22px;border-radius:20px;flex-shrink:0}
+@media(prefers-reduced-motion:reduce){.sk{animation:none}}
+
+/* ---------- BUSCAR PERSONA ---------------------------------------- */
+/* Acciones del header: la lupa y la cuenta, agrupadas. */
+.appbar-acc{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.iconbtn{
+  width:40px;height:40px;border-radius:12px;
+  display:grid;place-items:center;flex-shrink:0;
+  background:var(--surface);border:1px solid var(--border-strong);
+  color:var(--text-secondary);
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease);
+}
+.iconbtn .ic{width:19px;height:19px}
+.iconbtn:hover{background:var(--surface-2);color:var(--text-primary);border-color:var(--brand-primary)}
+
+.bsc-campo{margin:2px 0 14px}
+.bsc-campo input{font-size:16px}   /* 16px evita el zoom automático en iOS */
+
+.bsc-res{min-height:120px}
+.bsc-grupo{margin-bottom:18px}
+.bsc-grupo:last-child{margin-bottom:4px}
+.bsc-tit{
+  font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:8px;padding-left:2px;
+}
+
+/* Cada resultado es accionable: lleva a la pantalla donde se resuelve. */
+.bsc-item{
+  display:flex;align-items:center;gap:11px;width:100%;
+  min-height:var(--tap);
+  padding:11px 12px;margin-bottom:7px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-sm);text-align:left;
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.bsc-item:hover{border-color:var(--brand-primary);background:var(--surface-2)}
+.bsc-item:active{transform:scale(.995)}
+
+.bsc-ic{
+  width:30px;height:30px;border-radius:50%;flex-shrink:0;
+  display:grid;place-items:center;font-size:14px;font-weight:700;
+  background:var(--surface-elevated);border:1px solid var(--border-strong);
+  color:var(--text-muted);
+}
+.bsc-ic.ok{background:var(--success-bg);border-color:var(--success-bd);color:var(--success)}
+
+.bsc-body{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.bsc-nm{
+  font-size:14.5px;font-weight:600;color:var(--text-primary);
+  line-height:1.25;overflow-wrap:anywhere;
+}
+.bsc-sub{font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* El estado se lee por color y por palabra, nunca sólo por color. */
+.bsc-est{
+  font-size:11px;font-weight:700;letter-spacing:.03em;
+  padding:5px 10px;border-radius:20px;flex-shrink:0;
+  background:var(--surface-elevated);border:1px solid var(--border-strong);
+  color:var(--text-secondary);white-space:nowrap;
+}
+.bsc-est.ok{background:var(--success-bg);border-color:var(--success-bd);color:var(--success)}
+.bsc-est.pend{background:var(--warning-bg);border-color:var(--warning-bd);color:var(--warning)}
+.bsc-est.bad{background:var(--danger-bg);border-color:var(--danger-bd);color:var(--danger)}
+
+@media(min-width:900px){
+  .bsc-nm{font-size:15px}
+  .bsc-item{padding:12px 14px}
+}
+
+/* ---------- LISTA DE USUARIOS ------------------------------------- */
+/* Antes todo iba en una línea corrida ("@aqueirolo · Relacionador ·
+   Team A.Q · Ambos") que había que leer entera para encontrar un dato.
+   Ahora cada cosa tiene su lugar: nombre, luego identidad y rol como
+   etiquetas separadas, y el número abajo listo para copiar o abrir. */
+.us-fila{display:flex;align-items:flex-start;gap:11px;padding:13px 14px!important}
+.us-ini{margin-top:2px}
+.us-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+
+.us-l1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.us-nm{font-size:16px;font-weight:600;color:var(--text-primary);line-height:1.2;overflow-wrap:anywhere}
+.us-off{
+  font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 8px;border-radius:20px;
+  background:var(--danger-bg);border:1px solid var(--danger-bd);color:var(--danger);
+}
+
+/* Identidad, rol, team y boliche: cada uno legible por separado. */
+.us-l2{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.us-user{font-family:var(--mono);font-size:12px;color:var(--text-secondary)}
+.us-rol,.us-team,.us-club{
+  font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;
+  border:1px solid var(--border-strong);background:var(--surface-elevated);
+  color:var(--text-secondary);white-space:nowrap;
+}
+/* El rol se distingue por color: es el filtro mental más frecuente. */
+.us-rol[data-r="admin"]{background:var(--brand-soft);border-color:var(--brand-primary);color:var(--brand-secondary)}
+.us-rol[data-r="jefe"]{background:var(--info-bg);border-color:var(--info-bd);color:var(--info)}
+.us-team{background:transparent}
+.us-team.vacio{color:var(--text-muted);border-style:dashed}
+
+/* El número, que es a lo que se viene a esta pantalla. */
+.us-l3{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.us-tel{
+  font-family:var(--mono);font-size:13px;font-weight:600;
+  color:var(--success);text-decoration:none;
+  padding:5px 11px;border-radius:9px;
+  background:var(--success-bg);border:1px solid var(--success-bd);
+  transition:filter var(--t-fast) var(--ease);
+}
+.us-tel:hover{filter:brightness(1.15)}
+.us-tel.vacio{
+  font-family:var(--ui);font-weight:500;
+  background:var(--surface-elevated);border:1px dashed var(--border-strong);
+  color:var(--text-muted);cursor:pointer;
+}
+.us-tel.vacio:hover{border-color:var(--warning);color:var(--warning)}
+.us-copy{
+  font-size:11px;font-weight:600;padding:5px 10px;border-radius:9px;
+  background:var(--surface-elevated);border:1px solid var(--border-strong);
+  color:var(--text-secondary);
+  transition:border-color var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.us-copy:hover{border-color:var(--brand-primary);color:var(--text-primary)}
+
+.us-acc{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+.us-yo{
+  font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-muted);flex-shrink:0;align-self:center;
+  padding:4px 9px;border:1px dashed var(--border-strong);border-radius:20px;
+}
+
+/* En pantallas anchas las acciones van en fila: hay lugar de sobra. */
+@media(min-width:900px){
+  .us-acc{flex-direction:row}
+  .us-nm{font-size:16.5px}
+}
+
+/* ---------- COLA DE PUERTA (sin señal) ---------------------------- */
+/* Barra fija arriba: el portero tiene que saber que está trabajando sin
+   señal, pero sin que eso le corte el paso. Ámbar, no rojo: no es un
+   error, es un estado temporal y los ingresos no se perdieron. */
+.cola-aviso{
+  position:fixed;left:50%;transform:translateX(-50%);
+  top:calc(env(safe-area-inset-top) + 8px);
+  z-index:220;display:flex;align-items:center;gap:9px;
+  padding:9px 14px;border-radius:99px;cursor:pointer;
+  background:var(--warning-bg);border:1px solid var(--warning-bd);
+  color:var(--warning);font-size:12.5px;font-weight:600;
+  backdrop-filter:blur(10px);
+  box-shadow:0 8px 24px rgba(0,0,0,.45);
+  max-width:calc(100% - 24px);
+}
+.cola-pt{
+  width:8px;height:8px;border-radius:50%;background:var(--warning);
+  flex-shrink:0;animation:cola-late 1.6s ease-in-out infinite;
+}
+@keyframes cola-late{0%,100%{opacity:1}50%{opacity:.35}}
+.cola-cta{
+  font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  padding:3px 9px;border-radius:20px;
+  background:rgba(255,255,255,.1);
+}
+@media(prefers-reduced-motion:reduce){.cola-pt{animation:none}}
+
+/* ===================================================================
+   SHELL · barra lateral + topbar
+   ===================================================================
+   La app pasa de una columna estrecha centrada (pensada sólo para el
+   celular) a un layout de software de gestión: navegación permanente a
+   la izquierda, contexto arriba y el ancho completo para el contenido.
+
+   En el celular la barra lateral se esconde y la navegación baja al
+   pulgar. No es la misma barra comprimida: es la forma natural de cada
+   dispositivo.
+   =================================================================== */
+
+/* El contenedor deja de ser una columna de 540px. */
+.app{
+  max-width:none;
+  margin:0;
+  display:flex;
+  min-height:100dvh;
+  padding-bottom:0;
+}
+@media(min-width:600px){.app{border-inline:none}}
+
+/* ---------- BARRA LATERAL ---------- */
+.nav{
+  position:fixed;left:0;top:0;bottom:0;z-index:60;
+  width:236px;flex-shrink:0;
+  display:none;flex-direction:column;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  transition:width var(--t) var(--ease),transform var(--t-slow) var(--ease);
+}
+.nav-top{padding:16px 12px 10px}
+
+.nav-club{
+  display:flex;align-items:center;gap:11px;width:100%;
+  padding:10px;border-radius:var(--r-sm);
+  background:var(--surface-2);border:1px solid var(--border);
+  text-align:left;
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.nav-club:hover{border-color:var(--brand-primary);background:var(--surface-elevated)}
+.nav-club-txt{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;overflow:hidden}
+.nav-club .club-name{font-size:17px;line-height:1.1}
+.nav-club-sub{font-size:10.5px;color:var(--text-muted);letter-spacing:.03em}
+.nav-club .chev{width:15px;height:15px;color:var(--text-muted);flex-shrink:0}
+
+/* Las secciones: la lista principal de trabajo. */
+.nav-items{
+  flex:1;display:flex;flex-direction:column;gap:2px;
+  padding:8px;overflow-y:auto;overflow-x:hidden;
+  scrollbar-width:thin;
+}
+.nav-items button{
+  display:flex;align-items:center;gap:12px;width:100%;
+  min-height:42px;padding:9px 11px;border-radius:10px;
+  border:none;background:none;text-align:left;
+  font-family:var(--ui);font-size:14px;font-weight:500;
+  color:var(--text-secondary);white-space:nowrap;
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.nav-items button .ic{width:19px;height:19px;flex-shrink:0}
+.nav-items button:hover{background:var(--surface-2);color:var(--text-primary)}
+/* La sección activa se marca por fondo y por una barra a la izquierda:
+   dos señales, no sólo color. */
+.nav-items button.on{
+  background:var(--brand-soft);color:var(--brand-secondary);font-weight:600;
+  box-shadow:inset 2px 0 0 var(--brand-primary);
+}
+
+.nav-bottom{
+  padding:10px;border-top:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.nav-user{
+  display:flex;align-items:center;gap:10px;flex:1;min-width:0;
+  padding:7px;border-radius:10px;border:none;background:none;text-align:left;
+  transition:background var(--t-fast) var(--ease);
+}
+.nav-user:hover{background:var(--surface-2)}
+.nav-user-txt{display:flex;flex-direction:column;gap:1px;min-width:0;overflow:hidden}
+.nav-user-nm{font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-user-rol{font-size:11px;color:var(--text-muted);white-space:nowrap}
+.nav-toggle{
+  width:32px;height:32px;flex-shrink:0;border-radius:9px;
+  display:grid;place-items:center;
+  background:none;border:1px solid transparent;color:var(--text-muted);
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.nav-toggle:hover{background:var(--surface-2);color:var(--text-primary)}
+.nav-toggle .ic{width:16px;height:16px}
+
+/* ---------- ZONA DE TRABAJO ---------- */
+.work{flex:1;min-width:0;display:flex;flex-direction:column;min-height:100dvh}
+
+.topbar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:12px;
+  padding:calc(env(safe-area-inset-top) + 11px) 16px 11px;
+  background:color-mix(in srgb,var(--background) 88%,transparent);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+}
+.tb-menu{
+  width:38px;height:38px;flex-shrink:0;border-radius:10px;
+  display:grid;place-items:center;
+  background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);
+}
+.tb-menu .ic{width:19px;height:19px}
+
+/* Contexto: en qué local y en qué evento se está trabajando. Vive acá y
+   deja de repetirse dentro de cada pantalla. */
+.tb-ctx{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.tb-club{
+  display:none;align-items:center;gap:8px;flex-shrink:0;
+  padding:7px 11px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--border);
+  font-size:14px;font-weight:600;color:var(--text-primary);
+}
+.tb-club .chev{width:14px;height:14px;color:var(--text-muted)}
+.club-mark.sm{width:26px;height:26px;border-radius:8px;font-size:13px}
+.tb-sep{width:1px;height:22px;background:var(--border-strong);flex-shrink:0;display:none}
+
+.tb-ev{
+  display:flex;align-items:center;gap:9px;min-width:0;
+  padding:7px 11px;border-radius:10px;
+  background:none;border:1px solid transparent;text-align:left;
+  transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease);
+}
+.tb-ev:hover{background:var(--surface);border-color:var(--border)}
+.tb-ev-nm{
+  font-size:14.5px;font-weight:600;color:var(--text-primary);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.tb-ev-meta{font-size:12px;color:var(--text-muted);white-space:nowrap;display:none}
+.tb-ev .chev{width:14px;height:14px;color:var(--text-muted);flex-shrink:0}
+
+.tb-acc{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:auto}
+/* En escritorio la búsqueda es un campo visible con su atajo; en el
+   celular se reduce a la lupa. */
+.tb-search{
+  display:none;align-items:center;gap:9px;
+  min-width:210px;padding:8px 11px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--border);
+  color:var(--text-muted);font-size:13.5px;text-align:left;
+  transition:border-color var(--t-fast) var(--ease);
+}
+.tb-search:hover{border-color:var(--brand-primary)}
+.tb-search .ic{width:16px;height:16px;flex-shrink:0}
+.tb-search span{flex:1}
+.tb-search kbd{
+  font-family:var(--mono);font-size:11px;padding:2px 6px;border-radius:5px;
+  background:var(--surface-elevated);border:1px solid var(--border-strong);color:var(--text-muted);
+}
+.tb-avatar{width:36px;height:36px}
+#btnAlertas{position:relative}
+#btnAlertas .badge{
+  position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 4px;
+  border-radius:99px;display:grid;place-items:center;
+  background:var(--danger);color:#fff;font-size:10px;font-weight:700;
+  border:2px solid var(--background);
+}
+
+/* ---------- CONTENIDO ---------- */
+.screen{padding:20px 16px 28px;max-width:1400px;width:100%}
+.evsel{padding:12px 16px 0;max-width:1400px}
+
+/* ---------- NAVEGACIÓN INFERIOR (CELULAR) ---------- */
+.botnav{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;
+  display:flex;
+  height:calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);
+  background:color-mix(in srgb,var(--background) 92%,transparent);
+  backdrop-filter:blur(16px);
+  border-top:1px solid var(--border);
+}
+.botnav button{
+  flex:1;min-height:var(--tap);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  border:none;background:none;position:relative;
+  font-family:var(--ui);font-size:10.5px;font-weight:500;color:var(--text-muted);
+  transition:color var(--t-fast) var(--ease);
+}
+.botnav button .ic{width:21px;height:21px}
+.botnav button.on{color:var(--brand-secondary)}
+.botnav button.on::before{
+  content:"";position:absolute;top:0;width:24px;height:2px;border-radius:0 0 3px 3px;
+  background:var(--brand-primary);
+}
+
+/* Rejilla de "Más secciones" en el celular. */
+.mas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:4px}
+.mas-item{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  padding:16px 8px;border-radius:var(--r);min-height:82px;
+  background:var(--surface);border:1px solid var(--border);
+  font-family:var(--ui);font-size:12px;font-weight:500;color:var(--text-secondary);
+}
+.mas-item .ic{width:22px;height:22px}
+.mas-item:active{background:var(--surface-2)}
+
+.nav-scrim{
+  position:fixed;inset:0;z-index:55;background:rgba(0,0,0,.6);
+  opacity:0;pointer-events:none;transition:opacity var(--t) var(--ease);
+}
+.nav-scrim.show{opacity:1;pointer-events:auto}
+
+/* ===================================================================
+   ESCRITORIO
+   =================================================================== */
+@media(min-width:1000px){
+  .nav{display:flex}
+  .work{margin-left:236px}
+  .botnav{display:none}
+  .tb-menu{display:none}
+  .tb-club,.tb-sep{display:flex}
+  .tb-search{display:flex}
+  .tb-ev-meta{display:block}
+  .screen{padding:24px 28px 40px}
+  .evsel{padding:16px 28px 0}
+  /* El escáner deja de vivir en una columna angosta. */
+  .scanwrap{padding:24px 28px 40px;max-width:1400px}
+
+  /* Barra lateral contraída: sólo iconos, más ancho para las tablas. */
+  .nav-mini .nav{width:66px}
+  .nav-mini .work{margin-left:66px}
+  .nav-mini .nav-club-txt,
+  .nav-mini .nav-club .chev,
+  .nav-mini .nav-user-txt,
+  .nav-mini .nav-items button span{display:none}
+  .nav-mini .nav-items button{justify-content:center;padding:9px}
+  .nav-mini .nav-club{justify-content:center;padding:8px}
+  .nav-mini .nav-user{justify-content:center}
+  .nav-mini .nav-bottom{flex-direction:column-reverse;gap:6px}
+  .nav-mini .nav-toggle svg{transform:rotate(180deg)}
+}
+
+/* Pantallas anchas: el contenido se centra en vez de estirarse. */
+@media(min-width:1500px){
+  .screen,.evsel,.scanwrap{margin-inline:auto}
+}
+
+/* ===================================================================
+   CELULAR · la barra lateral entra deslizando
+   =================================================================== */
+@media(max-width:999px){
+  .nav{display:flex;transform:translateX(-100%);width:270px;box-shadow:0 0 60px rgba(0,0,0,.6)}
+  .nav-open .nav{transform:translateX(0)}
+  .nav-toggle{display:none}
+  .work{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom))}
+  .scanwrap{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 20px)}
+  /* La hoja inferior sube por encima de la navegación. */
+  .sheet{bottom:0;max-height:88dvh}
+}
+
+/* ===================================================================
+   INICIO · centro de operación
+   ===================================================================
+   Densidad antes que tarjetas grandes: el objetivo es que la noche se
+   lea entera sin scroll en escritorio. El evento manda arriba, las
+   métricas van en una fila, y sólo aparece lo que pide una acción.
+   =================================================================== */
+
+/* ---------- CABECERA DEL EVENTO ---------- */
+.hm-hero{
+  position:relative;overflow:hidden;
+  padding:22px 22px 20px;margin-bottom:16px;
+  border-radius:var(--r-lg);
+  border:1px solid var(--border-strong);
+  background:linear-gradient(150deg,var(--surface-2),var(--surface));
+}
+/* El resplandor de marca queda contenido en la cabecera: es el único
+   lugar donde la identidad del local habla fuerte. */
+.hm-hero::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 88% -20%,var(--brand-soft),transparent 58%);
+}
+.hm-hero>*{position:relative}
+
+.hm-hero-top{display:flex;align-items:center;gap:9px;margin-bottom:12px;flex-wrap:wrap}
+.hm-mark{display:inline-flex;width:26px;height:26px}
+.hm-mark svg{width:100%;height:100%}
+.hm-borr{
+  font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 9px;border-radius:20px;
+  background:var(--warning-bg);border:1px solid var(--warning-bd);color:var(--warning);
+}
+
+.hm-nm{
+  font-family:var(--display);font-weight:var(--display-w);
+  letter-spacing:var(--display-tr);text-transform:uppercase;
+  font-size:clamp(30px,7vw,44px);line-height:1;
+  color:var(--text-primary);margin-bottom:7px;
+  overflow-wrap:anywhere;
+}
+.hm-meta{font-size:13.5px;color:var(--text-secondary);margin-bottom:18px}
+
+/* Avance de la puerta: la barra es la lectura instantánea, el número
+   está al lado para quien necesita el dato exacto. */
+.hm-prog{display:flex;flex-direction:column;gap:7px}
+.hm-prog-bar{
+  height:7px;border-radius:99px;overflow:hidden;
+  background:var(--surface-elevated);border:1px solid var(--border);
+}
+.hm-prog-bar i{
+  display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,var(--brand-primary),var(--brand-secondary));
+  transition:width var(--t-slow) var(--ease);
+}
+.hm-prog-tx{font-size:13px;color:var(--text-secondary)}
+.hm-prog-tx b{font-family:var(--mono);font-size:15px;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.hm-prog-tx span{color:var(--text-muted)}
+
+/* ---------- MÉTRICAS ---------- */
+/* El dato manda; la etiqueta y el detalle acompañan. */
+.hm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:22px}
+.hm-m{
+  padding:14px 15px 13px;border-radius:var(--r);
+  background:var(--surface);border:1px solid var(--border);
+}
+.hm-k{
+  font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:7px;
+}
+.hm-v{
+  font-family:var(--mono);font-size:30px;font-weight:700;line-height:1;
+  letter-spacing:-.02em;color:var(--text-primary);
+  font-variant-numeric:tabular-nums;
+}
+.hm-s{font-size:11.5px;color:var(--text-muted);margin-top:5px}
+.hm-m.ok .hm-v{color:var(--success)}
+.hm-m.money{border-color:var(--brand-primary)}
+.hm-m.money .hm-v{color:var(--brand-secondary)}
+
+/* ---------- SECCIONES ---------- */
+.hm-sec{margin-bottom:22px}
+.hm-h2{
+  font-size:11px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:10px;
+}
+
+/* ---------- ALERTAS ---------- */
+/* Sólo aparece lo que pide una acción; tocar lleva a resolverlo. */
+.hm-alertas{display:flex;flex-direction:column;gap:7px}
+.hm-al{
+  display:flex;align-items:center;gap:10px;width:100%;
+  min-height:var(--tap);padding:11px 13px;
+  border-radius:var(--r-sm);text-align:left;
+  background:var(--surface);border:1px solid var(--border);
+  font-family:var(--ui);font-size:13.5px;font-weight:500;color:var(--text-primary);
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.hm-al:hover{background:var(--surface-2)}
+.hm-al span:nth-child(2){flex:1;min-width:0}
+.hm-al-pt{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.hm-al.warn{border-color:var(--warning-bd)}
+.hm-al.warn .hm-al-pt{background:var(--warning)}
+.hm-al.info{border-color:var(--border-strong)}
+.hm-al.info .hm-al-pt{background:var(--info)}
+.hm-al-ch{width:15px;height:15px;color:var(--text-muted);flex-shrink:0}
+
+/* ---------- ACCIONES ---------- */
+.hm-acc{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.hm-a{
+  display:flex;align-items:center;gap:10px;
+  min-height:var(--tap);padding:12px 13px;
+  border-radius:var(--r-sm);text-align:left;
+  background:var(--surface);border:1px solid var(--border);
+  font-family:var(--ui);font-size:13.5px;font-weight:500;color:var(--text-primary);
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.hm-a:hover{border-color:var(--brand-primary);background:var(--surface-2)}
+.hm-a .ic{width:18px;height:18px;flex-shrink:0;color:var(--brand-secondary)}
+
+/* ---------- ACTIVIDAD ---------- */
+/* Una línea por ingreso: la hora alineada permite leer el ritmo de la
+   puerta de un vistazo. */
+.hm-time{display:flex;flex-direction:column}
+.hm-t{
+  display:flex;align-items:center;gap:11px;
+  padding:9px 2px;border-bottom:1px solid var(--border);
+  font-size:13.5px;
+}
+.hm-t:last-child{border-bottom:none}
+.hm-t-h{
+  font-family:var(--mono);font-size:12px;color:var(--text-muted);
+  font-variant-numeric:tabular-nums;flex-shrink:0;min-width:42px;
+}
+.hm-t-pt{width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0}
+.hm-t-nm{flex:1;min-width:0;color:var(--text-primary);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hm-t-lt{font-size:11.5px;color:var(--text-muted);flex-shrink:0}
+
+/* ===================================================================
+   ESCRITORIO · la noche entra en una pantalla
+   =================================================================== */
+@media(min-width:760px){
+  .hm-grid{grid-template-columns:repeat(4,1fr);gap:12px}
+  .hm-acc{grid-template-columns:repeat(3,1fr)}
+}
+@media(min-width:1100px){
+  .hm-hero{padding:26px 28px 24px}
+  .hm-v{font-size:36px}
+  .hm-m{padding:16px 18px 15px}
+  /* Alertas y acciones conviven en dos columnas: menos scroll. */
+  .hm-cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+  .hm-acc{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ---------- AJUSTES DE INICIO ------------------------------------- */
+/* Acciones con más presencia: son el atajo que se usa con el celular en
+   una mano y la gente esperando. Los cuatro bloques miden igual. */
+.hm-acc{grid-template-columns:repeat(2,1fr);gap:10px}
+.hm-a{
+  flex-direction:column;align-items:flex-start;justify-content:center;gap:10px;
+  min-height:88px;padding:16px 15px;
+  border-radius:var(--r);
+  font-size:14.5px;font-weight:600;
+}
+.hm-a .ic{width:22px;height:22px;stroke-width:2}
+
+/* La tarjeta del resultado se puede abrir para ver de dónde sale. */
+button.hm-m{
+  text-align:left;width:100%;font-family:var(--ui);cursor:pointer;
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+button.hm-m:hover{background:var(--surface-2)}
+.hm-bs{font-family:var(--ui);font-size:14px;font-weight:600;color:var(--text-muted);margin-left:4px}
+.hm-m.money .hm-s{color:var(--text-secondary)}
+
+/* ---------- DETALLE DEL RESULTADO --------------------------------- */
+.rs-blq{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px 15px;margin-bottom:11px;
+}
+.rs-tit{
+  font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:11px;
+}
+.rs-f{
+  display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+  padding:7px 0;font-size:13.5px;color:var(--text-secondary);
+}
+.rs-f b{font-family:var(--mono);font-weight:600;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.rs-f.neg b{color:var(--danger)}
+.rs-f.tot{border-top:1px solid var(--border);margin-top:5px;padding-top:11px;color:var(--text-primary);font-weight:600}
+.rs-f.tot b{font-size:15.5px;color:var(--brand-secondary)}
+
+.rs-total{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:16px 17px;border-radius:var(--r);
+  background:linear-gradient(150deg,var(--brand-soft),var(--surface));
+  border:1px solid var(--brand-primary);
+}
+.rs-total span{font-size:13.5px;font-weight:600;color:var(--text-primary)}
+.rs-total b{
+  font-family:var(--mono);font-size:24px;font-weight:700;
+  color:var(--brand-secondary);font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+}
+
+@media(min-width:760px){
+  /* Cuatro acciones en dos filas de dos: bloques iguales, sin huecos. */
+  .hm-acc{grid-template-columns:repeat(2,1fr);max-width:640px}
+}
+@media(min-width:1100px){
+  .hm-acc{grid-template-columns:repeat(2,1fr)}
+  .hm-a{min-height:96px;font-size:15px}
+}
+
+/* ===================================================================
+   INICIO · gestión del evento
+   ===================================================================
+   Jerarquía: primero el evento activo, después sus datos operativos,
+   después las acciones, y el historial guardado en un acordeón para que
+   la pantalla abra limpia.
+
+   Sin cifras de plata: eso vive en Pagos y Reporte.
+   =================================================================== */
+
+/* ---------- CABECERA ---------- */
+.in-h{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;margin-bottom:18px;
+}
+.in-t{font-size:23px;font-weight:700;letter-spacing:-.02em;color:var(--text-primary);line-height:1.2}
+.in-s{font-size:13px;color:var(--text-muted);margin-top:3px}
+.in-nuevo{width:auto;flex-shrink:0;padding:12px 18px;font-size:14px;min-height:44px}
+
+.in-sec{margin-top:20px}
+.in-h2{
+  font-size:11px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:10px;
+}
+
+/* ---------- TARJETA DEL EVENTO ---------- */
+.ev-card{
+  position:relative;overflow:hidden;
+  padding:20px 22px 18px;border-radius:var(--r-lg);
+  border:1px solid var(--border-strong);
+  background:linear-gradient(150deg,var(--surface-2),var(--surface));
+}
+/* El resplandor de marca queda contenido acá: es el único lugar donde la
+   identidad del local habla fuerte. */
+.ev-card::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(115% 85% at 88% -20%,var(--brand-soft),transparent 58%);
+}
+.ev-card>*{position:relative}
+
+.ev-card-h{display:flex;align-items:center;gap:9px;margin-bottom:11px;flex-wrap:wrap}
+.ev-mk{display:inline-flex;width:24px;height:24px}
+.ev-mk svg{width:100%;height:100%}
+.ev-borr{
+  font-size:10px;font-weight:700;letter-spacing:.05em;
+  padding:3px 9px;border-radius:20px;
+  background:var(--warning-bg);border:1px solid var(--warning-bd);color:var(--warning);
+}
+.ev-borr.sm{font-size:9.5px;padding:2px 7px}
+
+.ev-nm{
+  font-family:var(--display);font-weight:var(--display-w);
+  letter-spacing:var(--display-tr);text-transform:uppercase;
+  font-size:clamp(27px,6.5vw,40px);line-height:1;
+  color:var(--text-primary);margin-bottom:8px;overflow-wrap:anywhere;
+}
+.ev-meta{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  font-size:13px;color:var(--text-secondary);margin-bottom:18px;
+}
+.ev-pt{width:3px;height:3px;border-radius:50%;background:var(--text-faint);flex-shrink:0}
+
+/* ---------- MÉTRICAS ---------- */
+/* Cada una lleva a su módulo: el dato es también el acceso. */
+.ev-mets{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:16px}
+.ev-met{
+  display:flex;flex-direction:column;align-items:flex-start;gap:6px;
+  padding:13px 14px;border-radius:var(--r);text-align:left;
+  background:var(--surface);border:1px solid var(--border);
+  font-family:var(--ui);
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.ev-met:hover{border-color:var(--brand-primary);background:var(--surface-2)}
+.ev-met-ic{display:inline-flex;width:17px;height:17px;color:var(--brand-secondary)}
+.ev-met-ic .ic{width:100%;height:100%}
+.ev-met-k{
+  font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--text-muted);
+}
+.ev-met b{
+  font-family:var(--mono);font-size:26px;font-weight:700;line-height:1;
+  letter-spacing:-.02em;color:var(--text-primary);font-variant-numeric:tabular-nums;
+}
+.ev-met.ok .ev-met-ic{color:var(--success)}
+.ev-met.ok b{color:var(--success)}
+
+/* ---------- ACCIONES ---------- */
+/* Tres visibles y el resto detrás de ⋯: cinco botones iguales no dejaban
+   ver cuál era la acción habitual. */
+.ev-acc{display:flex;gap:7px;flex-wrap:wrap;padding-top:15px;border-top:1px solid var(--border)}
+.ev-acc .ghost{min-height:38px;padding:9px 15px;font-size:13px}
+.ev-mas{margin-left:auto;padding:9px 13px!important;font-size:16px;line-height:1;letter-spacing:.05em}
+
+/* ---------- MENÚ DE ACCIONES ---------- */
+.mas-lista{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.mas-op{
+  display:flex;align-items:center;gap:12px;width:100%;
+  min-height:var(--tap);padding:13px 14px;
+  border-radius:var(--r-sm);text-align:left;
+  background:var(--surface);border:1px solid var(--border);
+  font-family:var(--ui);font-size:14.5px;font-weight:500;color:var(--text-primary);
+  transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease);
+}
+.mas-op:hover{background:var(--surface-2)}
+.mas-op .ic{width:18px;height:18px;color:var(--brand-secondary);flex-shrink:0}
+.mas-op.peligro{color:var(--danger)}
+.mas-op.peligro .ic{color:var(--danger)}
+.mas-op.peligro:hover{background:var(--danger-bg);border-color:var(--danger-bd)}
+
+/* ---------- LISTA DE EVENTOS ---------- */
+/* Compacta a propósito: la tarjeta grande está reservada al activo. */
+.ev-lista{display:flex;flex-direction:column;gap:6px}
+.ev-fila{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 13px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--border);
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.ev-fila:hover{border-color:var(--border-strong);background:var(--surface-2)}
+
+/* La fecha como bloque: permite recorrer el historial por día. */
+.ev-fecha{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-width:52px;padding:5px 7px;border-radius:9px;flex-shrink:0;
+  background:var(--surface-elevated);border:1px solid var(--border);
+  font-family:var(--ui);
+}
+.ev-dia{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+.ev-num{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text-primary);white-space:nowrap}
+
+.ev-fila-nm{
+  flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;
+  background:none;border:none;text-align:left;font-family:var(--ui);padding:0;
+}
+.ev-fila-t{
+  font-size:14.5px;font-weight:600;color:var(--text-primary);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ev-fila-e{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ev-fila-acc{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.ev-fila-acc .ghost{min-height:34px;padding:7px 12px;font-size:12px}
+.ev-fila-acc .ghost.pub{border-color:var(--success-bd);color:var(--success)}
+
+/* ---------- ACORDEÓN DE PASADOS ---------- */
+.ev-acc-h{
+  display:flex;align-items:center;gap:11px;width:100%;
+  min-height:52px;padding:13px 15px;border-radius:var(--r);
+  background:var(--surface);border:1px solid var(--border);
+  font-family:var(--ui);text-align:left;
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.ev-acc-h:hover{background:var(--surface-2);border-color:var(--border-strong)}
+.ev-acc-t{flex:1;font-size:14.5px;font-weight:600;color:var(--text-primary)}
+.ev-acc-n{
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  padding:3px 9px;border-radius:20px;
+  background:var(--surface-elevated);border:1px solid var(--border-strong);color:var(--text-secondary);
+}
+.ev-acc-ch{
+  width:17px;height:17px;color:var(--text-muted);flex-shrink:0;
+  transition:transform var(--t) var(--ease);
+}
+.ev-acc-ch.abierto{transform:rotate(180deg)}
+.ev-acc-b{display:none;margin-top:8px}
+.ev-acc-b.abierto{display:block;animation:ev-abre var(--t) var(--ease)}
+@keyframes ev-abre{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+
+/* ===================================================================
+   ESCRITORIO
+   =================================================================== */
+@media(min-width:760px){
+  .ev-mets{grid-template-columns:repeat(4,1fr);gap:11px}
+}
+@media(min-width:1100px){
+  .in-t{font-size:26px}
+  .ev-card{padding:24px 26px 20px}
+  .ev-met{padding:15px 16px}
+  .ev-met b{font-size:29px}
+  .ev-fila{padding:12px 15px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .ev-acc-b.abierto{animation:none}
+  .ev-acc-ch{transition:none}
+}
+
+/* ===================================================================
+   ACCESOS
+   ===================================================================
+   Cuatro pantallas sueltas pasan a ser una sección con subtabs: es la
+   misma pregunta —quién puede pasar y quién ya pasó— vista de distintas
+   formas.
+   =================================================================== */
+
+.ac-h{margin-bottom:14px}
+.ac-t{font-size:23px;font-weight:700;letter-spacing:-.02em;color:var(--text-primary);line-height:1.2}
+.ac-s{font-size:13px;color:var(--text-muted);margin-top:3px}
+
+/* ---------- SUBTABS ---------- */
+/* Se desplazan en el celular en vez de apilarse: la navegación de la
+   sección tiene que ocupar una línea, no cuatro. */
+.ac-subs{
+  display:flex;gap:4px;margin-bottom:18px;
+  padding:4px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--border);
+  overflow-x:auto;scrollbar-width:none;
+}
+.ac-subs::-webkit-scrollbar{display:none}
+.ac-sub{
+  flex:1 0 auto;min-height:38px;padding:9px 15px;
+  border:none;border-radius:9px;background:none;white-space:nowrap;
+  font-family:var(--ui);font-size:13.5px;font-weight:500;color:var(--text-secondary);
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.ac-sub:hover{color:var(--text-primary)}
+.ac-sub.on{background:var(--brand-soft);color:var(--brand-secondary);font-weight:600}
+
+.ac-sec{margin-top:22px}
+.ac-h2{
+  font-size:11px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:10px;
+}
+
+/* ---------- TOTAL ---------- */
+/* Una sola línea con lo esencial: cuántos entraron de los que podían. */
+.ac-tot{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:18px 20px;margin-bottom:12px;
+  border-radius:var(--r-lg);
+  background:linear-gradient(150deg,var(--surface-2),var(--surface));
+  border:1px solid var(--border-strong);
+}
+.ac-tot-k{
+  font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:6px;
+}
+.ac-tot-v{
+  font-family:var(--mono);font-size:34px;font-weight:700;line-height:1;
+  letter-spacing:-.02em;color:var(--text-primary);font-variant-numeric:tabular-nums;
+}
+.ac-tot-v span{font-family:var(--ui);font-size:14px;font-weight:500;color:var(--text-muted);margin-left:8px}
+.ac-tot-bar{
+  flex:1;min-width:140px;height:8px;border-radius:99px;overflow:hidden;
+  background:var(--surface-elevated);border:1px solid var(--border);
+}
+.ac-tot-bar i{
+  display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,var(--brand-primary),var(--brand-secondary));
+  transition:width var(--t-slow) var(--ease);
+}
+.ac-tot-pct{
+  font-family:var(--mono);font-size:18px;font-weight:700;
+  color:var(--brand-secondary);font-variant-numeric:tabular-nums;
+}
+
+/* ---------- VÍAS DE ACCESO ---------- */
+/* Lista y entradas son los dos caminos por los que entra la gente. */
+.ac-vias{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.ac-via{
+  display:flex;flex-direction:column;align-items:flex-start;gap:7px;
+  padding:15px 16px;border-radius:var(--r);text-align:left;
+  background:var(--surface);border:1px solid var(--border);
+  font-family:var(--ui);
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.ac-via:hover{border-color:var(--brand-primary);background:var(--surface-2)}
+.ac-via-k{
+  display:flex;align-items:center;gap:7px;
+  font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-muted);
+}
+.ac-via-k .ic{width:15px;height:15px;color:var(--brand-secondary)}
+.ac-via-v{
+  font-family:var(--mono);font-size:28px;font-weight:700;line-height:1;
+  color:var(--text-primary);font-variant-numeric:tabular-nums;
+}
+.ac-via-v small{font-family:var(--ui);font-size:13px;font-weight:500;color:var(--text-muted);margin-left:6px}
+.ac-via-s{font-size:11.5px;color:var(--text-muted)}
+
+/* ---------- POR LISTA ---------- */
+/* Barra por lista: se ve de un vistazo cuál está llena y cuál no llegó. */
+.ac-listas{display:flex;flex-direction:column;gap:7px}
+.ac-lista{
+  display:flex;align-items:center;gap:13px;
+  padding:11px 14px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--border);
+}
+.ac-lista-nm{
+  flex:0 0 auto;min-width:110px;max-width:190px;
+  font-size:13.5px;font-weight:600;color:var(--text-primary);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ac-lista-bar{
+  flex:1;min-width:60px;height:6px;border-radius:99px;overflow:hidden;
+  background:var(--surface-elevated);
+}
+.ac-lista-bar i{display:block;height:100%;border-radius:99px;background:var(--success)}
+.ac-lista-n{
+  font-family:var(--mono);font-size:12.5px;color:var(--text-muted);
+  font-variant-numeric:tabular-nums;flex-shrink:0;
+}
+.ac-lista-n b{color:var(--text-primary);font-size:14px}
+
+/* ---------- HISTORIAL ---------- */
+/* Una línea por ingreso, con la hora alineada: así se lee el ritmo de la
+   puerta y se reconstruye la noche cuando algo no cuadra. */
+.ac-hist{
+  display:flex;flex-direction:column;
+  border-radius:var(--r);overflow:hidden;
+  border:1px solid var(--border);background:var(--surface);
+}
+.ac-hf{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 14px;border-bottom:1px solid var(--border);
+  font-size:13.5px;
+}
+.ac-hf:last-child{border-bottom:none}
+.ac-hf-h{
+  font-family:var(--mono);font-size:12px;color:var(--text-muted);
+  font-variant-numeric:tabular-nums;flex-shrink:0;min-width:44px;
+}
+.ac-hf-ic{display:inline-flex;width:16px;height:16px;flex-shrink:0}
+.ac-hf-ic .ic{width:100%;height:100%}
+.ac-hf-ic.qr{color:var(--brand-secondary)}
+.ac-hf-ic.lista{color:var(--text-muted)}
+.ac-hf-nm{
+  flex:1;min-width:0;font-weight:500;color:var(--text-primary);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ac-hf-via{
+  font-size:11.5px;color:var(--text-muted);flex-shrink:0;
+  max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ac-hf-ok{
+  font-size:10.5px;font-weight:700;letter-spacing:.04em;
+  padding:3px 9px;border-radius:20px;flex-shrink:0;
+  background:var(--success-bg);border:1px solid var(--success-bd);color:var(--success);
+}
+
+/* ===================================================================
+   ESCRITORIO
+   =================================================================== */
+@media(min-width:760px){
+  .ac-subs{display:inline-flex;gap:4px}
+  .ac-sub{flex:0 0 auto}
+  .ac-vias{grid-template-columns:repeat(2,1fr);max-width:640px}
+}
+@media(min-width:1100px){
+  .ac-t{font-size:26px}
+  .ac-tot{padding:20px 24px}
+  .ac-tot-v{font-size:40px}
+  .ac-lista-nm{min-width:150px;max-width:240px}
+}
+
+/* En el celular la hora y el nombre mandan; la vía se oculta si aprieta. */
+@media(max-width:520px){
+  .ac-hf-via{display:none}
+  .ac-tot-v{font-size:30px}
+}
+
+/* ---------- RESULTADO DEL ESCÁNER · jerarquía ---------------------- */
+/* Orden de lectura en la puerta: veredicto, cliente, de dónde viene,
+   quién lo consiguió y a qué hora entró. Cada nivel pesa menos que el
+   anterior para que la vista caiga sola donde tiene que caer. */
+.res-quien{
+  font-size:13px;color:var(--text-secondary);margin-top:3px;
+  overflow-wrap:anywhere;
+}
+/* La hora es el dato que zanja la discusión cuando alguien vuelve a pasar. */
+.res-hora{
+  display:inline-flex;align-items:center;
+  margin-top:11px;padding:7px 13px;border-radius:20px;
+  font-family:var(--mono);font-size:14px;font-weight:700;
+  background:rgba(255,255,255,.07);border:1px solid var(--border-strong);
+  font-variant-numeric:tabular-nums;
+}
+.res.ok .res-hora{background:var(--success-bg);border-color:var(--success-bd);color:var(--success)}
+.res.warn .res-hora{background:var(--warning-bg);border-color:var(--warning-bd);color:var(--warning)}
+
+@media(min-width:900px){
+  .res-quien{font-size:14px}
+  .res-hora{font-size:15.5px}
+}
+
+/* ===================================================================
+   INVITADOS
+   ===================================================================
+   Las listas se presentan como grupos y se abren a demanda: antes todos
+   los anotados aparecían desplegados y la pantalla era un scroll largo.
+   =================================================================== */
+
+.iv-h{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.iv-t{font-size:19px;font-weight:700;letter-spacing:-.015em;color:var(--text-primary);line-height:1.2}
+.iv-s{font-size:13px;color:var(--text-muted);margin-top:3px}
+.iv-s b{font-family:var(--mono);font-weight:700;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+
+/* Búsqueda y filtros en una línea: ocupaban tres bloques apilados. */
+.iv-tools{display:flex;flex-direction:column;gap:9px;margin-bottom:16px}
+.iv-buscar input{width:100%}
+.iv-filtros{display:flex;gap:8px;flex-wrap:wrap}
+.iv-filtros select{flex:1;min-width:150px;min-height:42px;font-size:13px}
+
+/* Cabecera de cada lista: el resumen alcanza para decidir si abrirla.
+   (El CTA "Ver invitados" se quitó: la cabecera entera ya abre/cierra.) */
+.lst-cnt b{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* Agregar invitados: acción, no formulario permanente. */
+.iv-agregar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.iv-add{width:auto;padding:11px 18px;font-size:14px;min-height:42px}
+.iv-cupo{font-size:12.5px;color:var(--text-muted)}
+.iv-resumen{
+  font-size:13px;color:var(--text-muted);
+  padding:11px 13px;border-radius:var(--r-sm);margin-bottom:12px;
+  background:var(--surface);border:1px solid var(--border);
+}
+.iv-resumen.listo{color:var(--success);border-color:var(--success-bd);background:var(--success-bg)}
+
+/* Filas: el estado y la hora reemplazan al nombre del RRPP, que
+   aparecía como subtítulo en todas y ensuciaba la lectura. La inicial
+   del relacionador queda con tooltip para quien lo necesite. */
+.iv-est{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:3px}
+.iv-ok{
+  font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--success);
+  font-variant-numeric:tabular-nums;
+}
+.iv-no{font-size:11.5px;color:var(--text-muted)}
+.iv-qr{
+  font-size:9.5px;font-weight:700;letter-spacing:.06em;
+  padding:2px 6px;border-radius:5px;
+  background:var(--surface-elevated);border:1px solid var(--border-strong);color:var(--text-muted);
+}
+
+@media(min-width:760px){
+  .iv-tools{flex-direction:row;align-items:center}
+  .iv-buscar{flex:1;min-width:220px}
+  .iv-filtros{flex:0 0 auto}
+  .iv-filtros select{min-width:160px}
+}
+@media(min-width:1100px){
+  .iv-t{font-size:21px}
+}
+
+/* ---------- CERRAR EL PANEL --------------------------------------- */
+/* Antes sólo se cerraba tocando fuera y un QR abierto se sentía
+   atrapado. Ahora hay × visible y Escape. */
+.sheet-x{
+  position:absolute;top:12px;right:14px;z-index:2;
+  width:34px;height:34px;border-radius:10px;
+  display:grid;place-items:center;
+  background:var(--surface);border:1px solid var(--border-strong);
+  color:var(--text-secondary);
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.sheet-x .ic{width:16px;height:16px}
+.sheet-x:hover{background:var(--surface-2);color:var(--text-primary)}
+/* El título del panel deja lugar a la ×. */
+.sheet .sh-h{padding-right:44px}
+
+/* ---------- CONFIRMACIÓN DE UN TOQUE ------------------------------ */
+/* El botón queda rojo pidiendo el segundo toque. Vuelve solo a los 4 s
+   o si se toca otra fila. */
+.armado{
+  background:var(--danger-bg)!important;
+  border-color:var(--danger-bd)!important;
+  color:var(--danger)!important;
+  font-weight:700;
+  animation:armado-late 1.1s ease-in-out infinite;
+}
+@keyframes armado-late{0%,100%{opacity:1}50%{opacity:.62}}
+@media(prefers-reduced-motion:reduce){.armado{animation:none}}
+
+/* ===================================================================
+   ENTRADAS
+   ===================================================================
+   Era un formulario largo con el arte del evento a pantalla completa: la
+   lista de entradas quedaba muy abajo. Ahora la herramienta manda y lo
+   demás se guarda detrás de acciones.
+   =================================================================== */
+
+.en-h{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.en-t{font-size:19px;font-weight:700;letter-spacing:-.015em;color:var(--text-primary);line-height:1.2}
+.en-s{font-size:13px;color:var(--text-muted);margin-top:3px}
+.en-s b{font-family:var(--mono);font-weight:700;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.en-h-acc{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.en-gen{width:auto;padding:11px 18px;font-size:14px;min-height:42px}
+.en-cfg{min-height:42px;padding:11px 15px;font-size:13px}
+
+/* Estado de la fase y del horario: una línea, no un bloque. */
+.en-fase{
+  font-size:12.5px;padding:9px 13px;border-radius:var(--r-sm);margin-bottom:10px;
+  background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);
+}
+.en-fase.ok{border-color:var(--success-bd);color:var(--success);background:var(--success-bg)}
+.en-fase.bad{border-color:var(--danger-bd);color:var(--danger);background:var(--danger-bg)}
+.en-fase b{color:inherit;font-weight:700}
+
+/* Búsqueda, filtros y orden en una barra. */
+.en-tools{display:flex;flex-direction:column;gap:9px;margin:16px 0 12px}
+.en-buscar input{width:100%}
+.en-filtros{display:flex;gap:8px;flex-wrap:wrap}
+.en-filtros select{flex:1;min-width:150px;min-height:42px;font-size:13px}
+.en-orden{min-height:38px;padding:9px 14px;font-size:12.5px;white-space:nowrap}
+.en-count{font-size:12.5px;color:var(--text-muted);align-self:center}
+
+/* ---------- ARTE DE LA ENTRADA ---------- */
+/* Antes ocupaba el ancho completo y empujaba la lista fuera de la
+   pantalla. Ahora es una miniatura que se abre en grande si hace falta. */
+.tk-mini{
+  position:relative;display:flex;align-items:center;gap:14px;
+  padding:12px 14px;margin-bottom:14px;border-radius:var(--r);
+  background:var(--surface);border:1px solid var(--border-strong);
+}
+.tk-mini-img{
+  width:78px;flex-shrink:0;border-radius:10px;cursor:zoom-in;
+  border:1px solid var(--border-strong);
+  transition:transform var(--t-fast) var(--ease);
+}
+.tk-mini-img:hover{transform:scale(1.04)}
+.tk-mini-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.tk-mini-nm{font-size:14.5px;font-weight:600;color:var(--text-primary);overflow-wrap:anywhere}
+.tk-mini-cd{font-family:var(--mono);font-size:12px;color:var(--text-muted)}
+.tk-mini .tk-actions{margin-top:7px;width:auto}
+.tk-mini .tk-actions .btn{padding:8px 13px;font-size:12.5px;min-height:36px;width:auto}
+.tk-mini-x{
+  position:absolute;top:8px;right:9px;
+  width:28px;height:28px;border-radius:8px;
+  display:grid;place-items:center;
+  background:none;border:1px solid transparent;color:var(--text-muted);
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.tk-mini-x .ic{width:14px;height:14px}
+.tk-mini-x:hover{background:var(--surface-2);color:var(--text-primary)}
+
+@media(min-width:760px){
+  .en-tools{flex-direction:row;align-items:center}
+  .en-buscar{flex:1;min-width:220px}
+  .en-filtros{flex:0 0 auto}
+  .en-filtros select{min-width:170px}
+  .en-count{margin-left:auto}
+  .tk-mini-img{width:96px}
+}
+@media(min-width:1100px){
+  .en-t{font-size:21px}
+}
+
+/* ---------- FICHA DE ENTRADA -------------------------------------- */
+/* Todo lo de una entrada sin salir del listado: al cerrar se vuelve
+   exactamente a donde estabas. */
+.dt-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:11px}
+.dt-nm{
+  font-size:23px;font-weight:700;line-height:1.15;letter-spacing:-.015em;
+  color:var(--text-primary);margin-bottom:18px;overflow-wrap:anywhere;
+}
+.dt-datos{
+  display:flex;flex-direction:column;
+  border-radius:var(--r);overflow:hidden;
+  border:1px solid var(--border);background:var(--surface);
+  margin-bottom:18px;
+}
+.dt-f{
+  display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  padding:12px 14px;border-bottom:1px solid var(--border);
+}
+.dt-f:last-child{border-bottom:none}
+.dt-k{font-size:12.5px;color:var(--text-muted);flex-shrink:0}
+.dt-v{font-size:14px;font-weight:600;color:var(--text-primary);text-align:right;overflow-wrap:anywhere}
+.dt-f.ok .dt-v{font-family:var(--mono);color:var(--success);font-variant-numeric:tabular-nums}
+.dt-acc{display:flex;flex-direction:column;gap:9px}
+
+@media(min-width:520px){
+  .dt-acc{flex-direction:row}
+  .dt-acc .btn{flex:1}
+}
+
+/* ---------- BARRA DE SELECCIÓN ------------------------------------ */
+/* Sólo aparece con algo marcado. Queda fija arriba para no perderla al
+   seguir bajando por la lista. */
+.tk-tanda-acc{display:flex;gap:7px;flex-wrap:wrap}
+.tk-tanda-acc .btn{width:auto;padding:9px 15px;font-size:13px;min-height:38px}
+
+/* ---------- SELECCIÓN DE ENTRADA ---------------------------------- */
+/* La fila cuyo QR se está viendo arriba queda marcada, para no perder de
+   vista a quién corresponde el preview. */
+.list-row.sel{
+  border-color:var(--brand-primary)!important;
+  background:linear-gradient(160deg,var(--brand-soft),transparent),var(--surface)!important;
+}
+.tk-mas{
+  background:none;border:1px solid transparent;border-radius:9px;
+  color:var(--text-muted);font-size:16px;line-height:1;letter-spacing:.05em;
+  padding:8px 11px;flex-shrink:0;
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.tk-mas:hover{background:var(--surface-elevated);color:var(--text-primary)}
+
+/* Sin entrada elegida se dice, en vez de dejar el QR anterior: mostrarlo
+   haría creer que es el de la fila que se está mirando. */
+.tk-vacio{
+  padding:16px;margin-bottom:14px;border-radius:var(--r);
+  background:var(--surface);border:1px dashed var(--border-strong);
+  color:var(--text-muted);font-size:13px;text-align:center;
+}
+
+/* El ticket genérico también necesita su × de cierre. */
+.tk-gen{position:relative;margin-bottom:14px}
+.tk-gen .tk-mini-x{background:var(--surface);border-color:var(--border-strong)}
+
+/* El botón de agregar vive en la cabecera de la lista abierta, junto a
+   sus datos: ahí es donde se entiende a cuál se está anotando. */
+.iv-agregar{padding-bottom:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+
+/* La fila del invitado se toca para ver su QR, igual que en Entradas. */
+.list-row [data-verqr]{border-radius:9px;transition:background var(--t-fast) var(--ease)}
+.list-row [data-verqr]:hover{background:var(--surface-2)}
+
+/* ===================================================================
+   AGREGAR / GENERAR · mismo patrón en las dos pantallas
+   ===================================================================
+   Botón centrado entre el QR y los filtros. Al tocarlo el formulario se
+   despliega ahí mismo: no tapa la pantalla ni hace perder de vista en
+   qué lista o evento se está trabajando.
+   =================================================================== */
+.cta-zona{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  margin:4px 0 16px;
+}
+.cta-abrir{
+  width:auto;min-width:210px;padding:12px 24px;
+  font-size:14.5px;min-height:46px;
+}
+.iv-cupo{font-size:12px;color:var(--text-muted)}
+
+/* El formulario desplegado ocupa el ancho, para que el textarea respire. */
+.cta-form{
+  width:100%;max-width:560px;
+  padding:16px 17px 17px;border-radius:var(--r);
+  background:var(--surface);border:1px solid var(--border-strong);
+  text-align:left;
+  animation:cta-abre var(--t) var(--ease);
+}
+@keyframes cta-abre{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.cta-form-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px}
+.cta-form-t{font-size:15.5px;font-weight:700;color:var(--text-primary)}
+.cta-form-x{
+  width:30px;height:30px;border-radius:8px;flex-shrink:0;
+  display:grid;place-items:center;
+  background:none;border:1px solid transparent;color:var(--text-muted);
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.cta-form-x .ic{width:15px;height:15px}
+.cta-form-x:hover{background:var(--surface-2);color:var(--text-primary)}
+.cta-form-s{font-size:12.5px;color:var(--text-muted);margin-bottom:12px}
+.cta-form .field{margin-bottom:12px}
+.cta-form textarea{min-height:96px}
+
+@media(prefers-reduced-motion:reduce){.cta-form{animation:none}}
+
+/* ===================================================================
+   MESAS
+   ===================================================================
+   El plano es lo que se mira: el resto se acomoda alrededor. Antes había
+   hasta ocho botones al mismo nivel sobre el plano y ninguno destacaba.
+   =================================================================== */
+.ms-h{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.ms-t{font-size:19px;font-weight:700;letter-spacing:-.015em;color:var(--text-primary);line-height:1.2}
+.ms-s{font-size:13px;color:var(--text-muted);margin-top:3px}
+.ms-s b{font-family:var(--mono);font-weight:700;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+
+.ms-acc{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.ms-acc .ghost{min-height:38px;padding:9px 14px;font-size:12.5px}
+/* Lo que espera acción se distingue del resto. */
+.ms-urgente{
+  border-color:var(--warning-bd)!important;
+  color:var(--warning)!important;
+  background:var(--warning-bg)!important;
+}
+.ms-mover{border-color:var(--warning-bd)!important;color:var(--warning)!important}
+.ms-acc .ev-mas{margin-left:auto}
+
+@media(min-width:1100px){
+  .ms-t{font-size:21px}
+}
+
+/* ===================================================================
+   TEAMS
+   ===================================================================
+   Cada team se abre y muestra su gente: antes había que entrar al
+   desglose para saber quién lo integra.
+   =================================================================== */
+.tm-h{margin-bottom:12px}
+.tm-t{font-size:19px;font-weight:700;letter-spacing:-.015em;color:var(--text-primary);line-height:1.2}
+.tm-s{font-size:13px;color:var(--text-muted);margin-top:3px}
+.tm-s b{font-family:var(--mono);font-weight:700;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+
+.tm-lista{display:flex;flex-direction:column;gap:8px}
+.tm-card{
+  border-radius:var(--r);overflow:hidden;
+  background:var(--surface);border:1px solid var(--border);
+  transition:border-color var(--t-fast) var(--ease);
+}
+.tm-card.abierto{border-color:var(--brand-primary)}
+
+.tm-head{
+  display:flex;align-items:center;gap:12px;width:100%;
+  min-height:58px;padding:13px 15px;
+  background:none;border:none;text-align:left;font-family:var(--ui);
+  transition:background var(--t-fast) var(--ease);
+}
+.tm-head:hover{background:var(--surface-2)}
+.tm-nm{flex:1;min-width:0;font-size:15px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm-cnt{
+  font-family:var(--mono);font-size:12.5px;font-weight:700;
+  min-width:30px;padding:4px 10px;border-radius:20px;text-align:center;
+  background:var(--surface-elevated);border:1px solid var(--border-strong);
+  color:var(--text-secondary);flex-shrink:0;font-variant-numeric:tabular-nums;
+}
+.tm-ch{width:17px;height:17px;color:var(--text-muted);flex-shrink:0;transition:transform var(--t) var(--ease)}
+.tm-ch.abierto{transform:rotate(180deg)}
+
+.tm-body{
+  padding:2px 15px 14px;border-top:1px solid var(--border);
+  animation:tm-abre var(--t) var(--ease);
+}
+@keyframes tm-abre{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+
+/* La gente del team: filas mínimas, muchas visibles de una. */
+.tm-gente{display:flex;flex-direction:column;margin:8px 0 12px}
+.tm-p-w{border-bottom:1px solid var(--border)}
+.tm-p-w:last-child{border-bottom:none}
+.tm-p{
+  display:flex;align-items:center;gap:11px;width:100%;
+  padding:9px 2px;min-height:46px;
+  background:none;border:none;text-align:left;cursor:pointer;
+  font:inherit;color:inherit;border-radius:9px;
+  transition:background var(--t) var(--ease);
+}
+.tm-p:hover{background:var(--surface-hover,rgba(127,127,127,.06))}
+.tm-p-ch{
+  width:16px;height:16px;flex-shrink:0;margin-left:2px;color:var(--text-tertiary);
+  transition:transform var(--t) var(--ease);
+}
+.tm-p-ch.abierto{transform:rotate(180deg)}
+
+/* Ficha de la persona: los datos que se buscan cuando hay que ubicarla. */
+.tm-ficha{
+  padding:4px 2px 13px 41px;
+  animation:tm-abre var(--t) var(--ease);
+}
+.tm-d{display:flex;align-items:baseline;gap:10px;padding:5px 0}
+.tm-d-k{
+  font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--text-tertiary);width:62px;flex-shrink:0;
+}
+.tm-d-v{font-size:14px;color:var(--text-primary);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.tm-d-falta{color:var(--text-tertiary);font-style:italic}
+.tm-d-tel{
+  font-size:14px;font-variant-numeric:tabular-nums;color:var(--brand-secondary);
+  text-decoration:none;font-weight:600;
+}
+.tm-d-tel:hover{text-decoration:underline}
+.tm-d-acc{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.tm-d-acc .ghost{min-height:34px;padding:7px 12px;font-size:12px}
+.tm-p-ini{
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  display:grid;place-items:center;font-size:11.5px;font-weight:700;color:#fff;
+  background:linear-gradient(140deg,var(--brand-primary),var(--brand-secondary));
+}
+.tm-p-nm{flex:1;min-width:0;font-size:14px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm-p-jefe{
+  font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  padding:3px 8px;border-radius:20px;flex-shrink:0;
+  background:var(--brand-soft);border:1px solid var(--lounge-bd);color:var(--brand-secondary);
+}
+
+.tm-acc{display:flex;gap:7px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border)}
+.tm-acc .ghost{min-height:36px;padding:8px 13px;font-size:12.5px}
+
+@media(min-width:1100px){
+  .tm-t{font-size:21px}
+}
+@media(prefers-reduced-motion:reduce){.tm-body,.tm-ficha{animation:none}.tm-ch,.tm-p-ch{transition:none}}
+
+/* ============================================================
+   REPORTE · cierre del evento
+   Una sola cifra manda: la liquidación. Todo lo demás la explica
+   o la contextualiza, y se lee en ese orden.
+   ============================================================ */
+.rp-h{margin-bottom:12px}
+.rp-t{font-size:19px;font-weight:700;letter-spacing:-.015em;color:var(--text-primary);line-height:1.2}
+.rp-s{font-size:13px;color:var(--text-muted);margin-top:3px}
+
+/* La cifra oficial. Grande a propósito: es la respuesta de la pantalla. */
+.rp-cierre{
+  background:var(--surface-2);border:1px solid var(--ok-bd);
+  border-radius:var(--r-lg);padding:17px 17px 15px;margin-bottom:12px;
+  position:relative;overflow:hidden;
+}
+.rp-cierre::before{
+  content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--ok);
+}
+.rp-cierre-k{
+  display:block;font-size:11px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--text-tertiary);
+}
+.rp-cierre-v{
+  display:block;font-family:var(--display);font-size:34px;line-height:1.05;
+  font-weight:700;color:var(--ok);margin:5px 0 2px;font-variant-numeric:tabular-nums;
+}
+.rp-cierre-v small{font-size:15px;font-weight:600;opacity:.65;margin-left:3px}
+.rp-cierre-f{display:block;font-size:12px;color:var(--text-muted)}
+.rp-cierre-d{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  margin-top:13px;padding-top:12px;border-top:1px solid var(--border);
+}
+.rp-cd-k{display:block;font-size:11px;color:var(--text-tertiary);font-weight:600}
+.rp-cd-v{
+  display:block;font-family:var(--mono);font-size:16px;font-weight:700;
+  color:var(--text-primary);font-variant-numeric:tabular-nums;margin-top:1px;
+}
+.rp-cd-s{display:block;font-size:10.5px;color:var(--text-tertiary);margin-top:1px}
+
+.rp-ext{display:flex;gap:9px;align-items:flex-end;margin-bottom:4px}
+.rp-ext .field{flex:1;min-width:0;margin:0}
+.rp-ext .btn{width:auto;flex-shrink:0;padding:13px 16px}
+
+/* Las tres cifras de volumen, con su variación contra el evento anterior. */
+.rp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin:14px 0 12px}
+.rp-k{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);padding:12px 13px}
+.rp-k-k{display:block;font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:.03em}
+.rp-k-v{
+  display:block;font-family:var(--display);font-size:24px;font-weight:700;line-height:1.1;
+  color:var(--text-primary);margin-top:4px;font-variant-numeric:tabular-nums;
+}
+.rp-k-v small{font-size:14px;font-weight:600;color:var(--text-tertiary)}
+
+/* Bloques secundarios: mismo marco, menos peso que la cifra de cierre. */
+.rp-bloque{
+  background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--r);padding:13px 14px;margin-bottom:11px;
+}
+.rp-bloque-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:11px}
+.rp-bloque-t{font-size:13.5px;font-weight:700;color:var(--text-primary)}
+.rp-bloque-s{font-size:11.5px;color:var(--text-tertiary)}
+
+/* La barra del aporte de cada relacionador. */
+
+.rp-bar{display:block;height:5px;border-radius:99px;background:var(--surface-3);overflow:hidden}
+.rp-bar-f{display:block;height:100%;border-radius:99px;transition:width var(--t-slow) var(--ease)}
+.rp-bar-f.alta{background:linear-gradient(90deg,var(--brand-primary),var(--brand-secondary))}
+
+.rp-listas{display:flex;flex-wrap:wrap;gap:7px}
+.rp-lp{
+  display:inline-flex;align-items:baseline;gap:6px;
+  background:var(--surface-3);border:1px solid var(--border);
+  border-radius:99px;padding:5px 11px;
+}
+.rp-lp-n{font-size:12px;color:var(--text-secondary)}
+.rp-lp-v{font-family:var(--mono);font-size:12px;color:var(--text-tertiary);font-variant-numeric:tabular-nums}
+.rp-lp-v b{color:var(--ok)}
+
+/* El cálculo por comisiones: disponible, pero plegado — no compite. */
+.rp-det{
+  background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--r);margin-bottom:11px;overflow:hidden;
+}
+.rp-det-s{
+  padding:13px 14px;font-size:13px;font-weight:600;color:var(--text-secondary);
+  cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:46px;
+}
+.rp-det-s::-webkit-details-marker{display:none}
+.rp-det-s::before{content:"▸";color:var(--text-tertiary);transition:transform var(--t) var(--ease)}
+.rp-det[open] .rp-det-s::before{transform:rotate(90deg)}
+.rp-det-s:hover{color:var(--text-primary)}
+.rp-det-b{padding:0 14px 14px;border-top:1px solid var(--border)}
+.rp-det-n{font-size:11.5px;color:var(--text-tertiary);line-height:1.5;margin:11px 0 12px}
+.rp-dl{display:flex;flex-direction:column}
+.rp-d{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)}
+.rp-d-k{font-size:12.5px;color:var(--text-secondary)}
+.rp-d-v{font-family:var(--mono);font-size:13.5px;font-weight:600;color:var(--text-primary);font-variant-numeric:tabular-nums;flex-shrink:0}
+.rp-d-neg{color:var(--text-tertiary)}
+.rp-d-tot{border-bottom:none;padding-top:10px;margin-top:2px;border-top:1px solid var(--border-strong)}
+.rp-d-tot .rp-d-k{font-weight:700;color:var(--text-primary)}
+.rp-d-tot .rp-d-v{font-size:16px;color:var(--ok)}
+
+/* Copiar el cierre es lo que se hace al terminar la noche; el resto espera. */
+.rp-acc{display:flex;gap:8px;align-items:stretch;margin-bottom:14px}
+.rp-acc .btn.primary{flex:1;min-width:0}
+.rp-mas{flex-shrink:0;width:48px;padding:0;font-size:18px;letter-spacing:1px}
+
+/* Cada relacionador con su aporte relativo al que más movió. */
+.rp-rel{cursor:pointer}
+.rp-rel-b{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.rp-rel-n{font-size:14px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-rel-bar{max-width:120px}
+
+@media(max-width:420px){
+  .rp-cierre-v{font-size:29px}
+  .rp-ext{flex-direction:column;align-items:stretch}
+  .rp-ext .btn{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.rp-bar-f{transition:none}.rp-det-s::before{transition:none}}
+
+/* Desglose del pago al boliche: cada término en su renglón, el total
+   separado por una línea — se lee como la cuenta que es. */
+.rp-liq{display:flex;flex-direction:column;margin:11px 0 0}
+.rp-lq{padding:9px 0;border-bottom:1px solid var(--border)}
+.rp-lq-k{display:block;font-size:11.5px;font-weight:600;color:var(--text-secondary)}
+.rp-lq-v{
+  display:block;font-family:var(--mono);font-size:19px;font-weight:700;
+  color:var(--text-primary);font-variant-numeric:tabular-nums;line-height:1.2;margin-top:2px;
+}
+.rp-lq-v small{font-size:12px;font-weight:600;color:var(--text-tertiary);margin-left:2px}
+.rp-lq-s{display:block;font-size:11px;color:var(--text-tertiary);margin-top:3px;font-variant-numeric:tabular-nums}
+.rp-lq-neg .rp-lq-v{color:var(--warn)}
+
+.rp-cierre-tot{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  margin-top:12px;padding-top:12px;border-top:2px solid var(--border-strong);
+}
+.rp-cierre-tk{
+  font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-secondary);
+}
+.rp-cierre-tot .rp-cierre-v{margin:0;text-align:right}
+.rp-cierre-av{
+  font-size:11.5px;line-height:1.5;color:var(--text-secondary);
+  background:var(--warn-bg);border:1px solid var(--warn-bd);
+  border-radius:var(--r-sm);padding:9px 11px;margin:12px 0 0;
+}
+
+/* ===================================================================
+   COMPOSICIÓN MÓVIL (2026-08) · el celular no es el escritorio angosto.
+   Objetivo: varias filas por pantalla, un solo CTA visible por fila y
+   cero desborde horizontal. Las acciones secundarias de ENTRADAS viven
+   en la ficha (⋯); en INVITADOS se compactan sin esconder capacidades.
+   =================================================================== */
+@media(max-width:759px){
+  /* --- filas compactas (Entradas e Invitados comparten .list-row) --- */
+  .list-row{padding:8px 2px;gap:8px}
+  .list-row .r-l{gap:8px}
+  .rc-nm{font-size:14px}
+  .rc-sub{font-size:11px}
+  .code-chip{font-size:9.5px;padding:4px 5px}
+  .tkst{font-size:10px;padding:2px 8px}
+  .ce-time{font-size:10px}
+  .tk-pick input{width:18px;height:18px}
+
+  /* Entradas: Anular y ✕ salen de la fila; viven en la ficha (⋯).
+     Queda: [✓] #code Nombre · fase/estado · ⋯  */
+  #tkList .list-row .checkin{display:none}
+  .tk-mas{min-width:40px;min-height:40px}
+
+  /* Invitados: el tick y el QR se quedan (son EL flujo de la puerta),
+     pero compactos. El ✕ pierde aire, no función. */
+  #lsAcordeon .checkin{padding:7px 9px;font-size:12px;min-height:36px}
+  .cebox{width:30px;height:30px;border-radius:8px}
+  .relmark{width:26px;height:26px;font-size:12px}
+
+  /* cabecera de cada lista: envuelve en dos líneas prolijas, no desborda */
+  .lst-head{flex-wrap:wrap;row-gap:5px;padding:11px 12px}
+  .lst-nm{flex:1 1 auto;min-width:40%}
+  .lst-cnt{font-size:10.5px;padding:2px 7px}
+  .lst-cnt b{font-size:12px}
+
+  /* filtros: dos por línea, altura contenida — no media pantalla */
+  .iv-filtros,.en-filtros{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .iv-filtros select,.en-filtros select{min-width:0;min-height:38px;font-size:12.5px}
+  .iv-tools,.en-tools{gap:7px;margin-bottom:12px}
+  .en-tools{margin-top:12px}
+
+  /* cabeceras de sección con menos aire */
+  .iv-h,.en-h{margin-bottom:10px;gap:10px}
+  .ac-h{margin-bottom:10px}
+  .ac-subs{margin-bottom:12px}
+  .ac-sub{padding:8px 12px;font-size:13px}
+
+  /* la barra de tanda no tapa media pantalla */
+  .tk-tanda{padding:8px 10px}
+  .tk-tanda .btn{padding:8px 12px;font-size:12.5px}
+}
+@media(max-width:759px){
+  /* vendedor y team en UNA línea bajo el nombre (eran dos) */
+  #tkList .rc-body{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:2px}
+  #tkList .rc-nm{flex:1 1 100%}
+}
+
+/* ===================================================================
+   ADMINISTRACIÓN DE USUARIOS Y EQUIPOS (pantalla, antes sheet gigante)
+   Tabla en escritorio, cards compactas en el celular, ficha en sheet.
+   =================================================================== */
+.gn-tabs{max-width:420px}
+.gn-filtros{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.gn-filtros select{min-width:0;min-height:38px;font-size:12.5px}
+.gn-wa{min-height:38px;padding:8px 12px;font-size:12.5px;width:auto}
+.gn-tabla{border:1px solid var(--line-2);border-radius:14px;background:var(--surface-2);overflow:hidden}
+.gn-cab{display:none}
+.gn-fila{
+  display:grid;grid-template-columns:34px 1.4fr 1fr .9fr 1fr .7fr 44px;
+  align-items:center;gap:10px;padding:10px 12px;cursor:pointer;
+  border-bottom:1px solid var(--line);font-size:13.5px;
+}
+.gn-fila:last-child{border-bottom:none}
+.gn-fila:hover{background:var(--surface-3)}
+.gn-nm{font-weight:600;color:var(--text-primary);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gn-user{font-family:var(--mono);font-size:12px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gn-team{font-size:12.5px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gn-team .vacio,.gn-user .vacio{color:var(--text-muted)}
+.gn-on{font-size:11px;color:var(--ok);background:var(--ok-bg);border-radius:20px;padding:3px 9px}
+.gn-fila .tk-mas{justify-self:end}
+@media(min-width:900px){
+  .gn-cab{
+    display:grid;grid-template-columns:34px 1.4fr 1fr .9fr 1fr .7fr 44px;gap:10px;
+    padding:9px 12px;border-bottom:1px solid var(--line-2);
+    font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-muted);
+  }
+  .gn-filtros{display:flex}
+  .gn-filtros select{min-width:150px}
+}
+@media(max-width:759px){
+  /* cards: [inicial] Nombre · Estado · ⋯  /  Rol · Team */
+  .gn-fila{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;padding:9px 10px}
+  .gn-fila .relmark{order:0}
+  .gn-nm{order:1;flex:1 1 0;min-width:35%}
+  .gn-est{order:2}
+  .gn-fila .tk-mas{order:3}
+  .gn-user{display:none}
+  .gn-rol{order:4;margin-left:34px;font-size:11.5px}
+  .gn-team{order:5;font-size:11.5px}
+}
+/* niveles internos de la administración: volver contextual + miga */
+.gn-volver{width:auto;padding:8px 14px;margin-bottom:12px;font-size:13px}
+.gn-miga{font-size:12px;color:var(--text-muted);margin:-6px 0 12px}
+.gn-miga b{color:var(--text-secondary)}
+/* Historial: quién validó cada ingreso (portero del QR o quien tickeó) */
+.ac-hf-por{
+  font-size:10.5px;color:var(--text-muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:130px;flex-shrink:1;
+}
+/* Historial: chips de filtro por vía de ingreso */
+.hf-filtros{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-bottom:12px;padding-bottom:2px}
+.hf-filtros::-webkit-scrollbar{display:none}
+.hf-chip{
+  flex:0 0 auto;font-size:12px;font-weight:600;padding:7px 12px;min-height:34px;
+  border-radius:20px;border:1px solid var(--line-2);background:var(--surface-2);color:var(--text-2);
+  white-space:nowrap;cursor:pointer;
+}
+.hf-chip.on{background:var(--brand-soft);border-color:var(--lounge-bd);color:var(--brand-secondary)}
+
+/* ===================================================================
+   VENUE · marca de la plataforma (cada boliche conserva su propia
+   identidad de color). Negro pleno + VENUE en blanco, tipográfico.
+   =================================================================== */
+.login{background:#000}
+.vn-logo{
+  font-family:var(--ui);font-size:38px;font-weight:700;color:#fff;
+  letter-spacing:.42em;margin-right:-.42em;   /* compensa el tracking del último caracter */
+  line-height:1.1;
+}
+.vn-sub{
+  font-size:11px;font-weight:500;color:#9a9aa3;
+  letter-spacing:.24em;margin-right:-.24em;text-transform:uppercase;
+  margin-top:10px;
+}
+
+/* Login y registro en la identidad VENUE: negro pleno, blanco, monocromo.
+   Alcanza a los DOS formularios (el registro por invitación se pinta
+   dentro del mismo #loginCard). Solo la pantalla de entrada: adentro,
+   la app conserva su tema. */
+.login .login-card{
+  background:#0b0b0d;border:1px solid #26262c;border-radius:18px;
+  box-shadow:0 20px 60px rgba(0,0,0,.6);
+}
+.login .field label{color:#9a9aa3}
+.login .login-card input{
+  background:#000;border:1px solid #2e2e35;color:#fff;
+}
+.login .login-card input:focus{border-color:#8a8a93;box-shadow:none;outline:none}
+.login .btn.primary{
+  background:#fff;color:#000;border:none;box-shadow:none;
+  font-weight:700;
+}
+.login .btn.primary:hover{background:#e8e8ea}
+.login .btn.primary:active{background:#d8d8dc;transform:none}
+.login .btn.primary:disabled{background:#3a3a40;color:#8a8a93}
+.login .pw-eye{color:#8a8a93}
+.login .login-foot{color:#5c5c66}
+.login .sh-h,.login h1:not(.vn-logo){color:#fff}
+
+/* ---------- Caja · quiénes aparecen (perfil de la cuenta protegida) ----------
+   Un interruptor de verdad en vez de un check: el estado tiene que leerse
+   de un vistazo, porque cambia lo que ve la caja en la puerta. */
+.cf-card{border:1px solid var(--line-2);border-radius:16px;background:var(--surface-2);padding:15px 16px;margin-bottom:14px}
+.cf-card.on{border-color:var(--ok);background:linear-gradient(180deg,rgba(52,211,153,.09),transparent 70%)}
+.cf-top{display:flex;align-items:center;gap:13px}
+.cf-tx{flex:1;min-width:0}
+.cf-t{font-weight:700;font-size:15px;line-height:1.25}
+.cf-s{display:block;margin-top:3px;font-size:12.5px;color:var(--text-3);line-height:1.35}
+.cf-sw{width:52px;height:30px;border-radius:999px;border:none;background:var(--surface-3);
+  box-shadow:inset 0 0 0 1.5px var(--line-2);position:relative;flex-shrink:0;cursor:pointer;padding:0;
+  transition:background .18s,box-shadow .18s}
+.cf-sw::after{content:"";position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;
+  background:var(--text-3);transition:transform .18s,background .18s}
+.cf-sw.on{background:rgba(52,211,153,.22);box-shadow:inset 0 0 0 1.5px var(--ok)}
+.cf-sw.on::after{transform:translateX(22px);background:var(--ok)}
+.cf-sw:active::after{width:26px}
+.cf-num{display:flex;gap:10px;margin-top:13px;padding-top:13px;border-top:1px solid var(--line-2)}
+.cf-n{flex:1;text-align:center}
+.cf-nv{display:block;font-size:19px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.cf-nk{display:block;margin-top:2px;font-size:10.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px}
+.cf-sec{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:20px 0 9px}
+.cf-sec-t{font-weight:700;font-size:13.5px}
+.cf-sec-s{font-size:11.5px;color:var(--text-3)}
+.cf-chip{display:inline-block;margin-left:7px;padding:2px 8px;border-radius:999px;font-size:10px;
+  font-weight:700;letter-spacing:.3px;background:var(--accent-soft);color:var(--accent-2);vertical-align:middle}
