@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/networking/supabase.dart';
+import 'persona_puerta.dart';
 import 'qr.dart';
 import 'resultado.dart';
 
@@ -81,6 +82,70 @@ class PuertaRepository {
         detalle: mensajeDeError(e),
       );
     }
+  }
+
+  /// Marca (o desmarca) "no pasó el filtro" sobre un QR, sin consumirlo.
+  /// Devuelve `protegida` para las entradas de la casa, que no se filtran.
+  Future<Map<String, dynamic>> marcarFiltroQr({
+    required String eventoId,
+    required QrLeido qr,
+  }) async {
+    final r = await _sb.rpc(
+      qr.esLista ? 'marcar_filtro_lista' : 'marcar_filtro_entrada',
+      params: {'p_evento': eventoId, 'p_code': qr.codigo},
+    );
+    return Map<String, dynamic>.from(r as Map? ?? const {});
+  }
+
+  /// Búsqueda por nombre para la lista en puerta.
+  Future<List<PersonaPuerta>> buscar(String eventoId, String q) async {
+    final r = await _sb.rpc('buscar_registros',
+        params: {'p_evento': eventoId, 'p_q': q});
+    return (r as List? ?? const [])
+        .map((x) => PersonaPuerta.desde(Map<String, dynamic>.from(x as Map)))
+        .toList();
+  }
+
+  /// Ingreso manual de un invitado de lista. Devuelve true si entró ahora,
+  /// false si ya había ingresado.
+  Future<bool> ingresoDeLista(String registroId) async {
+    final r = Map<String, dynamic>.from(
+        await _sb.rpc('checkin_registro', params: {'p_registro': registroId})
+            as Map);
+    return r['resultado'] == 'ok';
+  }
+
+  Future<void> desmarcarLista(String registroId) =>
+      _sb.rpc('descheckin_registro', params: {'p_registro': registroId});
+
+  Future<void> desmarcarEntrada(String eventoId, String codigo) => _sb.rpc(
+      'descheckin_entrada',
+      params: {'p_evento': eventoId, 'p_code': codigo});
+
+  /// Alterna la marca de filtro de una persona de la lista en puerta.
+  /// Devuelve el texto para avisar y si quedó marcada.
+  Future<({bool marcado, String nombre, String rrpp})> alternarFiltro(
+      String eventoId, PersonaPuerta p) async {
+    final r = Map<String, dynamic>.from(await (p.esEntrada
+        ? _sb.rpc('marcar_filtro_entrada',
+            params: {'p_evento': eventoId, 'p_code': p.codigo})
+        : _sb.rpc('marcar_filtro_registro',
+            params: {'p_registro': p.id})) as Map);
+    return (
+      marcado: r['marcado'] == true,
+      nombre: r['nombre'] as String? ?? p.nombre,
+      rrpp: r['rrpp'] as String? ?? '',
+    );
+  }
+
+  /// Relacionadores del boliche, para que el guardia consulte de qué team
+  /// es quien llega. Es la misma lista que usa la caja; no trae plata.
+  Future<List<Relacionador>> relacionadores(String clubId, String? eventoId) async {
+    final r = await _sb.rpc('roster_caja',
+        params: {'p_club': clubId, 'p_evento': eventoId});
+    return (r as List? ?? const [])
+        .map((x) => Relacionador.desde(Map<String, dynamic>.from(x as Map)))
+        .toList();
   }
 
   Future<Aforo> aforo(String eventoId) async {

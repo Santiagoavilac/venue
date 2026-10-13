@@ -5,10 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../../core/networking/supabase.dart';
 import '../../../core/theme/venue_theme.dart';
+import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
 import '../../events/data/eventos.dart';
 import '../data/puerta_repository.dart';
+import '../data/qr.dart';
 import '../data/resultado.dart';
 import 'veredicto_card.dart';
 
@@ -37,6 +40,12 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
 
   ResultadoEscaneo? _ultimo;
   bool _validando = false;
+
+  /// Modo filtro: el QR se rechaza SIN consumirse y queda marcado "no pasó
+  /// el filtro" (con el relacionador que lo trajo). Las entradas de la casa
+  /// no se filtran: siguen de largo y se validan normalmente.
+  bool _modoFiltro = false;
+  bool _ultimoMarcado = false;
   String? _ultimoCrudo;
   DateTime _ultimoEn = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -63,12 +72,34 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
     _ultimoEn = ahora;
 
     setState(() => _validando = true);
-    final r = await ref
-        .read(puertaRepositoryProvider)
-        .validar(eventoId: evento.id, crudo: crudo);
+    final repo = ref.read(puertaRepositoryProvider);
+    ResultadoEscaneo? r;
+    final qr = QrLeido.interpretar(crudo);
+    if (_modoFiltro && qr != null && !qr.esDeOtroEvento(evento.id)) {
+      try {
+        final f = await repo.marcarFiltroQr(eventoId: evento.id, qr: qr);
+        if (f['resultado'] != 'protegida') {
+          // Se muestra igual que un código inválido, a propósito: quien
+          // mira la pantalla no distingue un filtrado de un QR falso.
+          r = ResultadoEscaneo(
+            veredicto: Veredicto.noValido,
+            codigo: qr.codigo,
+            detalle: '#${qr.codigo} no existe para este evento.',
+          );
+        }
+      } catch (e) {
+        r = ResultadoEscaneo(
+          veredicto: esFallaDeRed(e) ? Veredicto.sinConexion : Veredicto.noValido,
+          codigo: qr.codigo,
+          detalle: mensajeDeError(e),
+        );
+      }
+    }
+    final res = r ?? await repo.validar(eventoId: evento.id, crudo: crudo);
     if (!mounted) return;
+    _ultimoMarcado = false;
 
-    if (r.veredicto.dejaPasar) {
+    if (res.veredicto.dejaPasar) {
       HapticFeedback.mediumImpact();
       SystemSound.play(SystemSoundType.click);
     } else {
@@ -77,12 +108,39 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
     }
     setState(() {
       _validando = false;
-      _ultimo = r;
-      _historial.insert(0, _Registro(r));
+      _ultimo = res;
+      _historial.insert(0, _Registro(res));
       if (_historial.length > 30) _historial.removeLast();
     });
-    if (r.veredicto != Veredicto.sinConexion) {
+    if (res.veredicto != Veredicto.sinConexion) {
       ref.invalidate(aforoProvider(evento.id));
+    }
+  }
+
+  /// Bandera sobre el último QR de entrada: "no pasó el control".
+  Future<void> _alternarBandera() async {
+    final evento = ref.read(eventoActivoProvider);
+    final u = _ultimo;
+    if (evento == null || u == null || u.codigo.isEmpty) return;
+    try {
+      final f = await ref.read(puertaRepositoryProvider).marcarFiltroQr(
+          eventoId: evento.id, qr: QrLeido(codigo: u.codigo, esLista: false));
+      if (!mounted) return;
+      if (f['resultado'] != 'ok') {
+        avisar(context, 'No se encontró la entrada', tipo: TipoAviso.aviso);
+        return;
+      }
+      final marcado = f['marcado'] == true;
+      setState(() => _ultimoMarcado = marcado);
+      avisar(
+        context,
+        marcado
+            ? '${f['nombre']} marcado · lo vendió ${f['rrpp']}'
+            : 'Marca quitada a ${f['nombre']}',
+        tipo: marcado ? TipoAviso.aviso : TipoAviso.ok,
+      );
+    } catch (e) {
+      if (mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
     }
   }
 
@@ -184,6 +242,33 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
                     child: Center(child: CircularProgressIndicator()),
                   ),
                 Positioned(
+                  left: 12,
+                  bottom: 12,
+                  child: IconButton.filled(
+                    tooltip: _modoFiltro
+                        ? 'Modo filtro activado'
+                        : 'Modo filtro: rechaza sin consumir la entrada',
+                    iconSize: 28,
+                    style: IconButton.styleFrom(
+                      backgroundColor:
+                          _modoFiltro ? VenueColors.mal : Colors.black54,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(56, 56),
+                    ),
+                    onPressed: () {
+                      setState(() => _modoFiltro = !_modoFiltro);
+                      avisar(
+                        context,
+                        _modoFiltro
+                            ? 'Modo filtro: los QR se rechazan sin consumirse'
+                            : 'Modo filtro apagado',
+                        tipo: _modoFiltro ? TipoAviso.aviso : TipoAviso.ok,
+                      );
+                    },
+                    icon: const Icon(Icons.bolt_rounded),
+                  ),
+                ),
+                Positioned(
                   right: 12,
                   bottom: 12,
                   child: ValueListenableBuilder(
@@ -214,9 +299,29 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        if (_ultimo != null)
-          VeredictoCard(resultado: _ultimo!)
-        else
+        if (_ultimo != null) ...[
+          VeredictoCard(resultado: _ultimo!),
+          // La bandera vale para entradas con QR que el servidor reconoció.
+          if (const {Veredicto.pasa, Veredicto.yaIngreso}
+                  .contains(_ultimo!.veredicto) &&
+              !(_ultimo!.tipo?.contains('casa') ?? false))
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _alternarBandera,
+                icon: Icon(_ultimoMarcado
+                    ? Icons.flag_rounded
+                    : Icons.flag_outlined),
+                label: Text(_ultimoMarcado
+                    ? 'Marcado: no pasó el control'
+                    : 'Marcar: no pasó el control'),
+                style: TextButton.styleFrom(
+                  foregroundColor:
+                      _ultimoMarcado ? VenueColors.mal : VenueColors.textoSuave,
+                ),
+              ),
+            ),
+        ] else
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 14),
             child: Text(

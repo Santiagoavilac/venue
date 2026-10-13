@@ -93,6 +93,15 @@ dentro de la app.
 
 Compilar: `cd venue_mobile && flutter run --dart-define-from-file=env/dev.json`
 
+## Paridad web → app (en curso)
+
+Plan por etapas en `docs/PARIDAD.md`. **Etapa 1 · Puerta: hecha** — escáner
+con modo filtro y bandera, lista en puerta (buscar, marcar y desmarcar
+ingreso, filtro) y consulta de RRPPs. 29 tests unitarios/widget y 8 de
+integración contra el demo pasan (`flutter test test/integracion
+--dart-define-from-file=env/dev.json`). Falta de esa etapa: mesas en modo
+seguridad (va con Mesas). Etapas 2 a 9: sin empezar.
+
 ## Fases 4–8 — sin empezar
 
 Listas, entradas, RRPP/teams, eventos y admin, mesas y pagos, caja, barra/POS,

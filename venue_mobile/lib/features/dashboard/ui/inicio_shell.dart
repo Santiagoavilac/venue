@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/estado_vista.dart';
 import '../../access_control/ui/escaner_screen.dart';
+import '../../access_control/ui/lista_puerta_screen.dart';
+import '../../access_control/ui/rrpps_screen.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/ui/eventos_screen.dart';
 import 'cuenta_screen.dart';
@@ -21,6 +23,12 @@ List<_Seccion> _seccionesPara(Rol rol) => [
       if (rol.validaIngresos)
         const _Seccion('Escáner', Icons.qr_code_scanner_rounded,
             Icons.qr_code_scanner_rounded, EscanerScreen()),
+      if (rol.validaIngresos)
+        const _Seccion('Lista', Icons.checklist_rounded,
+            Icons.checklist_rounded, ListaPuertaScreen()),
+      if (rol == Rol.portero)
+        const _Seccion('RRPPs', Icons.groups_outlined, Icons.groups_rounded,
+            RrppsScreen()),
       if (rol.veEventos)
         const _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
             EventosScreen()),
