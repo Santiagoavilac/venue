@@ -1,107 +1,119 @@
 # Venue · estado de implementación
 
-Última actualización: 2026-10-13
+Última actualización: 2026-10-13 · Backend de trabajo: proyecto demo
+`cxksjarupexptfksnptg` (sin datos reales).
 
-Plan completo: ver el plan aprobado (fases 1–8). Este archivo dice qué está
-hecho **y ejecutado de verdad**, y qué no.
+Solo figura como probado lo que se ejecutó de verdad.
 
-## Hecho
+## Fase 1 · Auditoría — parcial
 
 | Qué | Estado |
 | --- | --- |
-| Repositorio git inicializado, primer commit con la web intacta | hecho |
-| `.gitignore` (credenciales, builds) · `config.js` y `.env.local` apuntando al proyecto demo `cxksjarupexptfksnptg` | hecho |
-| Proyecto demo verificado vacío (0 tablas, 0 usuarios) | verificado por REST |
-| Herramientas: Flutter 3.44.2, Dart 3.12.2, Xcode 26.5, Android SDK 36.1, CocoaPods 1.17 (`flutter doctor` sin problemas) | verificado |
-| Servidor MCP `supabase-venue` agregado para el proyecto demo | agregado, **falta autorizarlo** |
-| `db/18-helpers-permiso.sql` — rol efectivo por boliche, platform admins, `es_servicio()` | **escrito, sin ejecutar** |
-| `db/19-rpc-guardas.sql` — matriz de permisos de 76 RPC + generador de guardas + `revoke` a anónimos | **escrito, sin ejecutar** |
-| `db/20-triggers-servicio.sql` — triggers de cuenta protegida, perfil y membresía | **escrito, sin ejecutar** |
+| Revisión de código, esquema, RLS, triggers y Edge Function | hecha |
+| Instalación limpia de `db/01…17` en un proyecto vacío | hecha; falló en 2 puntos, corregidos (ver abajo) |
+| `docs/RPC_MATRIZ.md` (79 funciones: quién puede llamarlas) | generado desde la matriz que corre en el servidor |
+| `docs/INVENTARIO.md`, `docs/ESQUEMA.md`, `docs/PARIDAD.md` | **pendientes** |
 
-## App móvil (`venue_mobile/`) · Fase 3 empezada
+Fallos de instalación limpia encontrados y corregidos:
+- `02f` usaba `unaccent()` sin activar la extensión → `db/00-extensiones.sql`.
+- `02d` insertaba fases de un evento del proyecto de origen que no existe → ahora es condicional.
+- El `insert into profiles` del README omitía columnas obligatorias → defaults en `db/26` y README corregido.
+
+## Fase 2 · Seguridad — aplicada y probada en el demo
+
+| Migración | Qué hace |
+| --- | --- |
+| `18-helpers-permiso` | Rol efectivo **por boliche**, administradores de plataforma, distinción real entre servicio y anónimo |
+| `19-rpc-guardas` | 79 RPC con guarda de sesión + rol + boliche (las originales quedan intactas en el esquema interno `impl`); sin acceso anónimo; bloqueo de fila en ventas de mesa; límite de 40 códigos inexistentes cada 5 min en puerta |
+| `20-triggers-servicio` | Cuenta protegida, perfiles y membresías: nadie se cambia sus propios permisos |
+| `21-rls-por-boliche` | Todas las tablas filtran por boliche; pagos y teléfonos restringidos; vistas de stats respetan RLS |
+| `22-codigos-e-invitaciones` | Códigos de entrada de 10 caracteres con generador criptográfico; invitaciones de 128 bits con vencimiento opcional |
+| `23-comprobantes-privados` | Bucket privado + URL firmada (la web ya las usa) |
+| `25-auditoria` | `audit_log` con quién/cuándo/antes/después en pagos, entradas, invitados, mesas, perfiles, membresías, eventos, teams, boliches y ventas de barra |
+| `26-instalacion-limpia` | Defaults y `search_path` fijo |
+| Edge Function `crear-usuario` | Desplegada: límite de intentos por IP, invitación con vencimiento, rol validado, crear admins solo plataforma |
+
+### Pruebas ejecutadas
+
+`python3 tests/test_seguridad.py` → **103 de 103 pasan** contra el demo, con
+sesiones reales de 13 usuarios en 2 boliches. Cubren: anónimo sin acceso;
+RRPP sin funciones administrativas; aislamiento entre boliches (RPC, tablas y
+vistas); cuenta protegida; jefe no se asciende; teléfonos solo del team; 6
+validaciones simultáneas del mismo QR → entra una; 3 ventas simultáneas de la
+misma mesa → se vende una; auditoría; límite de intentos; comprobantes
+privados; alta de usuarios.
+
+Verificado en el catálogo: 0 funciones propias ejecutables por anónimos, 0
+tablas sin RLS, 0 permisos de tabla para anónimos, esquema interno cerrado.
+Asesor de seguridad de Supabase: sin errores.
+
+Antes de aplicar se confirmó el agujero: con solo la anon key,
+`eliminar_evento` se ejecutaba.
+
+### Bugs del original encontrados por las pruebas
+
+- **Doble venta de mesa**: dos RRPP podían vender la misma mesa a la vez. Corregido con bloqueo de fila.
+- **Un jefe podía ascenderse a admin** editando su propio perfil. Corregido.
+- **Cualquiera podía editar su propia membresía de boliche**. Corregido.
+- `bar_ventas` no guardaba quién vendió. Ahora sí (`vendido_por`), y el bartender solo anula sus ventas.
+
+### Cambios de comportamiento
+
+- Un admin común administra solo los boliches de `profiles.clubs`. Solo la cuenta `admin_principal` (o `platform_admins`) ve todos, crea boliches y nombra admins.
+- `profiles.clubs` vacío = sin acceso (antes = todos los boliches).
+- Un usuario creado sin team nace sin boliche; se lo asigna el admin que lo creó.
+- El jefe ve solo los teléfonos de su team. El RRPP solo paga/libera mesas que vendió y genera QR de sus invitados.
+- Las invitaciones de team existentes se regeneraron (links viejos ya no sirven).
+
+### Pendiente de seguridad
+
+- **Estados de pago e idempotencia** (`24`): pagos parciales, anticipos, devoluciones, clave de idempotencia en `crear_pago`. Sin hacer. La barra ya tenía idempotencia (`client_key`).
+- **La web no se volvió a recorrer a mano** tras las migraciones: `node --check` pasa y las RPC que usa responden, pero falta un recorrido por rol en el navegador.
+- Decisión de negocio abierta: el RRPP sigue leyendo todos los invitados y entradas de su boliche (lo usan Listas y Reporte), y RRPP/jefes con `puede_tickear` pueden marcar el ingreso de sus invitados.
+- Flujo de barra (recibir lote → vender → stock) sin test automatizado.
+- Avisos menores del asesor: `unaccent` en `public`; protección de contraseñas filtradas desactivada (se activa en el panel de Auth).
+- Rotar la service role key del demo (quedó pegada en el chat).
+
+## Fase 3 · App móvil (`venue_mobile/`) — base hecha
 
 Flutter 3.44 · Riverpod 3 · go_router · supabase_flutter · mobile_scanner.
 
 | Qué | Estado |
 | --- | --- |
-| Estructura por features, tema oscuro con acento por boliche, estados de carga/vacío/error | hecho |
-| Login usuario/clave, sesión persistida, cuenta desactivada | escrito; **sin probar contra el backend** (la base demo está vacía) |
-| Selector de boliche (`mis_clubs`) y rol efectivo desde el servidor (`rol_en_club`) | escrito; depende de aplicar `db/18` |
-| Eventos del boliche y evento de trabajo | escrito; sin probar contra el backend |
-| Escáner de puerta: cámara nativa, linterna, háptica, código manual, aforo, últimos escaneos, 7 veredictos | escrito; sin probar en dispositivo |
-| `flutter analyze` | sin problemas |
-| `flutter test` | 23 tests pasan (parser de QR, veredictos, rutas, roles, tema, tarjeta) |
-| `flutter build ios --release --no-codesign` | compila (Runner.app 18 MB) |
-| Instalación en iPhone | instalada y lanzada en "Santiago Avila (2)" (iPhone 16 Pro); pantallas sin verificar a mano |
+| Tema oscuro con acento por boliche, estados de carga/vacío/error | hecho |
+| Login, sesión persistida, selector de boliche, rol desde el servidor, eventos | hecho; las llamadas al backend se verificaron por API con 3 roles |
+| Escáner de puerta (cámara, linterna, háptica, código manual, aforo, 7 veredictos) | hecho; **sin probar en el teléfono con un QR real** |
+| `flutter analyze` / `flutter test` | sin problemas / 23 tests pasan |
+| Build iOS firmado (equipo `734M3ZA484`, `app.venue.venueMobile`) | compila; instalado una vez en el iPhone, **antes** de que existiera el backend |
+| Android | sin compilar todavía |
 
-Pendiente conocido en lo ya escrito: la sesión se guarda sin cifrar
-(preferencias de la app); pasarla al llavero con `flutter_secure_storage`.
-Sin validación de QR offline: sin señal el escáner responde SIN CONEXIÓN y
-no deja pasar.
+Pendiente en lo ya escrito: guardar la sesión en el llavero
+(`flutter_secure_storage`); registro por invitación y recuperación de clave
+dentro de la app.
 
 Compilar: `cd venue_mobile && flutter run --dart-define-from-file=env/dev.json`
 
-## Pruebas ejecutadas
+## Fases 4–8 — sin empezar
 
-Ninguna sobre las migraciones nuevas: todavía no hay forma de correr SQL
-contra el proyecto demo (ver "Bloqueos"). `node --check` de `app.js` y
-`contabilidad.js`: OK.
+Listas, entradas, RRPP/teams, eventos y admin, mesas y pagos, caja, barra/POS,
+comisiones y reportes en la app · CRM · WhatsApp Business, push, campañas,
+dashboard · offline y sincronización · publicación en tiendas.
 
-## Hallazgos nuevos durante la Fase 2
+## Datos de demostración
 
-- Un **jefe podía ascenderse a admin**: la política de RLS le deja actualizar
-  las filas de su team (incluida la suya) y `perfil_update_guard` dejaba
-  pasar todo cuando la persona editaba su propia fila. Corregido en `20-…`.
-- `club_membership`: quien editaba su propia fila pasaba sin control.
-  Corregido en `20-…`.
-- `bar_ventas` no guarda qué usuario hizo la venta: no se puede auditar ni
-  limitar la anulación al bartender que la hizo. Pendiente para `25-auditoria`.
-- En la web, RRPP y jefes pueden marcar el ingreso de sus propios invitados
-  (`puede_tickear`), lo que infla sus "ingresaron" para comisión. Se conserva
-  la regla (no se quitan funciones) pero queda señalado como riesgo de negocio.
+`python3 tools/seed_demo.py` crea 2 boliches (Aurora Club, Nebula), 14
+usuarios (contraseña `Venue2026!`), un evento por boliche abierto todo el
+día, lista de invitados, entradas, 4 mesas, un combo y una barra.
 
-## Cambios de comportamiento que traen las migraciones
+## Necesita al propietario
 
-- `profiles.clubs` vacío deja de significar "todos los boliches".
-- Un admin común solo es admin en los boliches de `profiles.clubs`; solo un
-  platform admin (`admin_principal` o tabla `platform_admins`) ve todos, crea
-  boliches y nombra otros admins.
-- El jefe ve solo los teléfonos de su team (`telefonos_equipo`).
-- El RRPP solo paga/libera mesas que vendió y solo genera QR de sus invitados.
-
-## Bloqueos (necesitan al propietario)
-
-1. **Autorizar el MCP**: `/mcp` → `supabase-venue` → autenticar. Sin eso no
-   se pueden aplicar `db/01…20` ni correr los tests de permisos.
-2. **Firma de iOS**: resuelto. Se firma con el equipo de Sebastian Vaca Diez (`734M3ZA484`), bundle id `app.venue.venueMobile`; instalada y abierta en el iPhone "Santiago Avila (2)". Lo que sigue describía el intento anterior:
-   ("login details were rejected"). Volver a iniciar sesión en
-   Xcode → Settings → Accounts. El proyecto ya apunta al equipo `ANTK9WLN9M`
-   con bundle id `app.venue.venueMobile`.
-3. **Liberar disco**: quedan ~6,6 GB (eran 2 GB). Los builds de Flutter
-   (Gradle, CocoaPods) necesitan al menos 15 GB.
-
-## Pendiente (en orden)
-
-- Fase 1: `docs/INVENTARIO.md`, `docs/ESQUEMA.md`, `docs/PARIDAD.md`,
-  `docs/RPC_MATRIZ.md` (se genera desde `impl.rpc_permiso`), tests de
-  caracterización.
-- Fase 2: aplicar y probar 18–20; escribir 21 (RLS por boliche), 22
-  (tokens de QR e invitación, límite de intentos), 23 (comprobantes
-  privados), 24 (idempotencia y estados de pago), 25 (auditoría), 26
-  (instalación limpia + README); `tests/seguridad/`; ajustes en `app.js`.
-- Fases 3–8: sin empezar.
-
-## Credenciales y configuración que faltan
-
-Cuenta Apple Developer · Google Play Console · proyecto Firebase y clave APNs
-· cuenta WhatsApp Business (Meta Cloud API) · proveedor de QR bancario (si se
-quiere verificación automática de pagos) · logo por boliche.
-
-La service role key del demo quedó pegada en el chat: conviene rotarla al
-terminar las pruebas.
+Cuenta Apple Developer / Google Play para publicar · proyecto Firebase y clave
+APNs (push) · cuenta WhatsApp Business de Meta · proveedor de QR bancario si
+se quiere verificación automática · logo por boliche · más espacio en disco
+para compilar Android (quedan ~6 GB).
 
 ## Próximo paso técnico
 
-Con el MCP autorizado: aplicar `db/01…17` en el demo, registrar qué falla en
-instalación limpia, aplicar 18–20 y correr la matriz de permisos (anónimo +
-8 roles × 2 boliches).
+Probar el escáner en el iPhone con una entrada real del demo y seguir con la
+Fase 4 por la puerta (búsqueda por nombre y check-in de lista) y RRPP
+(listas y entradas).

@@ -29,9 +29,24 @@ create table if not exists impl.rpc_permiso (
   roles   text not null,      -- documentación: roles admitidos
   guarda  text not null,      -- PL/pgSQL que corre antes de delegar (deja v_rol)
   filtro  text,               -- solo set-returning: condición sobre la fila `t`
-  nota    text
+  nota    text,
+  despues text                -- PL/pgSQL que corre tras delegar (el resultado está en v_res)
 );
+alter table impl.rpc_permiso add column if not exists despues text;
 truncate impl.rpc_permiso;
+
+/* Intentos de validación en puerta. Sirve para frenar a quien prueba códigos
+   al azar: cada validación queda anotada y, pasado un tope de códigos
+   inexistentes en pocos minutos, la cuenta queda en pausa. */
+create table if not exists intento_validacion (
+  id        bigint generated always as identity primary key,
+  user_id   uuid not null,
+  evento_id uuid not null,
+  ok        boolean not null,
+  at        timestamptz not null default now()
+);
+create index if not exists intento_validacion_user_idx on intento_validacion (user_id, at desc);
+alter table intento_validacion enable row level security;   -- sin políticas: solo las guardas
 
 /* guarda estándar: rol en el boliche de la entidad `tipo` que llega en `arg` */
 create or replace function impl.g(p_tipo text, p_arg text, p_roles text)
@@ -87,8 +102,8 @@ insert into impl.rpc_permiso (fn, alcance, roles, guarda, filtro, nota) values
 ('aviso_lectores',       'aviso',  'admin',                    impl.g('aviso','p_aviso','admin'), null, null),
 ('marcar_aviso_visto',   'aviso',  '*',                        impl.g('aviso','p_aviso','*'), null, null),
 -- ── puerta ───────────────────────────────────────────────────────────
-('validar_entrada',      'evento', 'admin,portero',            impl.g('evento','p_evento','admin,portero'), null, 'CONSUME la entrada'),
-('validar_qr_lista',     'evento', 'admin,portero',            impl.g('evento','p_evento','admin,portero'), null, 'marca el ingreso'),
+('validar_entrada',      'evento', 'admin,portero',            impl.g('evento','p_evento','admin,portero') || ' if (select count(*) from intento_validacion iv where iv.user_id = auth.uid() and not iv.ok and iv.at > now() - interval ''5 minutes'') >= 40 then raise exception ''Demasiados códigos inválidos seguidos. Esperá unos minutos o avisá al administrador.''; end if;', null, 'CONSUME la entrada · máx. 40 códigos inexistentes cada 5 min'),
+('validar_qr_lista',     'evento', 'admin,portero',            impl.g('evento','p_evento','admin,portero') || ' if (select count(*) from intento_validacion iv where iv.user_id = auth.uid() and not iv.ok and iv.at > now() - interval ''5 minutes'') >= 40 then raise exception ''Demasiados códigos inválidos seguidos. Esperá unos minutos o avisá al administrador.''; end if;', null, 'marca el ingreso · máx. 40 códigos inexistentes cada 5 min'),
 ('descheckin_entrada',   'evento', 'admin,portero',            impl.g('evento','p_evento','admin,portero'), null, null),
 ('marcar_filtro_entrada','evento', 'admin,portero',            impl.g('evento','p_evento','admin,portero'), null, null),
 ('marcar_filtro_lista',  'evento', 'admin,portero',            impl.g('evento','p_evento','admin,portero'), null, null),
@@ -174,10 +189,16 @@ insert into impl.rpc_permiso (fn, alcance, roles, guarda, filtro, nota) values
    impl.g('evento','p_evento','admin,propietario,barra') ||
    ' if impl.club_de(''barra'', p_barra) is distinct from impl.club_de(''evento'', p_evento) then raise exception ''No autorizado.'' using errcode = ''42501''; end if;',
    null, 'la barra tiene que ser del mismo boliche que el evento'),
-('bar_anular_venta',     'venta',  'admin,propietario,barra',  impl.g('venta','p_venta','admin,propietario,barra'), null,
-   'bar_ventas no guarda quién vendió: no se puede limitar al bartender a las suyas hasta 25-auditoria.sql'),
+('bar_anular_venta',     'venta',  'admin,propietario,barra',
+   impl.g('venta','p_venta','admin,propietario,barra') ||
+   ' if v_rol = ''barra'' and not exists (select 1 from bar_ventas bv where bv.id = p_venta and (to_jsonb(bv) ->> ''vendido_por'') = auth.uid()::text) then raise exception ''No autorizado.'' using errcode = ''42501''; end if;',
+   null, 'el bartender solo anula sus propias ventas (bar_ventas.vendido_por, 25-auditoria.sql)'),
 ('bar_ajuste_conteo',    'lote',   'admin,propietario',        impl.g('lote','p_lote','admin,propietario'), null, null),
 ('bar_baja',             'lote',   'admin,propietario',        impl.g('lote','p_lote','admin,propietario'), null, null);
+
+update impl.rpc_permiso set despues =
+  'if auth.uid() is not null then insert into intento_validacion (user_id, evento_id, ok) values (auth.uid(), p_evento, (v_res::jsonb ->> ''resultado'') is distinct from ''no_existe''); end if;'
+ where fn in ('validar_entrada', 'validar_qr_lista');
 
 /* ── generador ─────────────────────────────────────────────────────── */
 do $gen$
@@ -220,6 +241,7 @@ begin
           format('return query select * from %s t%s;', v_call,
                  case when r.filtro is not null then ' where ' || r.filtro else '' end)
         when f.prorettype = 'void'::regtype then format('perform %s;', v_call)
+        when r.despues is not null then format('v_res := %s; %s return v_res;', v_call, r.despues)
         else format('return %s;', v_call)
       end;
       execute format('drop function if exists public.%I(%s)', r.fn, f.ident);
@@ -228,13 +250,16 @@ begin
         language plpgsql %s security definer set search_path = public
         as $guarda$
         #variable_conflict use_column
-        declare v_rol text;
+        declare v_rol text; %s
         begin
           %s
           %s
         end;
         $guarda$
-      $f$, r.fn, f.args, f.res, v_vol, r.guarda, v_cuerpo);
+      $f$, r.fn, f.args, f.res, v_vol,
+           case when r.despues is not null and not f.proretset and f.prorettype <> 'void'::regtype
+                then format('v_res %s;', f.res) else '' end,
+           r.guarda, v_cuerpo);
       execute format('comment on function public.%I(%s) is %L', r.fn, f.ident, 'venue:guarda');
     end loop;
   end loop;
@@ -268,8 +293,25 @@ revoke execute on all functions in schema impl   from public, anon, authenticate
 
 -- internas: se usan solo desde otras funciones (que corren como dueño)
 revoke execute on function gen_code_evento(uuid), mesa_limpiar(uuid) from authenticated;
-revoke execute on function cuenta_protegida_guard(), perfil_update_guard(),
-  membresia_protegida_guard() from authenticated;
+
+-- El GRANT general de arriba alcanza a TODO lo que haya en public. Dos cosas
+-- no pueden quedar abiertas a una sesión común:
+--   · las funciones de trigger (no son RPC);
+--   · el instalador temporal _venue_exec (tools/aplicar.py), que ejecuta SQL
+--     arbitrario: solo service_role, y se borra al terminar de instalar.
+do $cerrar$
+declare f record;
+begin
+  for f in
+    select p.oid::regprocedure as firma
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and (p.prorettype = 'trigger'::regtype or p.proname = '_venue_exec')
+  loop
+    execute format('revoke execute on function %s from public, anon, authenticated', f.firma);
+  end loop;
+end
+$cerrar$;
 
 -- lo que se cree de acá en adelante nace cerrado para anónimos
 alter default privileges revoke execute on functions from public;

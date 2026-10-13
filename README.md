@@ -17,9 +17,24 @@ Creá un proyecto nuevo en [supabase.com](https://supabase.com), y anotá:
 
 **2 · Crear el esquema**
 
-En el SQL Editor de Supabase, pegá y ejecutá los archivos de `db/` **en
-orden numérico** (`01-tablas.sql`, `02-rpc-lectura.sql`, … hasta
-`17-boliches-dinamicos.sql`), uno por uno.
+Los archivos de `db/` se aplican **en orden** (`00-extensiones.sql`,
+`01-tablas.sql`, … hasta `26-instalacion-limpia.sql`). Dos formas:
+
+- A mano: pegarlos uno por uno en el SQL Editor de Supabase.
+- Con el script (necesita `.env.local` con la URL y la service role key):
+  ejecutar `tools/instalador.sql` en el SQL Editor y después
+
+  ```bash
+  python3 tools/aplicar.py $(ls db/*.sql | sort)
+  ```
+
+  Al terminar, borrar el instalador:
+  `drop function if exists public._venue_exec(text);`
+
+Los archivos 18 en adelante son la capa de seguridad (permisos por boliche,
+guardas de las RPC, RLS, auditoría). **No son opcionales.**
+
+Desplegar también la Edge Function `db/functions/crear-usuario`.
 
 **3 · Configurar la app**
 
@@ -42,23 +57,26 @@ Abrí <http://localhost:5173>.
 **5 · Crear el primer usuario admin**
 
 En Supabase → Authentication → Users → **Add user**, creá una cuenta con
-email y contraseña. Después, en el SQL Editor:
+email `admin@plataforma.local` y una contraseña. Después, en el SQL Editor:
 
 ```sql
-insert into profiles (id, usuario, nombre, rol, activo, admin_principal)
-values (
-  '<uuid del usuario creado arriba>',
-  'admin',
-  'Administrador',
-  'admin',
-  true,
-  true
-);
+insert into profiles (id, usuario, nombre, rol, admin_principal)
+values ('<uuid del usuario creado arriba>', 'admin', 'Administrador', 'admin', true);
 ```
 
-Con esa cuenta entrás a la app y desde **Admin → Boliches** creás el o los
-locales (nombre, colores de marca, etc.), y desde **Admin → Usuarios**
-das de alta al resto del equipo con su rol (portero, caja, RRPP, jefe...).
+`admin_principal = true` la vuelve administradora de la **plataforma**: ve
+todos los boliches, los crea (**Admin → Boliches**) y nombra a los admins de
+cada uno. Un admin común solo administra los boliches de `profiles.clubs`.
+
+Para un entorno de prueba con dos boliches y un usuario por rol:
+`python3 tools/seed_demo.py`.
+
+## Pruebas
+
+```bash
+python3 tools/seed_demo.py && python3 tests/test_seguridad.py   # 103 casos de permisos contra el proyecto de .env.local
+cd venue_mobile && flutter test                                  # app móvil
+```
 
 ## Estructura
 
@@ -71,12 +89,17 @@ das de alta al resto del equipo con su rol (portero, caja, RRPP, jefe...).
 | `config.js` | Credenciales de Supabase (no versionar) |
 | `db/*.sql` | Esquema completo, en orden de aplicación |
 | `db/functions/` | Edge Functions de Supabase |
+| `docs/RPC_MATRIZ.md` | Quién puede llamar a cada función del servidor |
+| `tools/` | Instalador de SQL y datos de demostración |
+| `tests/` | Pruebas de permisos contra un proyecto de prueba |
+| `venue_mobile/` | App Flutter (iOS / Android) |
+| `IMPLEMENTATION_STATUS.md` | Qué está hecho, probado y pendiente |
 
 ## Notas
 
 - La `anon key` es pública por diseño (viaja al navegador de todos modos).
-  Lo que protege los datos es RLS (`db/06-rls.sql` y
-  `db/09-endurecimiento.sql`), no esconder esa clave.
+  Lo que protege los datos son las guardas de las RPC y RLS por boliche
+  (`db/18` a `db/25`), no esconder esa clave.
 - La `service_role` key **nunca** va en el cliente ni en `config.js`.
 - Sin build ni bundler: HTML + CSS + JS plano. `node dev.mjs` sirve los
   archivos sin caché para que los cambios se vean al recargar.

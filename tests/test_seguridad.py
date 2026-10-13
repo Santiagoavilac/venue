@@ -164,6 +164,67 @@ r = rpc("bar_proyeccion_compra", {"p_club": "aurora"}, B); caso("bartender no ve
 r = http("POST", "/rest/v1/bebidas", {"club_id": "aurora", "nombre": "Pirata"}, token=B); caso("bartender no crea bebidas", not permitido(r), r)
 r = get("barras?select=id", T["rrpp.aurora"]); caso("rrpp no lee el módulo barra", r[1] == [], r)
 
+
+print("\n── códigos, auditoría y límite de intentos ──")
+r = rpc("generar_entrada", {"p_evento": ev_a, "p_cliente": "Prueba Código"}, R)
+nueva = servicio("GET", f"/rest/v1/entradas?evento_id=eq.{ev_a}&cliente=eq.Prueba%20C%C3%B3digo&select=id,code&order=created_at.desc&limit=1")[1]
+cod = nueva[0]["code"] if nueva else ""
+caso("código nuevo: 10 caracteres sin ambiguos", permitido(r) and len(cod) == 10 and not set(cod) & set("ILOU01"), (r, cod))
+r = rpc("validar_entrada", {"p_evento": ev_a, "p_code": cod}, P); caso("el código nuevo valida en puerta", permitido(r) and r[1]["resultado"] == "valida", r)
+r = get(f"audit_log?tabla=eq.entradas&fila_id=eq.{nueva[0]['id']}&select=op,actor,club_id", T["admin.aurora"])
+caso("la validación quedó auditada (quién y en qué boliche)", r[1] and r[1][0]["actor"] == uid["portero.aurora"] and r[1][0]["club_id"] == "aurora", r)
+r = get("audit_log?club_id=eq.aurora&select=id&limit=1", AN); caso("admin de Nebula no lee la auditoría de Aurora", r[1] == [], r)
+r = get("audit_log?select=id&limit=1", R); caso("rrpp no lee la auditoría", r[1] == [], r)
+r = http("POST", "/rest/v1/audit_log", {"tabla": "x", "op": "INSERT"}, token=AA); caso("nadie escribe la auditoría por la API", not permitido(r), r)
+rpc("eliminar_entrada", {"p_entrada": nueva[0]["id"]}, T["admin.aurora"])
+servicio("DELETE", f"/rest/v1/entradas?id=eq.{nueva[0]['id']}")
+PN = T["portero.nebula"]
+ult = None
+for i in range(42):
+    ult = rpc("validar_entrada", {"p_evento": ev_n, "p_code": f"NOPE{i:04d}"}, PN)
+caso("tras 40 códigos inexistentes la puerta corta al que prueba al azar", not permitido(ult) and "Demasiados" in str(ult[1]), ult)
+
+print("\n── comprobantes privados ──")
+import urllib.request, urllib.error
+from venue_api import URL
+def crudo(metodo, ruta, tok, datos=None, tipo="image/jpeg"):
+    h = {"apikey": ANON, "Authorization": f"Bearer {tok or ANON}"}
+    if datos is not None: h["Content-Type"] = tipo; h["x-upsert"] = "true"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(URL + ruta, method=metodo, headers=h, data=datos), timeout=60) as x: return x.status
+    except urllib.error.HTTPError as e: return e.code
+ruta = f"{uid['rrpp.aurora']}/prueba.jpg"
+caso("rrpp sube su comprobante", crudo("POST", f"/storage/v1/object/comprobantes/{ruta}", R, b"\xff\xd8\xff\xd9") < 300)
+caso("rrpp no sube en la carpeta de otro", crudo("POST", f"/storage/v1/object/comprobantes/{uid['jefe.aurora']}/x.jpg", R, b"\xff\xd8\xff\xd9") >= 400)
+caso("la URL pública ya no abre el comprobante", crudo("GET", f"/storage/v1/object/public/comprobantes/{ruta}", None) >= 400)
+firmar = lambda tok: http("POST", f"/storage/v1/object/sign/comprobantes/{ruta}", {"expiresIn": 60}, token=tok)
+caso("quien lo subió obtiene URL firmada", permitido(firmar(R)), firmar(R))
+caso("su jefe de team obtiene URL firmada", permitido(firmar(J)))
+caso("el admin de su boliche obtiene URL firmada", permitido(firmar(AA)))
+caso("otro rrpp del mismo team NO", not permitido(firmar(T["rrpp2.aurora"])))
+caso("el admin de otro boliche NO", not permitido(firmar(AN)))
+caso("el portero NO", not permitido(firmar(P)))
+
+print("\n── alta de usuarios (Edge Function) ──")
+fn = lambda cuerpo, tok=None: http("POST", "/functions/v1/crear-usuario", cuerpo, token=tok)
+r = fn({"action": "registro", "invite": "abc123", "nombre": "X", "usuario": "intruso1", "clave": "secreta1"})
+caso("registro con invitación inventada → rechazado", r[0] == 400, r)
+r = fn({"usuario": "pirata.admin", "nombre": "Pirata", "clave": "secreta1", "rol": "admin"}, AA)
+caso("admin de boliche no crea administradores", r[0] == 403, r)
+r = fn({"usuario": "pirata.rrpp", "nombre": "Pirata", "clave": "secreta1", "rol": "rrpp"}, R)
+caso("rrpp no crea usuarios", r[0] == 403, r)
+r = fn({"action": "reset", "user_id": uid["rrpp.aurora"], "clave": "secreta1"}, AN)
+caso("admin de otro boliche no resetea claves", r[0] == 403, r)
+inv = servicio("GET", f"/rest/v1/teams?id=eq.{team_a}&select=invite_code")[1][0]["invite_code"]
+caso("invitación de team: 32 hex", len(inv) == 32, inv)
+servicio("DELETE", "/rest/v1/profiles?usuario=eq.prueba.invitado")
+r = fn({"action": "registro", "invite": inv, "nombre": "Invitado Prueba", "usuario": "prueba.invitado", "clave": "secreta1"})
+nuevo = servicio("GET", "/rest/v1/profiles?usuario=eq.prueba.invitado&select=id,rol,clubs,team_id")[1]
+caso("registro con invitación válida → rrpp del team, solo en su boliche",
+     r[0] == 200 and nuevo and nuevo[0]["rol"] == "rrpp" and nuevo[0]["clubs"] == ["aurora"] and nuevo[0]["team_id"] == team_a, (r, nuevo))
+if nuevo:
+    servicio("DELETE", f"/rest/v1/profiles?id=eq.{nuevo[0]['id']}"); servicio("DELETE", f"/auth/v1/admin/users/{nuevo[0]['id']}")
+
 bien = sum(1 for _, k in res if k)
 print(f"\n{bien}/{len(res)} casos pasan")
 sys.exit(0 if bien == len(res) else 1)

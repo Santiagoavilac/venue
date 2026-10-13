@@ -163,7 +163,7 @@ create policy pagos_leer on pagos for select to authenticated
          or (rol_en('evento', evento_id) = 'jefe'
              and exists (select 1 from profiles pr
                           where pr.id = pagos.rrpp_id
-                            and pr.team_id = mi_team_en_club(impl.club_de('evento', pagos.evento_id)))));
+                            and pr.team_id = mi_team_en_club((select e.club_id from eventos e where e.id = pagos.evento_id)))));
 
 create policy telefono_usuario_leer on telefono_usuario for select to authenticated
   using (user_id = auth.uid() or es_platform_admin());
@@ -182,10 +182,9 @@ create policy caja_filtro_exc_leer on caja_filtro_excepcion for select to authen
 create policy caja_filtro_exc_escribir on caja_filtro_excepcion for all to authenticated
   using (es_platform_admin()) with check (es_platform_admin());
 
--- pagos.leer usa impl.club_de dentro de una política (corre como quien
--- consulta): necesita poder ejecutarla. Solo devuelve el id de un boliche.
-grant usage on schema impl to authenticated;
-grant execute on function impl.club_de(text, uuid) to authenticated;
+-- Las políticas no usan nada de `impl`: corren como quien consulta y ese
+-- esquema está cerrado para `authenticated`.
+revoke usage on schema impl from authenticated;
 
 -- ── vistas de estadísticas: que respeten RLS ────────────────────────
 -- v_stats_rrpp y v_stats_mesas corrían con los permisos del dueño y

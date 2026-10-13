@@ -18,9 +18,12 @@
  * .eq('usuario', usuario.toLowerCase())); clave mínimo 6; errores como
  * {error} con status != 2xx (el cliente muestra out.error tal cual).
  * TEXTOS de error SUPUESTOS (los reales del origen no son observables).
- * clubs del perfil: los del team; sin team o sin clubs => todos los
- * boliches activos que existan (consistente con que el admin los pise
- * justo después).
+ * clubs del perfil: los del team; sin team queda sin boliches y el admin
+ * que lo creó se los asigna después.
+ *
+ * ENDURECIDO (ver IMPLEMENTATION_STATUS.md): límite de intentos e
+ * invitaciones con vencimiento en el registro; rol validado; crear admins
+ * es solo de la plataforma; el admin de boliche no sale de sus locales.
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -37,8 +40,22 @@ const admin = createClient(
   { auth: { persistSession: false } },
 );
 
+const ROLES = ["admin", "jefe", "rrpp", "portero", "caja", "propietario", "barra", "deposito"];
+
+/* Límite de intentos por IP para lo que se llama sin sesión. */
+async function demasiadosIntentos(req: Request, accion: string, max: number, minutos: number) {
+  const ip = (req.headers.get("x-forwarded-for") ?? "desconocida").split(",")[0].trim();
+  const clave = `${accion}:${ip}`;
+  const desde = new Date(Date.now() - minutos * 60_000).toISOString();
+  const { count } = await admin.from("rate_limit")
+    .select("id", { count: "exact", head: true }).eq("clave", clave).gte("at", desde);
+  await admin.from("rate_limit").insert({ clave });
+  return (count ?? 0) >= max;
+}
+
 async function crearCuenta(usuario: string, nombre: string, clave: string, rol: string,
-  team_id: string | null, creado_por: string | null) {
+  team_id: string | null, creado_por: string | null, clubsIniciales: string[] | null = null) {
+  if (!ROLES.includes(rol)) return json({ error: "Rol inválido" }, 400);
   usuario = usuario.trim().toLowerCase();
   if (!/^[a-z0-9._-]{3,30}$/.test(usuario)) return json({ error: "Usuario inválido (3-30, letras/números/._-)" }, 400);
   if (!nombre?.trim() || (clave ?? "").length < 6) return json({ error: "Completá nombre y clave (6+)" }, 400);
@@ -46,15 +63,14 @@ async function crearCuenta(usuario: string, nombre: string, clave: string, rol: 
   const { data: dupe } = await admin.from("profiles").select("id").eq("usuario", usuario).maybeSingle();
   if (dupe) return json({ error: `El usuario @${usuario} ya existe` }, 409);
 
-  let clubs: string[] = [];
+  // Boliches del perfil: los del team. Sin team queda SIN boliches y el
+  // admin que lo creó le asigna el suyo (antes se le daban "todos los
+  // boliches activos", es decir acceso a locales ajenos).
+  let clubs: string[] = clubsIniciales ?? [];
   if (team_id) {
     const { data: team } = await admin.from("teams").select("clubs").eq("id", team_id).maybeSingle();
     if (!team) return json({ error: "Team inexistente" }, 400);
-    clubs = team.clubs?.length ? team.clubs : [];
-  }
-  if (!clubs.length) {
-    const { data: todosLosClubs } = await admin.from("clubs").select("id").eq("activo", true);
-    clubs = (todosLosClubs ?? []).map((c: { id: string }) => c.id);
+    clubs = team.clubs ?? [];
   }
   const { data: creado, error: eAuth } = await admin.auth.admin.createUser({
     email: `${usuario}@plataforma.local`, password: clave, email_confirm: true,
@@ -77,8 +93,10 @@ async function quienLlama(req: Request) {
   const { data } = await admin.auth.getUser(jwt);
   if (!data?.user) return null;
   const { data: perfil } = await admin.from("profiles")
-    .select("id, rol, team_id, activo").eq("id", data.user.id).maybeSingle();
-  return perfil?.activo ? perfil : null;
+    .select("id, rol, team_id, activo, clubs, admin_principal, eliminado_at").eq("id", data.user.id).maybeSingle();
+  if (!perfil?.activo || perfil.eliminado_at) return null;
+  const { data: pa } = await admin.from("platform_admins").select("user_id").eq("user_id", perfil.id).maybeSingle();
+  return { ...perfil, plataforma: !!perfil.admin_principal || !!pa };
 }
 
 Deno.serve(async (req) => {
@@ -89,11 +107,16 @@ Deno.serve(async (req) => {
 
   /* ---- autoregistro con invitación (sin sesión) ---- */
   if (body.action === "registro") {
+    // 10 intentos cada 10 minutos por IP: frena tanto adivinar el código
+    // como crear cuentas en masa con un link filtrado.
+    if (await demasiadosIntentos(req, "registro", 10, 10))
+      return json({ error: "Demasiados intentos. Probá de nuevo en unos minutos." }, 429);
     const invite = (body.invite ?? "").trim().toLowerCase();
     if (!invite) return json({ error: "Invitación inválida" }, 400);
     const { data: team } = await admin.from("teams")
-      .select("id, nombre").eq("invite_code", invite).maybeSingle();
-    if (!team) return json({ error: "Invitación inválida o vencida" }, 400);
+      .select("id, nombre, activo, invite_expira").eq("invite_code", invite).maybeSingle();
+    if (!team || !team.activo || (team.invite_expira && new Date(team.invite_expira) < new Date()))
+      return json({ error: "Invitación inválida o vencida" }, 400);
     const r = await crearCuenta(body.usuario ?? "", body.nombre ?? "", body.clave ?? "", "rrpp", team.id, null);
     if (r instanceof Response) return r;
     return json({ team: team.nombre });
@@ -106,7 +129,7 @@ Deno.serve(async (req) => {
   if (body.action === "reset") {
     if ((body.clave ?? "").length < 6) return json({ error: "Clave mínimo 6 caracteres" }, 400);
     const { data: target } = await admin.from("profiles")
-      .select("id, rol, team_id, admin_principal").eq("id", body.user_id).maybeSingle();
+      .select("id, rol, team_id, admin_principal, clubs").eq("id", body.user_id).maybeSingle();
     if (!target) return json({ error: "Usuario no encontrado" }, 404);
     // la cuenta con admin_principal es máxima autoridad: nadie más la toca
     // (ni otro admin); solo su dueño puede cambiar su propia clave
@@ -114,6 +137,13 @@ Deno.serve(async (req) => {
       return json({ error: "Esta cuenta administrativa está protegida." }, 403);
     if (caller.rol === "jefe" && (target.rol !== "rrpp" || target.team_id !== caller.team_id))
       return json({ error: "Solo podés resetear claves de tu team" }, 403);
+    // un admin de boliche no resetea a otros admins ni a gente de otro local
+    if (caller.rol === "admin" && !caller.plataforma && target.id !== caller.id) {
+      const mios = new Set<string>(caller.clubs ?? []);
+      const suyos: string[] = target.clubs ?? [];
+      if (target.rol === "admin" || !suyos.length || !suyos.every((c) => mios.has(c)))
+        return json({ error: "Solo podés resetear claves de la gente de tu boliche" }, 403);
+    }
     const { error } = await admin.auth.admin.updateUserById(target.id, { password: body.clave! });
     if (error) return json({ error: error.message }, 400);
     return json({ ok: true });
@@ -122,6 +152,16 @@ Deno.serve(async (req) => {
   /* alta directa */
   let rol = body.rol ?? "rrpp", team = body.team_id ?? null;
   if (caller.rol === "jefe") { rol = "rrpp"; team = caller.team_id; }   // el jefe solo crea rrpps de SU team
+  // nombrar administradores es de la plataforma, no de un admin de boliche
+  if (rol === "admin" && !caller.plataforma)
+    return json({ error: "Solo un administrador de la plataforma puede crear administradores" }, 403);
+  // un admin de boliche solo usa teams que operan en sus boliches
+  if (team && caller.rol === "admin" && !caller.plataforma) {
+    const { data: t } = await admin.from("teams").select("clubs").eq("id", team).maybeSingle();
+    const mios = new Set<string>(caller.clubs ?? []);
+    if (!t || !(t.clubs ?? []).length || !(t.clubs as string[]).every((c) => mios.has(c)))
+      return json({ error: "Ese team no es de tu boliche" }, 403);
+  }
   const r = await crearCuenta(body.usuario ?? "", body.nombre ?? "", body.clave ?? "", rol, team, caller.id);
   if (r instanceof Response) return r;
   return json({ ok: true, usuario: r.usuario });

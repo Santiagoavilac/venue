@@ -303,6 +303,38 @@ function expandNombres(raw) {
     .filter(Boolean);
 }
 
+/* ---------- comprobantes privados ----------
+   El bucket `comprobantes` dejó de ser público (db/23-comprobantes-privados.sql):
+   la URL guardada ya no abre sola. Cada <img>/<a> que apunte a un
+   comprobante se cambia por una URL firmada de corta duración, que el
+   servidor solo entrega a quien puede ver ese archivo.
+   Se hace observando el DOM para no tocar cada pantalla que los muestra. */
+const RX_COMP = /\/storage\/v1\/object\/(?:public|sign)\/comprobantes\/([^?"']+)/;
+const compFirmadas = new Map();
+async function urlComprobante(url) {
+  const m = RX_COMP.exec(url || "");
+  if (!m || !sb) return url;
+  const ruta = decodeURIComponent(m[1]);
+  const hit = compFirmadas.get(ruta);
+  if (hit && Date.now() - hit.at < 240000) return hit.url;
+  const { data, error } = await sb.storage.from("comprobantes").createSignedUrl(ruta, 300);
+  if (error || !data?.signedUrl) return "";
+  compFirmadas.set(ruta, { url: data.signedUrl, at: Date.now() });
+  return data.signedUrl;
+}
+function firmarComprobantes(raiz) {
+  if (!raiz.querySelectorAll) return;
+  raiz.querySelectorAll('img[src*="/public/comprobantes/"], a[href*="/public/comprobantes/"]').forEach(async el => {
+    const attr = el.tagName === "A" ? "href" : "src";
+    const original = el.getAttribute(attr);
+    el.removeAttribute(attr);                       // no pedir la URL pública, que ya no existe
+    const firmada = await urlComprobante(original);
+    if (firmada) el.setAttribute(attr, firmada);
+  });
+}
+new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => firmarComprobantes(n))))
+  .observe(document.documentElement, { childList: true, subtree: true });
+
 /* ---------- toasts ---------- */
 function toast(msg, type = "ok") {
   let w = document.getElementById("toastWrap");

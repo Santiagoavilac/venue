@@ -178,7 +178,14 @@ $$;
 create or replace function impl.puede_admin_usuario(p_user uuid)
 returns boolean language sql stable security definer set search_path = public
 as $$
-  select es_servicio() or es_platform_admin() or exists (
+  select es_servicio() or es_platform_admin()
+    -- recién creado por mí y todavía sin boliche: tengo que poder asignárselo
+    or exists (select 1 from profiles t
+                where t.id = p_user and t.creado_por = auth.uid()
+                  and t.rol <> 'admin' and not t.admin_principal
+                  and coalesce(array_length(t.clubs, 1), 0) = 0
+                  and not exists (select 1 from club_membership cm where cm.user_id = t.id))
+    or exists (
     select 1 from profiles t
      where t.id = p_user
        and t.rol <> 'admin' and not t.admin_principal
