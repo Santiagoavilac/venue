@@ -32,7 +32,7 @@ Flutter 3.44 · Riverpod 3 · go_router · supabase_flutter · mobile_scanner.
 | `flutter analyze` | sin problemas |
 | `flutter test` | 23 tests pasan (parser de QR, veredictos, rutas, roles, tema, tarjeta) |
 | `flutter build ios --release --no-codesign` | compila (Runner.app 18 MB) |
-| Instalación en iPhone | **bloqueada por la firma** (ver Bloqueos) |
+| Instalación en iPhone | instalada y lanzada en "Santiago Avila (2)" (iPhone 16 Pro); pantallas sin verificar a mano |
 
 Pendiente conocido en lo ya escrito: la sesión se guarda sin cifrar
 (preferencias de la app); pasarla al llavero con `flutter_secure_storage`.
@@ -73,7 +73,7 @@ contra el proyecto demo (ver "Bloqueos"). `node --check` de `app.js` y
 
 1. **Autorizar el MCP**: `/mcp` → `supabase-venue` → autenticar. Sin eso no
    se pueden aplicar `db/01…20` ni correr los tests de permisos.
-2. **Firma de iOS**: Xcode rechaza el login de `santiagoavilac@hotmail.com`
+2. **Firma de iOS**: resuelto. Se firma con el equipo de Sebastian Vaca Diez (`734M3ZA484`), bundle id `app.venue.venueMobile`; instalada y abierta en el iPhone "Santiago Avila (2)". Lo que sigue describía el intento anterior:
    ("login details were rejected"). Volver a iniciar sesión en
    Xcode → Settings → Accounts. El proyecto ya apunta al equipo `ANTK9WLN9M`
    con bundle id `app.venue.venueMobile`.
