@@ -114,14 +114,18 @@ insert into impl.rpc_permiso (fn, alcance, roles, guarda, filtro, nota) values
 ('anular_entrada',       'entrada','admin,jefe,rrpp',          impl.g('entrada','p_entrada','admin,jefe,rrpp'), null, 'la función exige vendedor o admin'),
 ('eliminar_entrada',     'entrada','admin,jefe,rrpp',          impl.g('entrada','p_entrada','admin,jefe,rrpp'), null, null),
 -- ── mesas ────────────────────────────────────────────────────────────
-('vender_mesa',          'mesa',   'admin,jefe,rrpp',          impl.g('mesa','p_mesa','admin,jefe,rrpp'), null, null),
-('vender_mesa_grupo',    'mesas',  'admin,jefe,rrpp',          'v_rol := impl.exigir_mesas(p_mesas, ''{admin,jefe,rrpp}''::text[]);', null, null),
-('editar_mesa',          'mesa',   'admin,jefe',               impl.g('mesa','p_mesa','admin,jefe'), null, null),
+-- BLOQUEO DE FILA: vender_mesa leía la mesa, veía "disponible" y la marcaba
+-- vendida sin bloquearla; dos ventas simultáneas pasaban las dos (probado:
+-- tests/test_seguridad.py). La guarda toma la fila FOR UPDATE antes de
+-- delegar: la segunda espera, y al seguir ya la ve vendida.
+('vender_mesa',          'mesa',   'admin,jefe,rrpp',          impl.g('mesa','p_mesa','admin,jefe,rrpp') || ' perform 1 from mesas ms where ms.id = p_mesa for update;', null, 'bloquea la mesa: sin doble venta'),
+('vender_mesa_grupo',    'mesas',  'admin,jefe,rrpp',          'v_rol := impl.exigir_mesas(p_mesas, ''{admin,jefe,rrpp}''::text[]); perform 1 from mesas ms where ms.id = any(p_mesas) order by ms.id for update;', null, 'bloquea las mesas en orden: sin doble venta ni deadlock'),
+('editar_mesa',          'mesa',   'admin,jefe',               impl.g('mesa','p_mesa','admin,jefe') || ' perform 1 from mesas ms where ms.id = p_mesa for update;', null, null),
 ('pagar_mesa',           'mesa',   'admin,jefe,rrpp',
    impl.g('mesa','p_mesa','admin,jefe,rrpp') ||
    ' if v_rol = ''rrpp'' and not exists (select 1 from mesas ms where ms.id = p_mesa and auth.uid() in (ms.vendido_por, ms.cargada_por)) then raise exception ''No autorizado.'' using errcode = ''42501''; end if;',
    null, 'el rrpp solo paga las mesas que vendió'),
-('verificar_mesa',       'mesa',   'admin',                    impl.g('mesa','p_mesa','admin'), null, 'verificación de pago'),
+('verificar_mesa',       'mesa',   'admin',                    impl.g('mesa','p_mesa','admin') || ' perform 1 from mesas ms where ms.id = p_mesa for update;', null, 'verificación de pago'),
 ('estado_mesa',          'mesa',   'admin,jefe,rrpp',
    impl.g('mesa','p_mesa','admin,jefe,rrpp') ||
    ' if v_rol = ''rrpp'' and not exists (select 1 from mesas ms where ms.id = p_mesa and auth.uid() in (ms.vendido_por, ms.cargada_por)) then raise exception ''No autorizado.'' using errcode = ''42501''; end if;'
@@ -246,8 +250,11 @@ begin
    where n.nspname = 'public' and p.prosecdef
      and p.prorettype <> 'trigger'::regtype
      and coalesce(obj_description(p.oid, 'pg_proc'), '') <> 'venue:guarda'
+     and p.proname <> '_venue_exec'   -- instalador temporal (tools/aplicar.py), solo service_role
      and p.proname not in ('rol_actual', 'mi_team_base', 'es_platform_admin',
-                           'rol_en_club', 'mi_team_en_club', 'mis_clubs');
+                           'rol_en_club', 'mi_team_en_club', 'mis_clubs',
+                           -- helpers de políticas (21-rls-por-boliche.sql): solo informan el rol propio
+                           'rol_en', 'admin_de_clubs', 'comparte_club');
   if v is not null then
     raise exception 'Funciones SECURITY DEFINER sin guarda en public: %', v;
   end if;

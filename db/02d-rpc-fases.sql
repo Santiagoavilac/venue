@@ -64,18 +64,26 @@ comment on table evento_fase is
 -- venta_por_fases = true al momento de la reconstruccion).
 -- Se usan los mismos id que devuelve el origen para que entradas.fase_id siga
 -- apuntando correctamente.
-insert into evento_fase (id, evento_id, nombre, precio, cupo, desde, hasta, orden, activo, created_at, ticket_url)
-values
-  ('4a2a7564-0ccf-40dc-bef9-c027cf140792', 'bde536c8-9056-4588-a9d2-7e994f2fdff1',
-   'Hot Tickets', 90, 30, '2026-08-17T10:00:00+00:00', null, 1, true, '2026-08-18T04:02:03.160797+00:00',
-   'https://kdkjmqrbiszmkcprinir.supabase.co/storage/v1/object/public/disenos/fase-4a2a7564-0ccf-40dc-bef9-c027cf140792.jpg?v=1787085787143'),
-  ('c950ee3e-dce5-4af3-810b-65c114a585d8', 'bde536c8-9056-4588-a9d2-7e994f2fdff1',
-   'Fase 1', 120, 50, null, null, 2, true, '2026-08-18T04:02:32.242876+00:00',
-   'https://kdkjmqrbiszmkcprinir.supabase.co/storage/v1/object/public/disenos/fase-c950ee3e-dce5-4af3-810b-65c114a585d8.jpg?v=1787085794015'),
-  ('3f5eda06-2e0f-4e36-a912-2e0a735fa1a9', 'bde536c8-9056-4588-a9d2-7e994f2fdff1',
-   'Fase 2', 150, null, null, null, 3, true, '2026-08-18T04:02:44.363421+00:00',
-   'https://kdkjmqrbiszmkcprinir.supabase.co/storage/v1/object/public/disenos/fase-3f5eda06-2e0f-4e36-a912-2e0a735fa1a9.jpg?v=1787187519423')
-on conflict (id) do nothing;
+-- Solo si ese evento existe: son filas del proyecto de origen. En una
+-- instalación limpia el evento no está y el insert violaba la FK.
+do $seed$
+begin
+  if exists (select 1 from eventos where id = 'bde536c8-9056-4588-a9d2-7e994f2fdff1') then
+    insert into evento_fase (id, evento_id, nombre, precio, cupo, desde, hasta, orden, activo, created_at, ticket_url)
+    values
+      ('4a2a7564-0ccf-40dc-bef9-c027cf140792', 'bde536c8-9056-4588-a9d2-7e994f2fdff1',
+       'Hot Tickets', 90, 30, '2026-08-17T10:00:00+00:00', null, 1, true, '2026-08-18T04:02:03.160797+00:00',
+       'https://kdkjmqrbiszmkcprinir.supabase.co/storage/v1/object/public/disenos/fase-4a2a7564-0ccf-40dc-bef9-c027cf140792.jpg?v=1787085787143'),
+      ('c950ee3e-dce5-4af3-810b-65c114a585d8', 'bde536c8-9056-4588-a9d2-7e994f2fdff1',
+       'Fase 1', 120, 50, null, null, 2, true, '2026-08-18T04:02:32.242876+00:00',
+       'https://kdkjmqrbiszmkcprinir.supabase.co/storage/v1/object/public/disenos/fase-c950ee3e-dce5-4af3-810b-65c114a585d8.jpg?v=1787085794015'),
+      ('3f5eda06-2e0f-4e36-a912-2e0a735fa1a9', 'bde536c8-9056-4588-a9d2-7e994f2fdff1',
+       'Fase 2', 150, null, null, null, 3, true, '2026-08-18T04:02:44.363421+00:00',
+       'https://kdkjmqrbiszmkcprinir.supabase.co/storage/v1/object/public/disenos/fase-3f5eda06-2e0f-4e36-a912-2e0a735fa1a9.jpg?v=1787187519423')
+    on conflict (id) do nothing;
+  end if;
+end
+$seed$;
 
 
 /* fases_evento(p_evento) -> setof json (array)
