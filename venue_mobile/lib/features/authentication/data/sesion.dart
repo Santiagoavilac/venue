@@ -10,12 +10,24 @@ class Perfil {
     required this.usuario,
     required this.nombre,
     required this.activo,
+    this.puedeTickear = false,
+    this.adminPrincipal = false,
+    this.contabilidadTotal = false,
   });
 
   final String id;
   final String usuario;
   final String nombre;
   final bool activo;
+
+  /// Puede marcar ingresos a mano desde Listas.
+  final bool puedeTickear;
+
+  /// Cuenta principal de la plataforma (ve Historial, crea boliches).
+  final bool adminPrincipal;
+
+  /// Puede exportar la contabilidad general del evento.
+  final bool contabilidadTotal;
 
   String get inicial => nombre.isEmpty ? '?' : nombre[0].toUpperCase();
   String get primerNombre => nombre.split(' ').first;
@@ -25,6 +37,9 @@ class Perfil {
         usuario: j['usuario'] as String? ?? '',
         nombre: j['nombre'] as String? ?? '',
         activo: j['activo'] as bool? ?? false,
+        puedeTickear: j['puede_tickear'] as bool? ?? false,
+        adminPrincipal: j['admin_principal'] as bool? ?? false,
+        contabilidadTotal: j['contabilidad_total'] as bool? ?? false,
       );
 }
 
@@ -40,7 +55,7 @@ final perfilProvider = FutureProvider<Perfil?>((ref) async {
   final fila = await ref
       .watch(supabaseProvider)
       .from('profiles')
-      .select('id, usuario, nombre, activo')
+      .select('id, usuario, nombre, activo, puede_tickear, admin_principal, contabilidad_total')
       .eq('id', uid)
       .maybeSingle();
   return fila == null ? null : Perfil.desde(fila);

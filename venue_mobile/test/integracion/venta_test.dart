@@ -8,6 +8,7 @@ import 'package:venue_mobile/features/tickets/data/entradas.dart';
 import 'demo.dart';
 
 void main() {
+  etapa2();
   late SupabaseClient rrpp, portero;
   late String ev, uid;
 
@@ -70,5 +71,79 @@ void main() {
     final lista = (await ListasRepository(rrpp).listas(ev)).first;
     await expectLater(ListasRepository(portero).anotar(lista.id, ['Intruso']),
         throwsA(isA<PostgrestException>()));
+  }, skip: saltear);
+}
+
+/// Etapa 2 completa: lo que ven y hacen jefe y admin, y las fases.
+void etapa2() {
+  test('la lista completa trae quién anotó a cada invitado', () async {
+    final sb = await sesionDe('admin.aurora');
+    final ev = await eventoDe(sb, 'aurora');
+    final todos = await ListasRepository(sb).todos(ev);
+    expect(todos.firstWhere((i) => i.nombre == 'Ana Paz').rrppNombre,
+        'Mateo Relaciones');
+  }, skip: saltear);
+
+  test('el jefe anota a nombre de un relacionador de su team; el rrpp no puede', () async {
+    final jefe = await sesionDe('jefe.aurora');
+    final rrpp = await sesionDe('rrpp.aurora');
+    final rrpp2 = await sesionDe('rrpp2.aurora');
+    final ev = await eventoDe(jefe, 'aurora');
+    final lista = (await ListasRepository(jefe).listas(ev)).first;
+    final idRrpp = rrpp.auth.currentUser!.id;
+
+    await ListasRepository(jefe).anotar(lista.id, ['Prueba A Nombre De'], aNombreDe: idRrpp);
+    final inv = (await ListasRepository(rrpp).misInvitados(ev, idRrpp))
+        .firstWhere((i) => i.nombre == 'Prueba A Nombre De');
+    expect(inv.rrppId, idRrpp);
+    await ListasRepository(rrpp).eliminar(inv.id);
+
+    await expectLater(
+        ListasRepository(rrpp2).anotar(lista.id, ['Intruso'], aNombreDe: idRrpp),
+        throwsA(isA<PostgrestException>()));
+  }, skip: saltear);
+
+  test('el admin ve todas las entradas con su vendedor', () async {
+    final sb = await sesionDe('admin.aurora');
+    final ev = await eventoDe(sb, 'aurora');
+    final todas = await EntradasRepository(sb).todas(ev);
+    expect(todas.length, greaterThanOrEqualTo(3));
+    expect(todas.firstWhere((e) => e.cliente == 'Carlos Roca').rrppNombre,
+        'Mateo Relaciones');
+  }, skip: saltear);
+
+  test('fases de preventa: precio y stock de la fase vigente', () async {
+    final admin = await sesionDe('admin.aurora');
+    final rrpp = await sesionDe('rrpp.aurora');
+    final ev = await eventoDe(admin, 'aurora');
+    final repo = EntradasRepository(rrpp);
+    await admin.rpc('guardar_fase', params: {
+      'p_evento': ev, 'p_id': null, 'p_nombre': 'Hot Tickets', 'p_precio': 80,
+      'p_cupo': 1, 'p_desde': null, 'p_hasta': null, 'p_orden': 1, 'p_activo': true,
+    });
+    await admin.rpc('set_venta_por_fases', params: {'p_evento': ev, 'p_on': true});
+    try {
+      final f = (await repo.faseVigente(ev))!;
+      expect((f.nombre, f.precio, f.quedan), ('Hot Tickets', 80, 1));
+      final e = await repo.generar(ev, 'Prueba Fase App');
+      expect((e.precio, e.faseId), (80, f.id));
+      // se agotó el stock de la fase: ya no hay fase vigente ni se puede vender
+      expect(await repo.faseVigente(ev), isNull);
+      await expectLater(
+          repo.generar(ev, 'Sin Stock'), throwsA(isA<PostgrestException>()));
+      await EntradasRepository(admin).eliminar(e.id);
+    } finally {
+      await admin.rpc('set_venta_por_fases', params: {'p_evento': ev, 'p_on': false});
+      for (final f in await EntradasRepository(admin).fases(ev)) {
+        await admin.rpc('borrar_fase', params: {'p_fase': f.id});
+      }
+    }
+  }, skip: saltear);
+
+  test('ventana de venta del relacionador', () async {
+    final rrpp = await sesionDe('rrpp.aurora');
+    final ev = await eventoDe(rrpp, 'aurora');
+    final v = await EntradasRepository(rrpp).ventana(ev, rrpp.auth.currentUser!.id);
+    expect(v.desde, isNull);
   }, skip: saltear);
 }

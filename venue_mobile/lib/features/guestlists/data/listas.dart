@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/networking/supabase.dart';
 import '../../authentication/data/sesion.dart';
 import '../../events/data/eventos.dart';
+import '../../teams/data/equipo.dart';
 
 /// Una lista del evento ("Invitados", "Free", "Compra en puerta"…).
 class ListaTipo {
@@ -45,6 +46,7 @@ class Invitado {
     required this.listaId,
     required this.nombre,
     required this.rrppId,
+    this.rrppNombre = '',
     this.codigo,
     this.ingresoAt,
   });
@@ -52,8 +54,17 @@ class Invitado {
   final String listaId;
   final String nombre;
   final String rrppId;
+
+  /// Quién lo anotó (viene embebido cuando se trae la lista completa).
+  final String rrppNombre;
   final String? codigo;
   final DateTime? ingresoAt;
+
+  Invitado con({DateTime? ingresoAt, bool limpiarIngreso = false, String? codigo}) => Invitado(
+        id: id, listaId: listaId, nombre: nombre, rrppId: rrppId, rrppNombre: rrppNombre,
+        codigo: codigo ?? this.codigo,
+        ingresoAt: limpiarIngreso ? null : (ingresoAt ?? this.ingresoAt),
+      );
 
   bool get ingreso => ingresoAt != null;
 
@@ -62,6 +73,7 @@ class Invitado {
         listaId: j['lista_tipo_id'] as String,
         nombre: j['nombre'] as String? ?? '',
         rrppId: j['rrpp_id'] as String,
+        rrppNombre: (j['rrpp'] as Map?)?['nombre'] as String? ?? '',
         codigo: j['code'] as String?,
         ingresoAt:
             DateTime.tryParse(j['ingreso_at'] as String? ?? '')?.toLocal(),
@@ -122,9 +134,29 @@ class ListasRepository {
     return r.map(Invitado.desde).toList();
   }
 
-  Future<ResultadoAnotar> anotar(String listaId, List<String> nombres) async {
-    final r = Map<String, dynamic>.from(await _sb.rpc('registrar_lista',
-        params: {'p_lista': listaId, 'p_nombres': nombres}) as Map);
+  /// Todos los invitados del evento, con quién los anotó. Paginado: una
+  /// noche grande pasa las 1000 filas.
+  Future<List<Invitado>> todos(String eventoId) async {
+    final filas = await traerTodo((d, h) => _sb
+        .from('registros')
+        .select('id, lista_tipo_id, nombre, rrpp_id, code, ingreso_at, '
+            'rrpp:profiles!registros_rrpp_id_fkey(nombre)')
+        .eq('evento_id', eventoId)
+        .order('created_at', ascending: false)
+        .order('id')
+        .range(d, h));
+    return filas.map(Invitado.desde).toList();
+  }
+
+  /// [aNombreDe]: usuario al que se le atribuyen (solo jefe/admin; el
+  /// servidor lo vuelve a comprobar).
+  Future<ResultadoAnotar> anotar(String listaId, List<String> nombres,
+      {String? aNombreDe}) async {
+    final r = Map<String, dynamic>.from(await _sb.rpc('registrar_lista', params: {
+      'p_lista': listaId,
+      'p_nombres': nombres,
+      'p_a_nombre_de': aNombreDe,
+    }) as Map);
     return ResultadoAnotar(
       (r['insertados'] as num?)?.toInt() ?? 0,
       ((r['duplicados'] as List?) ?? const []).cast<String>(),
@@ -152,6 +184,12 @@ final misCuposProvider = FutureProvider.autoDispose<Map<String, int>>((ref) {
   final ev = ref.watch(eventoActivoProvider);
   if (ev == null) return const {};
   return ref.watch(listasRepositoryProvider).misCupos(ev.id);
+});
+
+final invitadosProvider = FutureProvider.autoDispose<List<Invitado>>((ref) {
+  final ev = ref.watch(eventoActivoProvider);
+  if (ev == null) return const [];
+  return ref.watch(listasRepositoryProvider).todos(ev.id);
 });
 
 final misInvitadosProvider = FutureProvider.autoDispose<List<Invitado>>((ref) {
