@@ -26,6 +26,9 @@ void main() {
     for (final m in (await rAdmin.mesas(ev)).where((m) => m.etiqueta.startsWith('ZZ'))) {
       await rAdmin.borrar(m.id);
     }
+    for (final c in (await rAdmin.combos('aurora')).where((c) => c.nombre.startsWith('ZZ'))) {
+      await rAdmin.borrarCombo(c.id);
+    }
   });
 
   Future<Mesa> una(String id) async => (await rAdmin.mesas(ev)).firstWhere((m) => m.id == id);
