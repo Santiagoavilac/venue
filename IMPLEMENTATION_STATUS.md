@@ -95,12 +95,26 @@ Compilar: `cd venue_mobile && flutter run --dart-define-from-file=env/dev.json`
 
 ## Paridad web → app (en curso)
 
-Plan por etapas en `docs/PARIDAD.md`. **Etapa 1 · Puerta: hecha** — escáner
-con modo filtro y bandera, lista en puerta (buscar, marcar y desmarcar
-ingreso, filtro) y consulta de RRPPs. 29 tests unitarios/widget y 8 de
-integración contra el demo pasan (`flutter test test/integracion
---dart-define-from-file=env/dev.json`). Falta de esa etapa: mesas en modo
-seguridad (va con Mesas). Etapas 2 a 9: sin empezar.
+Plan por etapas y detalle pantalla por pantalla en `docs/PARIDAD.md`.
+
+- **Etapa 1 · Puerta: hecha.** Escáner con modo filtro y bandera, lista en
+  puerta (buscar, marcar y desmarcar ingreso, filtro) y consulta de RRPPs.
+  Falta: mesas en modo seguridad (va con Mesas).
+- **Etapa 2 · Listas y entradas: parcial.** El relacionador ya anota
+  invitados, ve su cupo, genera entradas, las anula y comparte el QR. Falta
+  lo de jefe/admin (ver todo, filtros, "a nombre de", tickear, QR masivo),
+  fases a la vista, envío en tanda, el arte del evento en el ticket, Resumen
+  e Historial.
+- **Etapa 0 (fundaciones):** faltan sesión en el llavero, registro por
+  invitación, avisos, pedido de WhatsApp, realtime y cola offline.
+- **Etapas 3 a 9** (mesas y plano, pagos, reporte, equipo, eventos, caja,
+  barra): sin empezar.
+
+Pruebas: 34 tests unitarios/widget y 12 de integración contra el demo pasan
+(`flutter test test/integracion --dart-define-from-file=env/dev.json`). Los
+de integración recorren el circuito real: el RRPP genera una entrada o anota
+un invitado desde la app y el portero la valida con el escáner de la app.
+Nada de esto se probó todavía a mano en un teléfono.
 
 ## Fases 4–8 — sin empezar
 

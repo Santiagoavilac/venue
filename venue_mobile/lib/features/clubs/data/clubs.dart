@@ -62,6 +62,7 @@ enum Rol {
 
   bool get validaIngresos => this == admin || this == portero;
   bool get veEventos => const {admin, jefe, rrpp, portero}.contains(this);
+  bool get vende => const {admin, jefe, rrpp}.contains(this);
 }
 
 /// Boliches donde la persona tiene algún rol (`mis_clubs` en el servidor).

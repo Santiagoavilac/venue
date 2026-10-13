@@ -17,7 +17,12 @@ fue probada todavía a mano en un teléfono.
 | 1 | Lista en puerta (`screenListaPuerta`) | `access_control/ui/lista_puerta_screen.dart` | hecho · probado contra el demo |
 | 1 | RRPPs en puerta (`screenRrppsPuerta`) | `access_control/ui/rrpps_screen.dart` | hecho · probado contra el demo |
 | 1 | Mesas en modo seguridad (`sheetMesaSeguridad`) | — | pendiente (va con Mesas) |
-| 2 | Resumen, Listas, Entradas, ticket e Historial | — | pendiente |
+| 2 | Listas: ver las propias con cupo, anotar, quitar, QR del invitado (`screenListas`) | `guestlists/ui/listas_screen.dart` | hecho · probado contra el demo |
+| 2 | Entradas: generar, ver, anular (`screenEntradas`) | `tickets/ui/entradas_screen.dart` | hecho · probado contra el demo |
+| 2 | Ticket con QR y compartir por WhatsApp (`sheetTicket`) | `tickets/ui/ticket_sheet.dart` | hecho (sin el arte del evento de fondo) |
+| 2 | Listas: ver las de todo el team/boliche, filtros, anotar "a nombre de", tickear, QR masivo | — | pendiente |
+| 2 | Entradas: fases de preventa a la vista, ventana de venta, filtros de admin, envío en tanda, eliminar | — | pendiente |
+| 2 | Resumen de accesos, Historial | — | pendiente |
 | 3 | Mesas, plano y editor | — | pendiente |
 | 4 | Pagos | — | pendiente |
 | 5 | Reporte, stats, liquidación, contabilidad Excel | — | pendiente |
@@ -30,9 +35,9 @@ fue probada todavía a mano en un teléfono.
 
 | Rol | Secciones |
 | --- | --- |
-| Seguridad | Escáner · Lista · RRPPs · Eventos · Cuenta |
-| Administrador | Escáner · Lista · Eventos · Cuenta |
-| Jefe, Relacionador | Eventos · Cuenta |
+| Seguridad | Escáner · Puerta · RRPPs · Eventos · Cuenta |
+| Administrador | Listas · Entradas · Escáner · Eventos · Cuenta |
+| Jefe, Relacionador | Listas · Entradas · Eventos · Cuenta |
 | Caja, Propietario, Barra, Recepción | Cuenta |
 
 Con esto, **el rol Seguridad ya tiene en la app todo lo que tiene en la web

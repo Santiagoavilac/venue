@@ -7,6 +7,8 @@ import '../../access_control/ui/lista_puerta_screen.dart';
 import '../../access_control/ui/rrpps_screen.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/ui/eventos_screen.dart';
+import '../../guestlists/ui/listas_screen.dart';
+import '../../tickets/ui/entradas_screen.dart';
 import 'cuenta_screen.dart';
 
 class _Seccion {
@@ -20,11 +22,17 @@ class _Seccion {
 /// Secciones disponibles para un rol. La primera es su pantalla de trabajo:
 /// el portero abre directo en el escáner, que es lo que hace toda la noche.
 List<_Seccion> _seccionesPara(Rol rol) => [
+      if (rol.vende)
+        const _Seccion('Listas', Icons.list_alt_outlined,
+            Icons.list_alt_rounded, ListasScreen()),
+      if (rol.vende)
+        const _Seccion('Entradas', Icons.qr_code_2_outlined,
+            Icons.qr_code_2_rounded, EntradasScreen()),
       if (rol.validaIngresos)
         const _Seccion('Escáner', Icons.qr_code_scanner_rounded,
             Icons.qr_code_scanner_rounded, EscanerScreen()),
-      if (rol.validaIngresos)
-        const _Seccion('Lista', Icons.checklist_rounded,
+      if (rol == Rol.portero)
+        const _Seccion('Puerta', Icons.checklist_rounded,
             Icons.checklist_rounded, ListaPuertaScreen()),
       if (rol == Rol.portero)
         const _Seccion('RRPPs', Icons.groups_outlined, Icons.groups_rounded,
