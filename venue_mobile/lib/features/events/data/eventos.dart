@@ -14,6 +14,11 @@ class Evento {
     this.ticketUrl,
     this.precioManilla = 0,
     this.ventaPorFases = false,
+    this.permiteReserva = true,
+    this.horasReserva = 3,
+    this.permiteAgrupar = true,
+    this.comboObligatorio = true,
+    this.comboPorMesa = false,
   });
 
   final String id;
@@ -28,6 +33,13 @@ class Evento {
   final num precioManilla;
   final bool ventaPorFases;
 
+  // reglas de venta de mesas del evento
+  final bool permiteReserva;
+  final int horasReserva;
+  final bool permiteAgrupar;
+  final bool comboObligatorio;
+  final bool comboPorMesa;
+
   factory Evento.desde(Map<String, dynamic> j) => Evento(
         id: j['id'] as String,
         nombre: j['nombre'] as String? ?? '',
@@ -38,6 +50,11 @@ class Evento {
         ticketUrl: j['ticket_url'] as String?,
         precioManilla: j['precio_manilla'] as num? ?? 0,
         ventaPorFases: j['venta_por_fases'] == true,
+        permiteReserva: j['permite_reserva'] != false,
+        horasReserva: (j['horas_reserva'] as num?)?.toInt() ?? 3,
+        permiteAgrupar: j['permite_agrupar'] != false,
+        comboObligatorio: j['combo_obligatorio'] != false,
+        comboPorMesa: j['combo_por_mesa'] == true,
       );
 
   /// ¿Está en curso ahora? Contempla el cruce de medianoche (21:00 → 06:00).
@@ -76,7 +93,7 @@ final eventosProvider = FutureProvider<List<Evento>>((ref) async {
   final filas = await ref
       .watch(supabaseProvider)
       .from('eventos')
-      .select('id, nombre, fecha, hora_inicio, hora_fin, estado, ticket_url, precio_manilla, venta_por_fases')
+      .select('id, nombre, fecha, hora_inicio, hora_fin, estado, ticket_url, precio_manilla, venta_por_fases, permite_reserva, horas_reserva, permite_agrupar, combo_obligatorio, combo_por_mesa')
       .eq('club_id', club)
       .neq('estado', 'cerrado')
       .order('fecha');

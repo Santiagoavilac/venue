@@ -13,6 +13,7 @@ import '../../access_control/ui/lista_puerta_screen.dart';
 import '../../access_control/ui/rrpps_screen.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/ui/eventos_screen.dart';
+import '../../vip_tables/ui/mesas_screen.dart';
 import '../../access_control/ui/accesos_screen.dart';
 import 'cuenta_screen.dart';
 
@@ -39,6 +40,9 @@ List<_Seccion> _seccionesPara(Rol rol) => [
       if (rol == Rol.portero)
         const _Seccion('RRPPs', Icons.groups_outlined, Icons.groups_rounded,
             RrppsScreen()),
+      if (rol.veEventos)
+        const _Seccion('Mesas', Icons.table_bar_outlined,
+            Icons.table_bar_rounded, MesasScreen()),
       if (rol.veEventos)
         const _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
             EventosScreen()),
@@ -132,6 +136,9 @@ class _InicioShellState extends ConsumerState<InicioShell>
         final pendientes = ref.watch(pendientesProvider);
         final secciones = _seccionesPara(r);
         final i = _i.clamp(0, secciones.length - 1);
+        // En el teléfono entran cuatro; el resto va detrás de "Más".
+        final conMas = secciones.length > 5;
+        final enBarra = conMas ? secciones.sublist(0, 4) : secciones;
         return Scaffold(
           appBar: AppBar(
             title: Text(secciones[i].titulo),
@@ -195,15 +202,37 @@ class _InicioShellState extends ConsumerState<InicioShell>
           bottomNavigationBar: secciones.length < 2
               ? null
               : NavigationBar(
-                  selectedIndex: i,
-                  onDestinationSelected: (n) => setState(() => _i = n),
+                  selectedIndex: conMas && i >= 4 ? 4 : i,
+                  onDestinationSelected: (n) async {
+                    if (!conMas || n < 4) return setState(() => _i = n);
+                    final elegido = await showModalBottomSheet<int>(
+                      context: context,
+                      showDragHandle: true,
+                      backgroundColor: VenueColors.superficie,
+                      builder: (c) => SafeArea(
+                        child: ListView(shrinkWrap: true, children: [
+                          for (var k = 4; k < secciones.length; k++)
+                            ListTile(
+                              leading: Icon(secciones[k].icono),
+                              title: Text(secciones[k].titulo),
+                              selected: k == i,
+                              onTap: () => Navigator.pop(c, k),
+                            ),
+                        ]),
+                      ),
+                    );
+                    if (elegido != null && mounted) setState(() => _i = elegido);
+                  },
                   destinations: [
-                    for (final s in secciones)
+                    for (final s in enBarra)
                       NavigationDestination(
                         icon: Icon(s.icono),
                         selectedIcon: Icon(s.iconoOn),
                         label: s.titulo,
                       ),
+                    if (conMas)
+                      const NavigationDestination(
+                          icon: Icon(Icons.more_horiz_rounded), label: 'Más'),
                   ],
                 ),
         );
