@@ -18,6 +18,29 @@ hecho **y ejecutado de verdad**, y qué no.
 | `db/19-rpc-guardas.sql` — matriz de permisos de 76 RPC + generador de guardas + `revoke` a anónimos | **escrito, sin ejecutar** |
 | `db/20-triggers-servicio.sql` — triggers de cuenta protegida, perfil y membresía | **escrito, sin ejecutar** |
 
+## App móvil (`venue_mobile/`) · Fase 3 empezada
+
+Flutter 3.44 · Riverpod 3 · go_router · supabase_flutter · mobile_scanner.
+
+| Qué | Estado |
+| --- | --- |
+| Estructura por features, tema oscuro con acento por boliche, estados de carga/vacío/error | hecho |
+| Login usuario/clave, sesión persistida, cuenta desactivada | escrito; **sin probar contra el backend** (la base demo está vacía) |
+| Selector de boliche (`mis_clubs`) y rol efectivo desde el servidor (`rol_en_club`) | escrito; depende de aplicar `db/18` |
+| Eventos del boliche y evento de trabajo | escrito; sin probar contra el backend |
+| Escáner de puerta: cámara nativa, linterna, háptica, código manual, aforo, últimos escaneos, 7 veredictos | escrito; sin probar en dispositivo |
+| `flutter analyze` | sin problemas |
+| `flutter test` | 23 tests pasan (parser de QR, veredictos, rutas, roles, tema, tarjeta) |
+| `flutter build ios --release --no-codesign` | compila (Runner.app 18 MB) |
+| Instalación en iPhone | **bloqueada por la firma** (ver Bloqueos) |
+
+Pendiente conocido en lo ya escrito: la sesión se guarda sin cifrar
+(preferencias de la app); pasarla al llavero con `flutter_secure_storage`.
+Sin validación de QR offline: sin señal el escáner responde SIN CONEXIÓN y
+no deja pasar.
+
+Compilar: `cd venue_mobile && flutter run --dart-define-from-file=env/dev.json`
+
 ## Pruebas ejecutadas
 
 Ninguna sobre las migraciones nuevas: todavía no hay forma de correr SQL
@@ -50,7 +73,11 @@ contra el proyecto demo (ver "Bloqueos"). `node --check` de `app.js` y
 
 1. **Autorizar el MCP**: `/mcp` → `supabase-venue` → autenticar. Sin eso no
    se pueden aplicar `db/01…20` ni correr los tests de permisos.
-2. **Liberar disco**: quedan 2 GB (99 % usado). Los builds de Flutter
+2. **Firma de iOS**: Xcode rechaza el login de `santiagoavilac@hotmail.com`
+   ("login details were rejected"). Volver a iniciar sesión en
+   Xcode → Settings → Accounts. El proyecto ya apunta al equipo `ANTK9WLN9M`
+   con bundle id `app.venue.venueMobile`.
+3. **Liberar disco**: quedan ~6,6 GB (eran 2 GB). Los builds de Flutter
    (Gradle, CocoaPods) necesitan al menos 15 GB.
 
 ## Pendiente (en orden)
