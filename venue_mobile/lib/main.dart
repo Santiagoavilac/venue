@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'core/config/env.dart';
+import 'core/security/llavero.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,12 +15,11 @@ Future<void> main() async {
     runApp(const SinConfiguracionApp());
     return;
   }
-  // supabase_flutter persiste la sesión y renueva el token solo.
-  // PENDIENTE: por defecto la guarda en las preferencias de la app, sin
-  // cifrar; hay que pasarla al llavero con flutter_secure_storage.
+  // La sesión se guarda en el llavero del sistema, no en preferencias.
   await Supabase.initialize(
     url: Env.supabaseUrl,
     publishableKey: Env.supabaseAnonKey,
+    authOptions: FlutterAuthClientOptions(localStorage: LlaveroStorage()),
   );
   runApp(const ProviderScope(child: VenueApp()));
 }

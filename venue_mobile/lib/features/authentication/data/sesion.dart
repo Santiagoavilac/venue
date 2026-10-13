@@ -81,4 +81,44 @@ class AuthRepository {
   }
 
   Future<void> salir() => _sb.auth.signOut();
+
+  /// Alta de relacionador con el link de invitación de un team. La cuenta la
+  /// crea la Edge Function `crear-usuario` (valida la invitación y limita
+  /// los intentos); después se inicia sesión normalmente.
+  /// Devuelve el nombre del team.
+  Future<String> registrarse({
+    required String invitacion,
+    required String nombre,
+    required String usuario,
+    required String clave,
+  }) async {
+    final u = usuario.trim().toLowerCase().replaceAll(RegExp(r'\s'), '');
+    try {
+      final r = await _sb.functions.invoke('crear-usuario', body: {
+        'action': 'registro',
+        'invite': codigoDeInvitacion(invitacion),
+        'nombre': nombre.trim(),
+        'usuario': u,
+        'clave': clave,
+      });
+      await ingresar(u, clave);
+      return (r.data as Map?)?['team'] as String? ?? '';
+    } on FunctionException catch (e) {
+      final d = e.details;
+      throw RegistroRechazado(
+          d is Map && d['error'] is String ? d['error'] as String : 'No se pudo registrar.');
+    }
+  }
+}
+
+class RegistroRechazado implements Exception {
+  const RegistroRechazado(this.motivo);
+  final String motivo;
+}
+
+/// Acepta el link completo (`…?invite=abc`) o el código solo.
+String codigoDeInvitacion(String texto) {
+  final t = texto.trim();
+  final m = RegExp(r'[?&]invite=([A-Za-z0-9]+)').firstMatch(t);
+  return (m?.group(1) ?? t).toLowerCase();
 }

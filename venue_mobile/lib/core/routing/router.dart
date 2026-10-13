@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/authentication/data/sesion.dart';
 import '../../features/authentication/ui/login_screen.dart';
+import '../../features/authentication/ui/registro_screen.dart';
 import '../../features/clubs/data/clubs.dart';
 import '../../features/clubs/ui/selector_club_screen.dart';
 import '../../features/dashboard/ui/inicio_shell.dart';
 
 abstract final class Rutas {
   static const login = '/login';
+  static const registro = '/registro';
   static const clubs = '/boliches';
   static const inicio = '/';
 }
@@ -44,10 +46,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         conSesion: ref.read(usuarioIdProvider) != null,
         conClub: ref.read(clubActivoIdProvider) != null,
       );
+      // El registro por invitación se abre sin sesión (también desde un
+      // link venue://app/registro?invite=…).
+      if (destino == Rutas.login && state.matchedLocation == Rutas.registro) {
+        return null;
+      }
       return state.matchedLocation == destino ? null : destino;
     },
     routes: [
       GoRoute(path: Rutas.login, builder: (_, _) => const LoginScreen()),
+      GoRoute(
+        path: Rutas.registro,
+        builder: (_, st) =>
+            RegistroScreen(invitacion: st.uri.queryParameters['invite']),
+      ),
       GoRoute(path: Rutas.clubs, builder: (_, _) => const SelectorClubScreen()),
       GoRoute(path: Rutas.inicio, builder: (_, _) => const InicioShell()),
     ],

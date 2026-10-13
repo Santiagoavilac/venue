@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/networking/supabase.dart';
@@ -122,7 +123,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             )
                           : const Text('Ingresar'),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: () => context.go('/registro'),
+                      child: const Text('Tengo un link de invitación'),
+                    ),
+                    const SizedBox(height: 8),
                     const Text(
                       '¿Olvidaste tu contraseña? Pedile a tu jefe de team o al administrador que te la restablezca.',
                       textAlign: TextAlign.center,

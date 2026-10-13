@@ -1,7 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/sync/cola_offline.dart';
+import '../../../core/theme/venue_theme.dart';
+import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
+import '../../avisos/bienvenida.dart';
 import '../../access_control/ui/escaner_screen.dart';
 import '../../access_control/ui/lista_puerta_screen.dart';
 import '../../access_control/ui/rrpps_screen.dart';
@@ -51,8 +57,48 @@ class InicioShell extends ConsumerStatefulWidget {
   ConsumerState<InicioShell> createState() => _InicioShellState();
 }
 
-class _InicioShellState extends ConsumerState<InicioShell> {
+class _InicioShellState extends ConsumerState<InicioShell>
+    with WidgetsBindingObserver {
   int _i = 0;
+  bool _bienvenida = false;
+  Timer? _reintento;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Lo que quedó sin enviar se reintenta solo: al abrir, al volver a la
+    // app y cada 20 s mientras haya algo pendiente.
+    _reintento = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (ref.read(pendientesProvider) > 0) _drenar();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _drenar());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _reintento?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _drenar();
+  }
+
+  Future<void> _drenar({bool avisarSiNada = false}) async {
+    final r = await ref.read(pendientesProvider.notifier).drenar();
+    if (!mounted || r == null) return;
+    if (r.enviadas > 0) avisar(context, '${r.enviadas} pendiente(s) enviados');
+    for (final x in r.rechazadas) {
+      avisar(context, '${x.op.etiqueta} no se registró: ${x.motivo}',
+          tipo: TipoAviso.aviso);
+    }
+    if (avisarSiNada && r.enviadas == 0 && r.quedan > 0) {
+      avisar(context, 'Todavía sin señal', tipo: TipoAviso.aviso);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +128,12 @@ class _InicioShellState extends ConsumerState<InicioShell> {
             ),
           );
         }
+        if (!_bienvenida) {
+          _bienvenida = true;
+          WidgetsBinding.instance.addPostFrameCallback(
+              (_) => correrBienvenida(context, ref));
+        }
+        final pendientes = ref.watch(pendientesProvider);
         final secciones = _seccionesPara(r);
         final i = _i.clamp(0, secciones.length - 1);
         return Scaffold(
@@ -105,7 +157,45 @@ class _InicioShellState extends ConsumerState<InicioShell> {
           ),
           // Solo se monta la sección visible: la cámara del escáner se
           // apaga al salir de su pestaña.
-          body: SafeArea(child: secciones[i].pantalla),
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Aviso fijo: la persona tiene que saber que está trabajando
+                // sin señal y que hay cosas por enviar.
+                if (pendientes > 0)
+                  Material(
+                    color: VenueColors.aviso,
+                    child: InkWell(
+                      onTap: () => _drenar(avisarSiNada: true),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.cloud_off_rounded,
+                                color: Colors.black, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '$pendientes sin enviar · se reintenta solo',
+                                style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            const Text('Reintentar',
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w800)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                Expanded(child: secciones[i].pantalla),
+              ],
+            ),
+          ),
           bottomNavigationBar: secciones.length < 2
               ? null
               : NavigationBar(

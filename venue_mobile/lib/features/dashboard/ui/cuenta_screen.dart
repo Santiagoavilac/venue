@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/sync/cola_offline.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
@@ -90,7 +91,33 @@ class CuentaScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 20),
         OutlinedButton.icon(
-          onPressed: () => ref.read(authRepositoryProvider).salir(),
+          onPressed: () async {
+            final pend = ref.read(pendientesProvider);
+            if (pend > 0) {
+              final si = await showDialog<bool>(
+                context: context,
+                builder: (c) => AlertDialog(
+                  title: Text('Hay $pend operación(es) sin enviar'),
+                  content: const Text(
+                      'Si cerrás sesión ahora se pierden: todavía no llegaron al servidor.'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(c, false),
+                        child: const Text('Seguir conectado')),
+                    TextButton(
+                        onPressed: () => Navigator.pop(c, true),
+                        style: TextButton.styleFrom(
+                            foregroundColor: VenueColors.mal),
+                        child: const Text('Cerrar y descartar')),
+                  ],
+                ),
+              );
+              if (si != true) return;
+            }
+            // La cola guarda nombres de clientes: no queda en el teléfono.
+            await ref.read(colaOfflineProvider).vaciar();
+            await ref.read(authRepositoryProvider).salir();
+          },
           icon: const Icon(Icons.logout_rounded),
           label: const Text('Cerrar sesión'),
         ),

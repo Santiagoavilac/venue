@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/networking/supabase.dart';
+import '../../../core/sync/tiempo_real.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
@@ -170,6 +171,11 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
       );
     }
 
+    ref.listen(cambiosEventoProvider(evento.id), (_, c) {
+      if (c.value?.any(const {'entradas', 'registros'}.contains) ?? false) {
+        ref.invalidate(aforoProvider(evento.id));
+      }
+    });
     final aforo = ref.watch(aforoProvider(evento.id));
     final color = _ultimo == null ? null : colorDeVeredicto(_ultimo!.veredicto);
 

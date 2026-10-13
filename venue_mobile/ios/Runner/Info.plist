@@ -22,6 +22,17 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.venue</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>venue</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
@@ -30,6 +41,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Venue usa la cámara para escanear el QR de las entradas en la puerta.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Venue usa tus fotos para adjuntar comprobantes de pago y el arte de los eventos.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
