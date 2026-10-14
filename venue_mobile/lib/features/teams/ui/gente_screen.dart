@@ -1,0 +1,997 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
+
+import '../../../core/networking/supabase.dart';
+import '../../../core/theme/venue_theme.dart';
+import '../../../core/widgets/avisos.dart';
+import '../../../core/widgets/estado_vista.dart';
+import '../../analytics/ui/reporte_hojas.dart';
+import '../../authentication/data/sesion.dart';
+import '../../clubs/data/clubs.dart';
+import '../../events/data/eventos.dart';
+import '../data/equipo.dart';
+import '../data/gente.dart';
+
+Future<T?> _hoja<T>(BuildContext context, Widget child) => showModalBottomSheet<T>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: VenueColors.superficie,
+      builder: (c) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom),
+        child: child,
+      ),
+    );
+
+String _error(Object e) => e is RechazoDelServidor ? e.motivo : mensajeDeError(e);
+
+Future<String?> _pedirClave(BuildContext context, String nombre) {
+  final t = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: Text('Nueva contraseña para $nombre'),
+      content: TextField(
+          controller: t,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Mínimo 6 caracteres')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancelar')),
+        TextButton(
+            onPressed: () => t.text.length < 6 ? null : Navigator.pop(c, t.text),
+            child: const Text('Cambiar')),
+      ],
+    ),
+  );
+}
+
+Future<void> _compartirInvitacion(BuildContext context, TeamInfo t, String boliche) async {
+  await SharePlus.instance.share(ShareParams(text: mensajeDeInvitacion(t, boliche)));
+}
+
+// ═══════════════════════ MI TEAM (jefe) ═══════════════════════
+/// El jefe gestiona a sus relacionadores: los suma, los pausa y les
+/// restablece la contraseña.
+class MiTeamScreen extends ConsumerWidget {
+  const MiTeamScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final club = ref.watch(clubActivoProvider);
+    final yo = ref.watch(usuarioIdProvider);
+    final equipo = ref.watch(equipoProvider).value ?? const <String, Miembro>{};
+    final teamId = equipo[yo]?.teamId;
+    final gente = ref.watch(miTeamProvider);
+    final ev = ref.watch(eventoActivoProvider);
+    final repo = ref.read(genteRepositoryProvider);
+    if (club == null) return const SizedBox.shrink();
+
+    Future<void> hacer(Future<void> Function() f, String ok) async {
+      try {
+        await f();
+        ref.invalidate(miTeamProvider);
+        ref.invalidate(equipoProvider);
+        if (context.mounted) avisar(context, ok);
+      } catch (e) {
+        if (context.mounted) avisar(context, _error(e), tipo: TipoAviso.aviso);
+      }
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => ref.refresh(miTeamProvider.future),
+      child: VistaAsync(
+        valor: gente,
+        reintentar: () => ref.invalidate(miTeamProvider),
+        datos: (lista) => ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            Text('${equipo[yo]?.team ?? 'Mi team'} · ${lista.length} relacionadores',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 10),
+            if (teamId != null)
+              FutureBuilder(
+                future: repo.team(teamId),
+                builder: (context, s) {
+                  final t = s.data;
+                  if (t == null) return const SizedBox.shrink();
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('Invitar a un relacionador',
+                            style: TextStyle(fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 4),
+                        const Text(
+                            'Mandale el link: se registra solo y queda en tu team.',
+                            style: TextStyle(color: VenueColors.textoSuave)),
+                        const SizedBox(height: 10),
+                        Row(children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
+                              onPressed: () => _compartirInvitacion(context, t, club.nombre),
+                              icon: const Icon(Icons.ios_share_rounded, size: 18),
+                              label: const Text('Compartir link'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 46)),
+                            onPressed: () async {
+                              await Clipboard.setData(ClipboardData(text: t.invitacion));
+                              if (context.mounted) avisar(context, 'Código copiado');
+                            },
+                            child: const Text('Copiar código'),
+                          ),
+                        ]),
+                      ]),
+                    ),
+                  );
+                },
+              ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final ok = await _hoja<bool>(context, const _AltaUsuario(deJefe: true));
+                if (ok == true) {
+                  ref.invalidate(miTeamProvider);
+                  ref.invalidate(equipoProvider);
+                }
+              },
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+              label: const Text('Crear relacionador'),
+            ),
+            const SizedBox(height: 8),
+            if (lista.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('Todavía no tenés relacionadores en este boliche.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: VenueColors.textoSuave)),
+              ),
+            for (final g in lista)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(g.nombre,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: g.activo ? null : VenueColors.textoSuave)),
+                subtitle: Text('@${g.usuario}${g.activo ? '' : ' · en pausa'}'),
+                onTap: ev == null
+                    ? null
+                    : () => hojaDetallePersona(context, g.id, g.nombre, ev),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  IconButton(
+                    tooltip: 'Restablecer contraseña',
+                    icon: const Icon(Icons.key_outlined),
+                    onPressed: () async {
+                      final c = await _pedirClave(context, g.nombre);
+                      if (c != null) {
+                        await hacer(() => repo.resetearClave(g.id, c),
+                            'Contraseña de ${g.nombre} cambiada');
+                      }
+                    },
+                  ),
+                  Switch(
+                    value: g.activo,
+                    onChanged: (v) => hacer(() => repo.activar(g.id, v),
+                        v ? '${g.nombre} activado' : '${g.nombre} en pausa'),
+                  ),
+                ]),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════ GENTE (admin) ═══════════════════════
+class GenteScreen extends ConsumerWidget {
+  const GenteScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final plataforma = ref.watch(plataformaProvider).value ?? false;
+    return DefaultTabController(
+      length: plataforma ? 3 : 2,
+      child: Column(children: [
+        TabBar(tabs: [
+          const Tab(text: 'Usuarios'),
+          const Tab(text: 'Teams'),
+          if (plataforma) const Tab(text: 'Boliches'),
+        ]),
+        Expanded(
+          child: TabBarView(children: [
+            const _Usuarios(),
+            const _Teams(),
+            if (plataforma) const _Boliches(),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+class _Usuarios extends ConsumerStatefulWidget {
+  const _Usuarios();
+  @override
+  ConsumerState<_Usuarios> createState() => _UsuariosState();
+}
+
+class _UsuariosState extends ConsumerState<_Usuarios> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final usuarios = ref.watch(usuariosProvider);
+    final equipo = ref.watch(equipoProvider).value ?? const <String, Miembro>{};
+    void recargar() {
+      ref.invalidate(usuariosProvider);
+      ref.invalidate(equipoProvider);
+    }
+
+    return VistaAsync(
+      valor: usuarios,
+      reintentar: recargar,
+      datos: (todos) {
+        final q = normalizar(_q.trim());
+        final lista = q.isEmpty
+            ? todos
+            : todos.where((u) => normalizar(
+                    '${u.nombre} @${u.usuario} ${u.rolEtiqueta} ${equipo[u.id]?.team ?? ''}')
+                .contains(q)).toList();
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+          children: [
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => setState(() => _q = v),
+                  autocorrect: false,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar por nombre, usuario, rol o team…',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixText: '${lista.length}',
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                tooltip: 'Nuevo usuario',
+                onPressed: () async {
+                  if (await _hoja<bool>(context, const _AltaUsuario()) == true) recargar();
+                },
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+              ),
+            ]),
+            for (final u in lista)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: VenueColors.superficieAlta,
+                  child: Text(u.nombre.isEmpty ? '?' : u.nombre[0].toUpperCase()),
+                ),
+                title: Text(u.nombre,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: u.activo ? null : VenueColors.textoSuave)),
+                subtitle: Text([
+                  '@${u.usuario}',
+                  Rol.desde(equipo[u.id]?.rol ?? u.rol)?.etiqueta ?? u.rol,
+                  if (equipo[u.id]?.teamId != null) equipo[u.id]!.team,
+                  if (!u.activo) 'en pausa',
+                  if (u.adminPrincipal) 'cuenta principal',
+                ].join(' · ')),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  if (await _hoja<bool>(context, _EditarUsuario(usuario: u)) == true) recargar();
+                },
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Alta de una cuenta. Para el jefe: siempre relacionador de su team.
+class _AltaUsuario extends ConsumerStatefulWidget {
+  const _AltaUsuario({this.deJefe = false});
+  final bool deJefe;
+  @override
+  ConsumerState<_AltaUsuario> createState() => _AltaUsuarioState();
+}
+
+class _AltaUsuarioState extends ConsumerState<_AltaUsuario> {
+  final _n = TextEditingController(), _u = TextEditingController(), _c = TextEditingController();
+  String _rol = 'rrpp';
+  String? _team;
+  bool _ocupado = false;
+
+  @override
+  void dispose() {
+    for (final x in [_n, _u, _c]) {
+      x.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final club = ref.watch(clubActivoIdProvider)!;
+    final teams = ref.watch(teamsInfoProvider).value ?? const <TeamInfo>[];
+    final plataforma = ref.watch(plataformaProvider).value ?? false;
+    return ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      children: [
+        Text(widget.deJefe ? 'Crear relacionador' : 'Nuevo usuario',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 12),
+        TextField(
+            controller: _n,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Nombre y apellido')),
+        const SizedBox(height: 10),
+        TextField(
+            controller: _u,
+            autocorrect: false,
+            decoration: const InputDecoration(labelText: 'Usuario (corto, sin espacios)')),
+        const SizedBox(height: 10),
+        TextField(
+            controller: _c, decoration: const InputDecoration(labelText: 'Contraseña (mín. 6)')),
+        if (!widget.deJefe) ...[
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: _rol,
+                decoration: const InputDecoration(labelText: 'Rol'),
+                items: [
+                  for (final r in rolesAsignables.where((r) => r != 'admin' || plataforma))
+                    DropdownMenuItem(value: r, child: Text(Rol.desde(r)?.etiqueta ?? r)),
+                ],
+                onChanged: (v) => setState(() => _rol = v!),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: DropdownButtonFormField<String?>(
+                initialValue: _team,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Team'),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('— sin team —')),
+                  for (final t in teams)
+                    DropdownMenuItem<String?>(
+                        value: t.id, child: Text(t.nombre, overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (v) => setState(() => _team = v),
+              ),
+            ),
+          ]),
+        ],
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: _ocupado
+              ? null
+              : () async {
+                  if (_n.text.trim().isEmpty || _u.text.trim().length < 3 || _c.text.length < 6) {
+                    avisar(context, 'Completá nombre, usuario y clave (6+)',
+                        tipo: TipoAviso.aviso);
+                    return;
+                  }
+                  setState(() => _ocupado = true);
+                  try {
+                    final u = await ref.read(genteRepositoryProvider).crear(
+                          usuario: _u.text, nombre: _n.text.trim(), clave: _c.text,
+                          rol: widget.deJefe ? 'rrpp' : _rol,
+                          teamId: widget.deJefe ? null : _team,
+                          // sin team hay que decirle en qué boliche opera
+                          clubs: widget.deJefe || _team != null ? null : [club],
+                        );
+                    if (!context.mounted) return;
+                    Navigator.pop(context, true);
+                    avisar(context, '@$u creado');
+                  } catch (e) {
+                    if (context.mounted) {
+                      avisar(context, _error(e), tipo: TipoAviso.aviso);
+                      setState(() => _ocupado = false);
+                    }
+                  }
+                },
+          child: const Text('Crear usuario'),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditarUsuario extends ConsumerStatefulWidget {
+  const _EditarUsuario({required this.usuario});
+  final Usuario usuario;
+  @override
+  ConsumerState<_EditarUsuario> createState() => _EditarUsuarioState();
+}
+
+class _EditarUsuarioState extends ConsumerState<_EditarUsuario> {
+  late final g = widget.usuario;
+  late final _nombre = TextEditingController(text: g.nombre);
+  late String _rol = g.rol;
+  late String? _team = g.teamId;
+  late final _clubs = {...g.clubs};
+  final _rolEn = <String, String>{}, _teamEn = <String, String?>{};
+  bool _ocupado = false, _cargado = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(genteRepositoryProvider).membresias(g.id).then((ms) {
+      if (!mounted) return;
+      setState(() {
+        for (final m in ms) {
+          _rolEn[m.clubId] = m.rol;
+          _teamEn[m.clubId] = m.teamId;
+        }
+        _cargado = true;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _nombre.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final clubs = ref.watch(clubsProvider).value ?? const <Club>[];
+    final teams = ref.watch(teamsInfoProvider).value ?? const <TeamInfo>[];
+    final plataforma = ref.watch(plataformaProvider).value ?? false;
+    final yo = ref.watch(usuarioIdProvider);
+    final repo = ref.read(genteRepositoryProvider);
+    // la cuenta principal solo la toca su dueño
+    final protegida = g.adminPrincipal && g.id != yo;
+    final porBoliche = _clubs.length >= 2 && _rol != 'admin';
+    final roles = rolesAsignables.where((r) => r != 'admin' || plataforma || g.rol == 'admin').toList();
+
+    Future<void> hacer(Future<void> Function() f, String ok) async {
+      setState(() => _ocupado = true);
+      try {
+        await f();
+        if (!context.mounted) return;
+        Navigator.pop(context, true);
+        avisar(context, ok);
+      } catch (e) {
+        if (context.mounted) {
+          avisar(context, _error(e), tipo: TipoAviso.aviso);
+          setState(() => _ocupado = false);
+        }
+      }
+    }
+
+    return ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      children: [
+        Text('@${g.usuario}', style: const TextStyle(color: VenueColors.textoSuave)),
+        if (protegida)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Text('Esta cuenta administrativa está protegida: solo su dueño puede modificarla.',
+                style: TextStyle(color: VenueColors.aviso)),
+          ),
+        const SizedBox(height: 8),
+        TextField(
+            controller: _nombre,
+            enabled: !protegida,
+            decoration: const InputDecoration(labelText: 'Nombre')),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              initialValue: roles.contains(_rol) ? _rol : null,
+              decoration: const InputDecoration(labelText: 'Rol base'),
+              items: [
+                for (final r in roles)
+                  DropdownMenuItem(value: r, child: Text(Rol.desde(r)?.etiqueta ?? r)),
+              ],
+              onChanged: protegida ? null : (v) => setState(() => _rol = v!),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: DropdownButtonFormField<String?>(
+              initialValue: teams.any((t) => t.id == _team) ? _team : null,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Team base'),
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('— sin team —')),
+                for (final t in teams)
+                  DropdownMenuItem<String?>(
+                      value: t.id, child: Text(t.nombre, overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: protegida ? null : (v) => setState(() => _team = v),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        const Text('Boliches donde opera'),
+        Wrap(spacing: 8, children: [
+          for (final c in clubs)
+            FilterChip(
+              label: Text(c.nombre),
+              selected: _clubs.contains(c.id),
+              onSelected: protegida
+                  ? null
+                  : (v) => setState(() => v ? _clubs.add(c.id) : _clubs.remove(c.id)),
+            ),
+        ]),
+        if (porBoliche && _cargado) ...[
+          const SizedBox(height: 8),
+          const Text('Rol y team en cada boliche',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+          for (final c in clubs.where((c) => _clubs.contains(c.id)))
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(children: [
+                SizedBox(width: 86, child: Text(c.nombre, overflow: TextOverflow.ellipsis)),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _rolEn[c.id] ?? _rol,
+                    isExpanded: true,
+                    decoration: const InputDecoration(isDense: true),
+                    items: [
+                      for (final r in rolesAsignables.where((r) => r != 'admin'))
+                        DropdownMenuItem(value: r, child: Text(Rol.desde(r)?.etiqueta ?? r)),
+                    ],
+                    onChanged: (v) => setState(() => _rolEn[c.id] = v!),
+                  ),
+                ),
+              ]),
+            ),
+        ],
+        const SizedBox(height: 16),
+        if (!protegida) ...[
+          FilledButton(
+            onPressed: _ocupado
+                ? null
+                : () {
+                    if (_nombre.text.trim().isEmpty) {
+                      avisar(context, 'Poné el nombre', tipo: TipoAviso.aviso);
+                      return;
+                    }
+                    if (_clubs.isEmpty) {
+                      avisar(context, 'Elegí al menos un boliche', tipo: TipoAviso.aviso);
+                      return;
+                    }
+                    hacer(
+                        () => repo.editar(
+                              g.id,
+                              nombre: _nombre.text.trim(), rol: _rol, teamId: _team,
+                              clubs: _clubs.toList(),
+                              porBoliche: [
+                                for (final c in _clubs)
+                                  Membresia(
+                                      clubId: c,
+                                      rol: _rolEn[c] ?? _rol,
+                                      teamId: _teamEn[c] ?? _team),
+                              ],
+                            ),
+                        'Usuario actualizado');
+                  },
+            child: const Text('Guardar'),
+          ),
+          const SizedBox(height: 9),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _ocupado
+                    ? null
+                    : () async {
+                        final c = await _pedirClave(context, g.nombre);
+                        if (c != null) {
+                          await hacer(() => repo.resetearClave(g.id, c), 'Contraseña cambiada');
+                        }
+                      },
+                child: const Text('Cambiar clave'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _ocupado
+                    ? null
+                    : () => hacer(() => repo.activar(g.id, !g.activo),
+                        g.activo ? '${g.nombre} en pausa' : '${g.nombre} activado'),
+                child: Text(g.activo ? 'Pausar' : 'Activar'),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 9),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(foregroundColor: VenueColors.mal),
+            onPressed: _ocupado
+                ? null
+                : () async {
+                    final si = await showDialog<bool>(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: Text('Eliminar a ${g.nombre}'),
+                        content: Text(
+                            '@${g.usuario} · ${g.rolEtiqueta}\n\nSi tiene ventas o invitados, la cuenta se archiva y su historia queda con su nombre. Si no, se borra por completo.'),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(c, false),
+                              child: const Text('Cancelar')),
+                          TextButton(
+                              onPressed: () => Navigator.pop(c, true),
+                              style: TextButton.styleFrom(foregroundColor: VenueColors.mal),
+                              child: const Text('Eliminar usuario')),
+                        ],
+                      ),
+                    );
+                    if (si != true) return;
+                    setState(() => _ocupado = true);
+                    try {
+                      final modo = await repo.eliminar(g.id);
+                      if (!context.mounted) return;
+                      Navigator.pop(context, true);
+                      avisar(
+                          context,
+                          modo == 'archivado'
+                              ? '${g.nombre} eliminado — sus manillas y listas quedan con su nombre'
+                              : '${g.nombre} eliminado',
+                          tipo: TipoAviso.aviso);
+                    } catch (e) {
+                      if (context.mounted) {
+                        avisar(context, _error(e), tipo: TipoAviso.aviso);
+                        setState(() => _ocupado = false);
+                      }
+                    }
+                  },
+            child: const Text('Eliminar usuario'),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ── teams ──
+class _Teams extends ConsumerWidget {
+  const _Teams();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final teams = ref.watch(teamsInfoProvider);
+    final club = ref.watch(clubActivoProvider);
+    final equipo = ref.watch(equipoProvider).value ?? const <String, Miembro>{};
+    final clubs = ref.watch(clubsProvider).value ?? const <Club>[];
+    final repo = ref.read(genteRepositoryProvider);
+    if (club == null) return const SizedBox.shrink();
+    void recargar() {
+      ref.invalidate(teamsInfoProvider);
+      ref.invalidate(equipoProvider);
+    }
+
+    Future<void> hacer(Future<void> Function() f, String ok) async {
+      try {
+        await f();
+        recargar();
+        if (context.mounted) avisar(context, ok);
+      } catch (e) {
+        if (context.mounted) avisar(context, _error(e), tipo: TipoAviso.aviso);
+      }
+    }
+
+    Future<void> formulario([TeamInfo? t]) async {
+      final nombre = TextEditingController(text: t?.nombre ?? '');
+      final sel = {...?t?.clubs, if (t == null) club.id};
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => StatefulBuilder(
+          builder: (c, set) => AlertDialog(
+            title: Text(t == null ? 'Nuevo team' : 'Editar team'),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(
+                  controller: nombre,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Nombre')),
+              if (t != null) ...[
+                const SizedBox(height: 10),
+                Wrap(spacing: 8, children: [
+                  for (final b in clubs)
+                    FilterChip(
+                        label: Text(b.nombre),
+                        selected: sel.contains(b.id),
+                        onSelected: (v) => set(() => v ? sel.add(b.id) : sel.remove(b.id))),
+                ]),
+              ],
+            ]),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
+              TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Guardar')),
+            ],
+          ),
+        ),
+      );
+      final n = nombre.text.trim();
+      if (ok != true || n.isEmpty) return;
+      await hacer(
+          () => t == null ? repo.crearTeam(n, club.id) : repo.editarTeam(t.id, n, sel.toList()),
+          t == null ? 'Team creado' : 'Team actualizado');
+    }
+
+    return VistaAsync(
+      valor: teams,
+      reintentar: recargar,
+      datos: (lista) => ListView(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+        children: [
+          OutlinedButton.icon(
+            onPressed: formulario,
+            icon: const Icon(Icons.group_add_outlined),
+            label: const Text('Nuevo team'),
+          ),
+          for (final t in lista)
+            Card(
+              margin: const EdgeInsets.only(top: 10),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+                child: Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(t.nombre,
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                      Text(
+                        '${equipo.values.where((m) => m.teamId == t.id).length} personas'
+                        '${equipo[t.jefeId] == null ? '' : ' · jefe ${equipo[t.jefeId]!.nombre}'}',
+                        style: const TextStyle(color: VenueColors.textoSuave),
+                      ),
+                    ]),
+                  ),
+                  IconButton(
+                      tooltip: 'Compartir invitación',
+                      onPressed: () => _compartirInvitacion(context, t, club.nombre),
+                      icon: const Icon(Icons.ios_share_rounded)),
+                  PopupMenuButton<String>(
+                    onSelected: (k) async {
+                      if (k == 'editar') return formulario(t);
+                      final otros = lista.where((x) => x.id != t.id).toList();
+                      String? destino;
+                      final si = await showDialog<bool>(
+                        context: context,
+                        builder: (c) => StatefulBuilder(
+                          builder: (c, set) => AlertDialog(
+                            title: Text('Eliminar ${t.nombre}'),
+                            content: Column(mainAxisSize: MainAxisSize.min, children: [
+                              const Text('Su gente pasa al team que elijas, o queda sin team.'),
+                              const SizedBox(height: 10),
+                              DropdownButtonFormField<String?>(
+                                initialValue: destino,
+                                isExpanded: true,
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                      value: null, child: Text('— dejar sin team —')),
+                                  for (final o in otros)
+                                    DropdownMenuItem<String?>(value: o.id, child: Text(o.nombre)),
+                                ],
+                                onChanged: (v) => set(() => destino = v),
+                              ),
+                            ]),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(c, false),
+                                  child: const Text('Cancelar')),
+                              TextButton(
+                                  onPressed: () => Navigator.pop(c, true),
+                                  style: TextButton.styleFrom(foregroundColor: VenueColors.mal),
+                                  child: const Text('Eliminar team')),
+                            ],
+                          ),
+                        ),
+                      );
+                      if (si == true) {
+                        await hacer(() => repo.eliminarTeam(t.id, destino: destino),
+                            '${t.nombre} eliminado');
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'editar', child: Text('Editar')),
+                      PopupMenuItem(value: 'eliminar', child: Text('Eliminar')),
+                    ],
+                  ),
+                ]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── boliches (plataforma) ──
+class _Boliches extends ConsumerWidget {
+  const _Boliches();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clubs = ref.watch(clubsProvider);
+    Future<void> abrir([Club? c]) async {
+      if (await _hoja<bool>(context, _BolicheForm(club: c)) == true) {
+        ref.invalidate(clubsProvider);
+      }
+    }
+
+    return VistaAsync(
+      valor: clubs,
+      reintentar: () => ref.invalidate(clubsProvider),
+      datos: (lista) => ListView(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+        children: [
+          OutlinedButton.icon(
+            onPressed: abrir,
+            icon: const Icon(Icons.add_business_outlined),
+            label: const Text('Nuevo boliche'),
+          ),
+          for (final c in lista)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                  backgroundColor: c.primario ?? VenueColors.marcaPorDefecto,
+                  child: Text(c.inicial,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
+              title: Text(c.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text([c.id, if (c.subtitulo?.isNotEmpty ?? false) c.subtitulo!].join(' · ')),
+              trailing: const Icon(Icons.edit_outlined),
+              onTap: () => abrir(c),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+String _hex(Color? c, String defecto) => c == null
+    ? defecto
+    : '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+
+class _BolicheForm extends ConsumerStatefulWidget {
+  const _BolicheForm({this.club});
+  final Club? club;
+  @override
+  ConsumerState<_BolicheForm> createState() => _BolicheFormState();
+}
+
+class _BolicheFormState extends ConsumerState<_BolicheForm> {
+  late final c = widget.club;
+  late final _nombre = TextEditingController(text: c?.nombre ?? '');
+  late final _id = TextEditingController(text: c?.id ?? '');
+  late final _sub = TextEditingController(text: c?.subtitulo ?? '');
+  late final _p = TextEditingController(text: _hex(c?.primario, '#7C3AED'));
+  late final _s = TextEditingController(text: _hex(c?.secundario, '#A855F7'));
+  final _a = TextEditingController(text: '#22D3EE');
+  bool _ocupado = false;
+
+  @override
+  void dispose() {
+    for (final x in [_nombre, _id, _sub, _p, _s, _a]) {
+      x.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final repo = ref.read(genteRepositoryProvider);
+    Future<void> hacer(Future<void> Function() f, String ok) async {
+      setState(() => _ocupado = true);
+      try {
+        await f();
+        if (!context.mounted) return;
+        Navigator.pop(context, true);
+        avisar(context, ok);
+      } catch (e) {
+        if (context.mounted) {
+          avisar(
+              context,
+              e is PostgrestException && e.code == '23505'
+                  ? 'Ya existe un boliche con el slug "${_id.text.trim()}"'
+                  : _error(e),
+              tipo: TipoAviso.aviso);
+          setState(() => _ocupado = false);
+        }
+      }
+    }
+
+    Widget color(String l, TextEditingController t) => Expanded(
+          child: TextField(
+            controller: t,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: l,
+              suffixIcon: Padding(
+                padding: const EdgeInsets.all(12),
+                child: CircleAvatar(
+                    radius: 9,
+                    backgroundColor: colorDesdeHex(t.text) ?? Colors.transparent),
+              ),
+            ),
+          ),
+        );
+
+    return ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      children: [
+        Text(c == null ? 'Nuevo boliche' : 'Editar boliche',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 12),
+        TextField(controller: _nombre, decoration: const InputDecoration(labelText: 'Nombre')),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _id,
+          enabled: c == null,
+          autocorrect: false,
+          decoration: const InputDecoration(
+              labelText: 'Identificador',
+              helperText: 'Minúsculas, números y guiones. No se puede cambiar después.'),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+            controller: _sub,
+            decoration: const InputDecoration(labelText: 'Subtítulo (zona, ciudad…)')),
+        const SizedBox(height: 10),
+        Row(children: [color('Primario', _p), const SizedBox(width: 8), color('Secundario', _s)]),
+        const SizedBox(height: 10),
+        Row(children: [color('Acento', _a), const Spacer()]),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: _ocupado
+              ? null
+              : () {
+                  final nombre = _nombre.text.trim(), id = _id.text.trim();
+                  if (nombre.isEmpty || !slugValido(id)) {
+                    avisar(context, 'Completá el nombre y un identificador válido',
+                        tipo: TipoAviso.aviso);
+                    return;
+                  }
+                  if (![_p, _s, _a].every((t) => colorValido(t.text.trim()))) {
+                    avisar(context, 'Los colores van como #RRGGBB', tipo: TipoAviso.aviso);
+                    return;
+                  }
+                  final sub = _sub.text.trim().isEmpty ? null : _sub.text.trim();
+                  hacer(
+                      () => c == null
+                          ? repo.crearClub(
+                              id: id, nombre: nombre, subtitulo: sub, primario: _p.text.trim(),
+                              secundario: _s.text.trim(), acento: _a.text.trim())
+                          : repo.editarClub(c!.id,
+                              nombre: nombre, subtitulo: sub, primario: _p.text.trim(),
+                              secundario: _s.text.trim(), acento: _a.text.trim()),
+                      c == null ? 'Boliche creado' : 'Boliche actualizado');
+                },
+          child: const Text('Guardar'),
+        ),
+        if (c != null) ...[
+          const SizedBox(height: 9),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(foregroundColor: VenueColors.mal),
+            onPressed: _ocupado
+                ? null
+                : () => hacer(() => repo.desactivarClub(c!.id), '${c!.nombre} desactivado'),
+            child: const Text('Desactivar boliche'),
+          ),
+        ],
+      ],
+    );
+  }
+}

@@ -14,6 +14,7 @@ import '../../access_control/ui/rrpps_screen.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/ui/eventos_screen.dart';
 import '../../payments/ui/pagos_screen.dart';
+import '../../teams/ui/gente_screen.dart';
 import '../../vip_tables/ui/mesas_screen.dart';
 import '../../access_control/ui/accesos_screen.dart';
 import '../../analytics/ui/reporte_screen.dart';
@@ -51,6 +52,12 @@ List<_Seccion> _seccionesPara(Rol rol) => [
       if (rol.vende)
         _Seccion(rol == Rol.admin ? 'Reporte' : 'Stats', Icons.bar_chart_outlined,
             Icons.bar_chart_rounded, const ReporteScreen()),
+      if (rol == Rol.jefe)
+        const _Seccion('Mi team', Icons.groups_outlined, Icons.groups_rounded,
+            MiTeamScreen()),
+      if (rol == Rol.admin)
+        const _Seccion('Gente', Icons.manage_accounts_outlined,
+            Icons.manage_accounts_rounded, GenteScreen()),
       if (rol.veEventos)
         const _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
             EventosScreen()),

@@ -141,10 +141,14 @@ create policy teams_escribir on teams for all to authenticated
 
 -- profiles: yo, y la gente con la que comparto boliche
 create policy profiles_leer on profiles for select to authenticated
-  using (id = auth.uid() or es_platform_admin() or comparte_club(id));
+  -- `creado_por`: quien da de alta una cuenta sin team la recibe SIN boliche
+  -- y tiene que poder verla para asignarle el suyo.
+  using (id = auth.uid() or es_platform_admin() or comparte_club(id)
+         or creado_por = auth.uid());
 -- el detalle fino (qué columnas, a quién) lo hace el trigger perfil_update
 create policy profiles_escribir on profiles for update to authenticated
   using (id = auth.uid() or es_platform_admin()
+         or (creado_por = auth.uid() and rol_actual() = 'admin')
          or (comparte_club(id) and (rol_actual() = 'admin'
               or (rol_actual() = 'jefe' and team_id is not distinct from mi_team_base()))))
   with check (id = auth.uid() or es_platform_admin()

@@ -52,7 +52,10 @@ fue probada todavía a mano en un teléfono.
 | 5 | Nombre por nombre y eventos pasados (`sheetRrppDetalle`, `sheetHistorialRrpp`, `sheetHistTeam`) | ídem | hecho · probado contra el demo |
 | 5 | Reporte de filtro (`sheetFiltro`) | ídem | hecho |
 | 5 | Contabilidad a Excel (`contabilidad.js`) | `analytics/data/contabilidad.dart`, `xlsx.dart` | hecho · mismas fórmulas; el archivo abre con openpyxl; **falta abrirlo en Excel/Numbers reales** |
-| 6 | Mi team, Gente, boliches | — | pendiente |
+| 6 | Mi team del jefe: invitar por link, crear relacionador, pausar, cambiar clave (`screenTeam`) | `teams/ui/gente_screen.dart` · `MiTeamScreen` | hecho · probado contra el demo |
+| 6 | Gente: usuarios con buscador, alta, edición de rol/team/boliches, rol por boliche, pausar, cambiar clave, eliminar (`screenGente`, `sheetEditarUsuario`) | ídem · `GenteScreen` | hecho · probado contra el demo |
+| 6 | Teams: crear, editar, eliminar moviendo a su gente, invitación (`screenTeamAdmin`) | ídem | hecho · probado contra el demo |
+| 6 | Boliches: crear, editar colores, desactivar (solo plataforma) | ídem | hecho · probado contra el demo |
 | 7 | Eventos (admin), listas, fases, avisos | — | pendiente |
 | 8 | Caja | — | pendiente |
 | 9 | Barra, inventario, POS, cierre, analítica | — | pendiente |
@@ -62,8 +65,8 @@ fue probada todavía a mano en un teléfono.
 | Rol | Secciones |
 | --- | --- |
 | Seguridad | Escáner · Puerta · RRPPs · Mesas · Eventos · Cuenta |
-| Administrador | Accesos (Listas, Entradas, Resumen, Historial) · Escáner · Pagos · Mesas · Reporte · Eventos · Cuenta |
-| Jefe, Relacionador | Accesos (Listas, Entradas, Resumen) · Pagos · Mesas · Stats · Eventos · Cuenta |
+| Administrador | Accesos (Listas, Entradas, Resumen, Historial) · Escáner · Pagos · Mesas · Reporte · Gente · Eventos · Cuenta |
+| Jefe, Relacionador | Accesos (Listas, Entradas, Resumen) · Pagos · Mesas · Stats · Mi team (jefe) · Eventos · Cuenta |
 | Caja, Propietario, Barra, Recepción | Cuenta |
 
 Con esto, **el rol Seguridad ya tiene en la app todo lo que tiene en la web

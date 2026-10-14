@@ -17,3 +17,9 @@ alter function lista_limite_ingreso(uuid)   set search_path = public;
 alter function telefono_normalizar(text)    set search_path = public;
 alter function es_servicio()                set search_path = public;
 alter function impl.g(text, text, text)     set search_path = public;
+
+-- club_membership.team_id se infirió NOT NULL del respaldo (todas las filas
+-- de la muestra tenían team). Pero un portero, una caja o un bartender no
+-- tienen team: darles un rol distinto por boliche fallaba con
+-- "null value in column team_id". La web manda null en ese caso.
+alter table club_membership alter column team_id drop not null;
