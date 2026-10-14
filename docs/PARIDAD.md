@@ -2,8 +2,9 @@
 
 Cada pantalla de la web y su estado en `venue_mobile/`. "Hecho" significa
 escrito, con tests, y —donde dice "probado contra el demo"— ejecutado contra
-el backend real con los usuarios de `tools/seed_demo.py`. Ninguna pantalla
-fue probada todavía a mano en un teléfono.
+el backend real con los usuarios de `tools/seed_demo.py`. La app está instalada en un
+iPhone, pero las pantallas no fueron recorridas una por una a mano: lo
+probado es la capa de datos contra el servidor y piezas sueltas de interfaz.
 
 | Etapa | Web (`app.js`) | App | Estado |
 | --- | --- | --- | --- |
@@ -64,7 +65,14 @@ fue probada todavía a mano en un teléfono.
 | 7 | Avisos al equipo y quién los leyó (`sheetAvisos`, `sheetQuienLeyo`) | ídem | hecho · probado contra el demo |
 | 8 | Caja: relacionadores por team, buscador, marcar atendidos (`screenCaja`) | `caja/caja.dart` | hecho · probado contra el demo |
 | 8 | Filtro de la lista de caja y agregados a mano (`sheetCajaFiltro`) | ídem | hecho · probado contra el demo |
-| 9 | Barra, inventario, POS, cierre, analítica | — | pendiente |
+| 9 | Punto de venta: carta por barra, carrito, efectivo / QR / cortesía, anular la última, cola sin señal idempotente (`screenBarPOS`, `posCobrar`) | `bar/ui/pos_screen.dart` | hecho · probado contra el demo |
+| 9 | Inventario: stock en ml y botellas, valor, bajo stock, lotes, conteo físico y bajas (`screenInventario`, `sheetBebida`) | `bar/ui/barra_screens.dart` | hecho · probado contra el demo |
+| 9 | Recepción de mercadería y "lo mío" del depósito (`screenRecepcion`, `screenRecepcionMias`) | ídem | hecho · probado contra el demo |
+| 9 | Conteo de la noche (`screenBarConteo`) | ídem | hecho · probado contra el demo |
+| 9 | Carta y recetas (`sheetTragos`, `sheetTrago`) | ídem | hecho · probado contra el demo |
+| 9 | Turno, barras y cupo de cortesías (`sheetTurno`, `sheetBarras`, `sheetCortesiasConfig`) | ídem | hecho · probado contra el demo |
+| 9 | Movimientos de stock (`screenBarMovimientos`) | ídem | hecho · probado contra el demo |
+| 9 | Cierre de la noche y analítica con margen, merma y proyección de compra (`screenBarCierre`, `screenBarAnalitica`) | ídem | hecho · probado contra el demo |
 
 ## Qué ve hoy cada rol en la app
 
@@ -74,7 +82,9 @@ fue probada todavía a mano en un teléfono.
 | Administrador | Accesos (Listas, Entradas, Resumen, Historial) · Escáner · Pagos · Mesas · Reporte · Gente · Eventos · Cuenta |
 | Jefe, Relacionador | Accesos (Listas, Entradas, Resumen) · Pagos · Mesas · Stats · Mi team (jefe) · Eventos · Cuenta |
 | Caja | Relacionadores · Eventos · Cuenta |
-| Propietario, Barra, Recepción | Cuenta |
+| Propietario | Inventario · Vender · Cierre · Analítica · Movimientos · Cuenta |
+| Bartender | Vender · Cuenta |
+| Recepción | Registrar · Lo mío · Cuenta |
 
 Con esto, **el rol Seguridad ya tiene en la app todo lo que tiene en la web
 salvo la vista de mesas**.

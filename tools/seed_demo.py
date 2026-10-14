@@ -92,6 +92,8 @@ def main():
         }, extra={"Prefer": "return=representation"}), f"evento {nombre}")[0]["id"]
 
     ev_a, ev_n = evento("aurora", "Noche Aurora"), evento("nebula", "Nebula Fest")
+    # corrida en otro día: el evento de demostración se trae a hoy
+    servicio("PATCH", f"/rest/v1/eventos?id=in.({ev_a},{ev_n})", {"fecha": HOY})
 
     def lista(ev, nombre):
         s, j = servicio("GET", f"/rest/v1/lista_tipos?evento_id=eq.{ev}&nombre=eq.{q(nombre)}&select=id")
@@ -135,6 +137,34 @@ def main():
         barra = ok(*http("POST", "/rest/v1/barras", {"club_id": "aurora", "nombre": "Barra principal"},
                          token=t_prop, extra={"Prefer": "return=representation"}), "barra")[0]["id"]
         print("  barra creada por el propietario:", barra)
+
+    # bebida con stock, trago con receta y bartender asignado al turno
+    from venue_api import http
+    t_dep = login("deposito.aurora", CLAVE)
+    barra = servicio("GET", "/rest/v1/barras?club_id=eq.aurora&select=id")[1][0]["id"]
+    cat = servicio("GET", "/rest/v1/bar_categorias?select=id")[1]
+    if not cat:
+        cat = ok(*http("POST", "/rest/v1/bar_categorias", {"nombre": "Destilados", "orden": 1},
+                       token=t_prop, extra={"Prefer": "return=representation"}), "categoría")
+    beb = servicio("GET", "/rest/v1/bebidas?club_id=eq.aurora&nombre=eq.Vodka%20Demo&select=id")[1]
+    if not beb:
+        beb = ok(*http("POST", "/rest/v1/bebidas", {
+            "club_id": "aurora", "categoria_id": cat[0]["id"], "nombre": "Vodka Demo",
+            "volumen_ml": 750, "unidad": "botella", "umbral_bajo": 2},
+            token=t_prop, extra={"Prefer": "return=representation"}), "bebida")
+        ok(*rpc("bar_recibir_lote", {"p_bebida": beb[0]["id"], "p_cantidad": 6, "p_codigo": None,
+                                     "p_costo": 120, "p_notas": "demo"}, t_dep), "recibir lote")
+    tr = servicio("GET", "/rest/v1/tragos?club_id=eq.aurora&nombre=eq.Vodka%20Tonic%20Demo&select=id")[1]
+    if not tr:
+        tr = ok(*http("POST", "/rest/v1/tragos", {"club_id": "aurora", "nombre": "Vodka Tonic Demo",
+                                                   "precio_venta": 35},
+                      token=t_prop, extra={"Prefer": "return=representation"}), "trago")
+        ok(*http("POST", "/rest/v1/receta_items", {"trago_id": tr[0]["id"], "bebida_id": beb[0]["id"], "ml": 50},
+                 token=t_prop), "receta")
+        ok(*http("PATCH", f"/rest/v1/tragos?id=eq.{tr[0]['id']}", {"activo": True}, token=t_prop), "activar trago")
+    http("POST", "/rest/v1/bar_staff?on_conflict=evento_id,barra_id,user_id",
+         {"evento_id": ev_a, "barra_id": barra, "user_id": ids["barra.aurora"]},
+         token=t_prop, extra={"Prefer": "resolution=merge-duplicates"})
 
     print("\nSeed listo.")
     print(f"  evento Aurora: {ev_a}\n  evento Nebula: {ev_n}")

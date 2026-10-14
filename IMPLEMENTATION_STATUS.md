@@ -1,142 +1,134 @@
 # Venue · estado de implementación
 
-Última actualización: 2026-10-13 · Backend de trabajo: proyecto demo
+Última actualización: 2026-10-14 · Backend de trabajo: proyecto demo
 `cxksjarupexptfksnptg` (sin datos reales).
 
 Solo figura como probado lo que se ejecutó de verdad.
 
-## Fase 1 · Auditoría — parcial
+## Resumen
 
-| Qué | Estado |
+| Bloque | Estado |
 | --- | --- |
-| Revisión de código, esquema, RLS, triggers y Edge Function | hecha |
-| Instalación limpia de `db/01…17` en un proyecto vacío | hecha; falló en 2 puntos, corregidos (ver abajo) |
-| `docs/RPC_MATRIZ.md` (79 funciones: quién puede llamarlas) | generado desde la matriz que corre en el servidor |
-| `docs/INVENTARIO.md`, `docs/ESQUEMA.md`, `docs/PARIDAD.md` | **pendientes** |
+| Seguridad del servidor | aplicada y probada en el demo |
+| Paridad web → app (9 etapas) | **todas las pantallas de la web tienen su equivalente en la app** (`docs/PARIDAD.md`) |
+| App en iPhone | compila firmada e instalada; **pantallas sin recorrer a mano una por una** |
+| App en Android | compiló el APK de depuración con la base de la app; **falta recompilar con todo lo nuevo** |
+| CRM, fidelización, notificaciones, WhatsApp Business | **sin empezar** |
+| Publicación en tiendas | sin empezar |
 
-Fallos de instalación limpia encontrados y corregidos:
-- `02f` usaba `unaccent()` sin activar la extensión → `db/00-extensiones.sql`.
-- `02d` insertaba fases de un evento del proyecto de origen que no existe → ahora es condicional.
-- El `insert into profiles` del README omitía columnas obligatorias → defaults en `db/26` y README corregido.
+## Cómo correr todo
 
-## Fase 2 · Seguridad — aplicada y probada en el demo
+```bash
+sh tools/pruebas.sh        # seed + seguridad + análisis + tests de la app, en orden
+```
+
+Las pruebas de integración van de a un archivo: en paralelo, Supabase Auth
+corta por exceso de logins y la corrida queda esperando.
+
+## Seguridad (`db/18` … `db/28`)
 
 | Migración | Qué hace |
 | --- | --- |
 | `18-helpers-permiso` | Rol efectivo **por boliche**, administradores de plataforma, distinción real entre servicio y anónimo |
-| `19-rpc-guardas` | 79 RPC con guarda de sesión + rol + boliche (las originales quedan intactas en el esquema interno `impl`); sin acceso anónimo; bloqueo de fila en ventas de mesa; límite de 40 códigos inexistentes cada 5 min en puerta |
+| `19-rpc-guardas` | 79 RPC con guarda de sesión + rol + boliche (las originales intactas en el esquema `impl`); sin acceso anónimo; bloqueo de fila en ventas de mesa; límite de códigos inexistentes en puerta; **cupos de lista y ventana de venta ahora los hace cumplir el servidor** |
 | `20-triggers-servicio` | Cuenta protegida, perfiles y membresías: nadie se cambia sus propios permisos |
-| `21-rls-por-boliche` | Todas las tablas filtran por boliche; pagos y teléfonos restringidos; vistas de stats respetan RLS |
-| `22-codigos-e-invitaciones` | Códigos de entrada de 10 caracteres con generador criptográfico; invitaciones de 128 bits con vencimiento opcional |
-| `23-comprobantes-privados` | Bucket privado + URL firmada (la web ya las usa) |
-| `25-auditoria` | `audit_log` con quién/cuándo/antes/después en pagos, entradas, invitados, mesas, perfiles, membresías, eventos, teams, boliches y ventas de barra |
-| `26-instalacion-limpia` | Defaults y `search_path` fijo |
-| Edge Function `crear-usuario` | Desplegada: límite de intentos por IP, invitación con vencimiento, rol validado, crear admins solo plataforma |
-
-### Pruebas ejecutadas
-
-`python3 tests/test_seguridad.py` → **103 de 103 pasan** contra el demo, con
-sesiones reales de 13 usuarios en 2 boliches. Cubren: anónimo sin acceso;
-RRPP sin funciones administrativas; aislamiento entre boliches (RPC, tablas y
-vistas); cuenta protegida; jefe no se asciende; teléfonos solo del team; 6
-validaciones simultáneas del mismo QR → entra una; 3 ventas simultáneas de la
-misma mesa → se vende una; auditoría; límite de intentos; comprobantes
-privados; alta de usuarios.
+| `21-rls-por-boliche` | Todas las tablas filtran por boliche; pagos y teléfonos restringidos; **eventos en borrador visibles solo para el admin**; vistas de stats respetan RLS |
+| `22-codigos-e-invitaciones` | Códigos de entrada de 10 caracteres con generador criptográfico; invitaciones de 128 bits |
+| `23-comprobantes-privados` | Bucket privado + URL firmada (web y app) |
+| `24-pagos-idempotencia` | Un pago reenviado no se registra dos veces (`crear_pago_unico`) |
+| `25-auditoria` | `audit_log` de pagos, entradas, invitados, mesas, perfiles, membresías, eventos, teams, boliches y ventas de barra |
+| `26-instalacion-limpia` | Defaults, `search_path`, membresía sin team |
+| `27-realtime` | Mesas, entradas e invitados en tiempo real |
+| `28-storage-disenos-lectura` | Permite reemplazar artes, fondos de plano y QRs de cobro |
+| Edge Function `crear-usuario` | Límite de intentos, invitación con vencimiento, rol validado, crear admins solo plataforma |
 
 Verificado en el catálogo: 0 funciones propias ejecutables por anónimos, 0
-tablas sin RLS, 0 permisos de tabla para anónimos, esquema interno cerrado.
-Asesor de seguridad de Supabase: sin errores.
+tablas sin RLS, esquema interno cerrado, sin el instalador temporal.
 
-Antes de aplicar se confirmó el agujero: con solo la anon key,
-`eliminar_evento` se ejecutaba.
+### Bugs del original encontrados por las pruebas (corregidos)
 
-### Bugs del original encontrados por las pruebas
+- Dos relacionadores podían vender la misma mesa a la vez.
+- Un jefe podía ascenderse a admin editando su propio perfil.
+- Cualquiera podía editar su propia membresía de boliche.
+- `bar_ventas` no guardaba quién vendió.
+- Los cupos de lista y la ventana de venta solo los controlaba la pantalla.
+- Un evento en borrador lo podía leer todo el equipo por la API.
+- Darle a alguien sin team un rol distinto por boliche fallaba.
 
-- **Doble venta de mesa**: dos RRPP podían vender la misma mesa a la vez. Corregido con bloqueo de fila.
-- **Un jefe podía ascenderse a admin** editando su propio perfil. Corregido.
-- **Cualquiera podía editar su propia membresía de boliche**. Corregido.
-- `bar_ventas` no guardaba quién vendió. Ahora sí (`vendido_por`), y el bartender solo anula sus ventas.
+### Cambios de comportamiento a tener presentes
 
-### Cambios de comportamiento
+- Un admin común administra solo los boliches de `profiles.clubs`. Solo la
+  cuenta `admin_principal` (o `platform_admins`) ve todos, crea boliches y
+  nombra admins.
+- `profiles.clubs` vacío = sin acceso.
+- El jefe ve solo los teléfonos de su team; el RRPP solo paga/libera mesas
+  que vendió.
+- Relacionadores y jefes ya no pueden pasarse de su cupo ni vender fuera de
+  horario (el admin sí).
+- Las invitaciones de team anteriores se regeneraron.
 
-- Un admin común administra solo los boliches de `profiles.clubs`. Solo la cuenta `admin_principal` (o `platform_admins`) ve todos, crea boliches y nombra admins.
-- `profiles.clubs` vacío = sin acceso (antes = todos los boliches).
-- Un usuario creado sin team nace sin boliche; se lo asigna el admin que lo creó.
-- El jefe ve solo los teléfonos de su team. El RRPP solo paga/libera mesas que vendió y genera QR de sus invitados.
-- Las invitaciones de team existentes se regeneraron (links viejos ya no sirven).
-
-### Pendiente de seguridad
-
-- **Estados de pago e idempotencia** (`24`): pagos parciales, anticipos, devoluciones, clave de idempotencia en `crear_pago`. Sin hacer. La barra ya tenía idempotencia (`client_key`).
-- **La web no se volvió a recorrer a mano** tras las migraciones: `node --check` pasa y las RPC que usa responden, pero falta un recorrido por rol en el navegador.
-- Decisión de negocio abierta: el RRPP sigue leyendo todos los invitados y entradas de su boliche (lo usan Listas y Reporte), y RRPP/jefes con `puede_tickear` pueden marcar el ingreso de sus invitados.
-- Flujo de barra (recibir lote → vender → stock) sin test automatizado.
-- Avisos menores del asesor: `unaccent` en `public`; protección de contraseñas filtradas desactivada (se activa en el panel de Auth).
-- Rotar la service role key del demo (quedó pegada en el chat).
-
-## Fase 3 · App móvil (`venue_mobile/`) — base hecha
+## App móvil (`venue_mobile/`)
 
 Flutter 3.44 · Riverpod 3 · go_router · supabase_flutter · mobile_scanner.
 
-| Qué | Estado |
+Por rol, lo mismo que en la web:
+
+| Rol | Secciones |
 | --- | --- |
-| Tema oscuro con acento por boliche, estados de carga/vacío/error | hecho |
-| Login, sesión persistida, selector de boliche, rol desde el servidor, eventos | hecho; las llamadas al backend se verificaron por API con 3 roles |
-| Escáner de puerta (cámara, linterna, háptica, código manual, aforo, 7 veredictos) | hecho; **sin probar en el teléfono con un QR real** |
-| `flutter analyze` / `flutter test` | sin problemas / 23 tests pasan |
-| Build iOS firmado (equipo `734M3ZA484`, `app.venue.venueMobile`) | compila; instalado una vez en el iPhone, **antes** de que existiera el backend |
-| Android | sin compilar todavía |
+| Administrador | Accesos · Escáner · Pagos · Mesas · Reporte · Gente · Eventos · Cuenta |
+| Jefe | Accesos · Pagos · Mesas · Stats · Mi team · Eventos · Cuenta |
+| Relacionador | Accesos · Pagos · Mesas · Stats · Eventos · Cuenta |
+| Seguridad | Escáner · Puerta · RRPPs · Mesas · Eventos · Cuenta |
+| Caja | Relacionadores · Eventos · Cuenta |
+| Propietario | Inventario · Vender · Cierre · Analítica · Movimientos · Cuenta |
+| Bartender | Vender · Cuenta |
+| Recepción | Registrar · Lo mío · Cuenta |
 
-Pendiente en lo ya escrito: guardar la sesión en el llavero
-(`flutter_secure_storage`); registro por invitación y recuperación de clave
-dentro de la app.
+Fundaciones: sesión en el llavero, cola sin señal con reintento automático e
+idempotencia, tiempo real, registro por invitación, avisos y pedido de
+WhatsApp.
 
-Compilar: `cd venue_mobile && flutter run --dart-define-from-file=env/dev.json`
+### Lo que NO está verificado
 
-## Paridad web → app (en curso)
+- **Recorrido manual en el teléfono.** Lo probado es la capa de datos
+  contra el servidor y piezas de interfaz en tests. El plano de mesas tuvo un
+  defecto que solo se vio en el teléfono (ya corregido): puede haber otros de
+  ese tipo.
+- Subir imágenes desde el teléfono (comprobantes, fondo del plano, arte del
+  ticket, QR de cobro): la subida se probó por API, no desde la cámara o la
+  galería.
+- El ticket con arte real del evento (el dibujo se prueba sin arte).
+- El libro de contabilidad en Excel o Numbers reales (abre con openpyxl).
+- Los links `venue://` de invitación.
+- Android con todo lo nuevo.
+- La **web** no se volvió a recorrer en el navegador tras las migraciones.
 
-Plan por etapas y detalle pantalla por pantalla en `docs/PARIDAD.md`.
+## Pendiente
 
-- **Etapa 1 · Puerta: hecha.** Escáner con modo filtro y bandera, lista en
-  puerta (buscar, marcar y desmarcar ingreso, filtro) y consulta de RRPPs.
-  Falta: mesas en modo seguridad (va con Mesas).
-- **Etapa 2 · Listas y entradas: parcial.** El relacionador ya anota
-  invitados, ve su cupo, genera entradas, las anula y comparte el QR. Falta
-  lo de jefe/admin (ver todo, filtros, "a nombre de", tickear, QR masivo),
-  fases a la vista, envío en tanda, el arte del evento en el ticket, Resumen
-  e Historial.
-- **Etapa 0 (fundaciones):** faltan sesión en el llavero, registro por
-  invitación, avisos, pedido de WhatsApp, realtime y cola offline.
-- **Etapas 3 a 9** (mesas y plano, pagos, reporte, equipo, eventos, caja,
-  barra): sin empezar.
+- CRM (perfiles de cliente, segmentación), fidelización, campañas.
+- Notificaciones push (requiere proyecto Firebase y clave APNs).
+- Envío automático de entradas por WhatsApp Business API (requiere cuenta de
+  Meta, número y plantillas aprobadas).
+- Estados de pago nuevos: parciales, anticipos y devoluciones.
+- Recuperación de contraseña dentro de la app (hoy la restablece el jefe o el
+  admin).
+- `docs/INVENTARIO.md`, `docs/ESQUEMA.md`.
+- Publicación: iconos, splash, políticas de privacidad, fichas de tienda.
 
-Pruebas: 34 tests unitarios/widget y 12 de integración contra el demo pasan
-(`flutter test test/integracion --dart-define-from-file=env/dev.json`). Los
-de integración recorren el circuito real: el RRPP genera una entrada o anota
-un invitado desde la app y el portero la valida con el escáner de la app.
-Nada de esto se probó todavía a mano en un teléfono.
+## Necesita al propietario
 
-## Fases 4–8 — sin empezar
-
-Listas, entradas, RRPP/teams, eventos y admin, mesas y pagos, caja, barra/POS,
-comisiones y reportes en la app · CRM · WhatsApp Business, push, campañas,
-dashboard · offline y sincronización · publicación en tiendas.
+- **Rotar la service role key del demo**: se hace desde el panel de Supabase
+  (Settings → API). Quedó pegada en el chat. Verificado: no está en ningún
+  commit; solo en `.env.local`, que git ignora.
+- Activar "protección de contraseñas filtradas" en el panel de Auth.
+- Liberar espacio en disco: la Mac se llenó durante el trabajo y hubo que
+  borrar cachés para seguir (quedan ~5 GB).
+- Cuentas Apple Developer / Google Play, Firebase, Meta (WhatsApp Business).
 
 ## Datos de demostración
 
 `python3 tools/seed_demo.py` crea 2 boliches (Aurora Club, Nebula), 14
-usuarios (contraseña `Venue2026!`), un evento por boliche abierto todo el
-día, lista de invitados, entradas, 4 mesas, un combo y una barra.
-
-## Necesita al propietario
-
-Cuenta Apple Developer / Google Play para publicar · proyecto Firebase y clave
-APNs (push) · cuenta WhatsApp Business de Meta · proveedor de QR bancario si
-se quiere verificación automática · logo por boliche · más espacio en disco
-para compilar Android (quedan ~6 GB).
-
-## Próximo paso técnico
-
-Probar el escáner en el iPhone con una entrada real del demo y seguir con la
-Fase 4 por la puerta (búsqueda por nombre y check-in de lista) y RRPP
-(listas y entradas).
+usuarios (contraseña `Venue2026!`), un evento por boliche con fecha de hoy,
+lista de invitados, entradas, 4 mesas, un combo, y en Aurora una barra con
+stock, un trago con receta y el bartender asignado al turno. Se puede volver
+a correr cualquier día: trae el evento a la fecha actual.
