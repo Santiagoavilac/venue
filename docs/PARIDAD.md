@@ -62,8 +62,8 @@ fue probada todavía a mano en un teléfono.
 | 7 | Fases de preventa, stock, arte y cupos por team (`sheetFases`, `sheetCuposFase`) | ídem | hecho · probado contra el demo |
 | 7 | Horario de venta y excepciones por team o persona (`renderExcepciones`) | ídem | hecho · probado contra el demo |
 | 7 | Avisos al equipo y quién los leyó (`sheetAvisos`, `sheetQuienLeyo`) | ídem | hecho · probado contra el demo |
-| 7 | Filtro de caja (`sheetCajaFiltro`) | — | pendiente (va con Caja) |
-| 8 | Caja | — | pendiente |
+| 8 | Caja: relacionadores por team, buscador, marcar atendidos (`screenCaja`) | `caja/caja.dart` | hecho · probado contra el demo |
+| 8 | Filtro de la lista de caja y agregados a mano (`sheetCajaFiltro`) | ídem | hecho · probado contra el demo |
 | 9 | Barra, inventario, POS, cierre, analítica | — | pendiente |
 
 ## Qué ve hoy cada rol en la app
@@ -73,7 +73,8 @@ fue probada todavía a mano en un teléfono.
 | Seguridad | Escáner · Puerta · RRPPs · Mesas · Eventos · Cuenta |
 | Administrador | Accesos (Listas, Entradas, Resumen, Historial) · Escáner · Pagos · Mesas · Reporte · Gente · Eventos · Cuenta |
 | Jefe, Relacionador | Accesos (Listas, Entradas, Resumen) · Pagos · Mesas · Stats · Mi team (jefe) · Eventos · Cuenta |
-| Caja, Propietario, Barra, Recepción | Cuenta |
+| Caja | Relacionadores · Eventos · Cuenta |
+| Propietario, Barra, Recepción | Cuenta |
 
 Con esto, **el rol Seguridad ya tiene en la app todo lo que tiene en la web
 salvo la vista de mesas**.
