@@ -96,7 +96,7 @@ final eventosProvider = FutureProvider<List<Evento>>((ref) async {
       .select('id, nombre, fecha, hora_inicio, hora_fin, estado, ticket_url, precio_manilla, venta_por_fases, permite_reserva, horas_reserva, permite_agrupar, combo_obligatorio, combo_por_mesa')
       .eq('club_id', club)
       .neq('estado', 'cerrado')
-      .order('fecha');
+      .order('fecha', ascending: true);
   return filas.map(Evento.desde).toList();
 });
 

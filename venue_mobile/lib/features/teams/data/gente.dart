@@ -106,14 +106,14 @@ class GenteRepository {
   /// con la que se comparte boliche.
   Future<List<Usuario>> usuarios(String clubId) async {
     final r = await _sb.from('profiles').select(_cols)
-        .filter('eliminado_at', 'is', null).contains('clubs', [clubId]).order('nombre');
+        .filter('eliminado_at', 'is', null).contains('clubs', [clubId]).order('nombre', ascending: true);
     return r.map(Usuario.desde).toList();
   }
 
   Future<List<TeamInfo>> teams(String clubId) async {
     final r = await _sb.from('teams')
         .select('id, nombre, clubs, invite_code, jefe_id, activo')
-        .contains('clubs', [clubId]).order('nombre');
+        .contains('clubs', [clubId]).order('nombre', ascending: true);
     return r.map(TeamInfo.desde).toList();
   }
 

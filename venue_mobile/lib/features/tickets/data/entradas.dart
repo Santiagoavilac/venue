@@ -141,7 +141,7 @@ class EntradasRepository {
         .eq('evento_id', eventoId)
         .isFilter('mesa_id', null)
         .order('created_at', ascending: false)
-        .order('id')
+        .order('id', ascending: true)
         .range(d, h));
     return filas.map(Entrada.desde).toList();
   }
@@ -151,7 +151,7 @@ class EntradasRepository {
         .from('evento_fase')
         .select('id, nombre, precio, cupo, desde, hasta, orden, activo, ticket_url')
         .eq('evento_id', eventoId)
-        .order('orden');
+        .order('orden', ascending: true);
     return r.map(Fase.desde).toList();
   }
 

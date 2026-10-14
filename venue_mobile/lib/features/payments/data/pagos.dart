@@ -194,7 +194,7 @@ class PagosRepository {
 
   // ── QRs de cobro del boliche (admin) ──
   Future<List<QrCobro>> qrs(String clubId) async {
-    final r = await _sb.from('qr_cobro').select().eq('club_id', clubId).order('orden');
+    final r = await _sb.from('qr_cobro').select().eq('club_id', clubId).order('orden', ascending: true);
     return r.map(QrCobro.desde).toList();
   }
 

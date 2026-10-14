@@ -278,17 +278,17 @@ class MesasRepository {
   }
 
   Future<List<Mesa>> mesas(String eventoId) async {
-    final r = await _sb.from('mesas').select().eq('evento_id', eventoId).order('etiqueta');
+    final r = await _sb.from('mesas').select().eq('evento_id', eventoId).order('etiqueta', ascending: true);
     return r.map(Mesa.desde).toList();
   }
 
   Future<List<Mesa>> grupo(String grupoId) async {
-    final r = await _sb.from('mesas').select().eq('grupo_id', grupoId).order('etiqueta');
+    final r = await _sb.from('mesas').select().eq('grupo_id', grupoId).order('etiqueta', ascending: true);
     return r.map(Mesa.desde).toList();
   }
 
   Future<List<Combo>> combos(String clubId) async {
-    final r = await _sb.from('combos').select().eq('club_id', clubId).order('nombre');
+    final r = await _sb.from('combos').select().eq('club_id', clubId).order('nombre', ascending: true);
     return r.map(Combo.desde).toList();
   }
 
@@ -315,7 +315,7 @@ class MesasRepository {
         .select('nombre, url')
         .eq('club_id', clubId)
         .eq('activo', true)
-        .order('orden')
+        .order('orden', ascending: true)
         .limit(1);
     if (r.isEmpty) return null;
     return (nombre: r.first['nombre'] as String? ?? '', url: r.first['url'] as String);

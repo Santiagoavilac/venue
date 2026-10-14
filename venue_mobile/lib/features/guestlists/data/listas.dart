@@ -109,7 +109,7 @@ class ListasRepository {
         .from('lista_tipos')
         .select('id, nombre, registro_desde, registro_hasta, ingreso_hasta')
         .eq('evento_id', eventoId)
-        .order('orden');
+        .order('orden', ascending: true);
     return r.map(ListaTipo.desde).toList();
   }
 
@@ -143,7 +143,7 @@ class ListasRepository {
             'rrpp:profiles!registros_rrpp_id_fkey(nombre)')
         .eq('evento_id', eventoId)
         .order('created_at', ascending: false)
-        .order('id')
+        .order('id', ascending: true)
         .range(d, h));
     return filas.map(Invitado.desde).toList();
   }

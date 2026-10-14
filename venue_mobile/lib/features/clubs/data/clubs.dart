@@ -76,7 +76,7 @@ final clubsProvider = FutureProvider<List<Club>>((ref) async {
       .select('id, nombre, subtitulo, inicial, color_primario, color_secundario')
       .inFilter('id', ids)
       .eq('activo', true)
-      .order('nombre');
+      .order('nombre', ascending: true);
   return filas.map(Club.desde).toList();
 });
 

@@ -27,7 +27,7 @@ fue probada todavía a mano en un teléfono.
 | 2 | Entradas (`screenEntradas`): generar, fases de preventa, ventana de venta, mías / mi team / todas, buscador, anular, eliminar, envío en tanda, entradas de la casa | `tickets/ui/entradas_screen.dart` | hecho · probado contra el demo |
 | 2 | Ticket con el arte del evento o de la fase, sello de fase y marco dorado (`ticketImage`) | `tickets/data/ticket_imagen.dart` | hecho · el dibujo se prueba sin arte; con arte real falta verlo en dispositivo |
 | 2 | Historial (`accHistorial`) | `access_control/ui/accesos_screen.dart` · `HistorialView` | hecho |
-| 2 | Editar una lista desde Listas (menú ⋮ del admin) | — | pendiente (va con Eventos) |
+| 2 | Editar una lista (menú ⋮ del admin) | `events/ui/gestion_screen.dart` (Eventos → Listas y cupos) | hecho |
 | 3 | Plano por planta con fondo, estados, team asignado, zoom y tiempo real (`screenMesas`) | `vip_tables/ui/mesas_screen.dart`, `plano.dart` | hecho · datos probados contra el demo |
 | 3 | Vender / reservar: combo por tipo de mesa, cantidad, unir mesas, botellas, manillas con QR, a nombre de, cortesía, efectivo o transferencia con comprobante y QR de cobro (`sheetMesa`) | `vip_tables/ui/mesa_hojas.dart` | hecho · probado contra el demo |
 | 3 | Mesa vendida: detalle, manillas, editar, marcar pagada, verificar/rechazar, ocupada, liberar | ídem | hecho · probado contra el demo |
@@ -56,7 +56,13 @@ fue probada todavía a mano en un teléfono.
 | 6 | Gente: usuarios con buscador, alta, edición de rol/team/boliches, rol por boliche, pausar, cambiar clave, eliminar (`screenGente`, `sheetEditarUsuario`) | ídem · `GenteScreen` | hecho · probado contra el demo |
 | 6 | Teams: crear, editar, eliminar moviendo a su gente, invitación (`screenTeamAdmin`) | ídem | hecho · probado contra el demo |
 | 6 | Boliches: crear, editar colores, desactivar (solo plataforma) | ídem | hecho · probado contra el demo |
-| 7 | Eventos (admin), listas, fases, avisos | — | pendiente |
+| 7 | Eventos del admin: crear (borrador), publicar, editar, reglas de mesas, cerrar, eliminar (`screenEventos`, `sheetEditarEvento`) | `events/ui/gestion_screen.dart` | hecho · probado contra el demo |
+| 7 | Arte del ticket del evento | ídem | hecho (subir la imagen: sin probar) |
+| 7 | Listas: crear, ordenar, editar, cupos por rol, precio de puerta, cupos especiales por persona (`sheetListas`, `renderCuposLista`) | ídem | hecho · probado contra el demo |
+| 7 | Fases de preventa, stock, arte y cupos por team (`sheetFases`, `sheetCuposFase`) | ídem | hecho · probado contra el demo |
+| 7 | Horario de venta y excepciones por team o persona (`renderExcepciones`) | ídem | hecho · probado contra el demo |
+| 7 | Avisos al equipo y quién los leyó (`sheetAvisos`, `sheetQuienLeyo`) | ídem | hecho · probado contra el demo |
+| 7 | Filtro de caja (`sheetCajaFiltro`) | — | pendiente (va con Caja) |
 | 8 | Caja | — | pendiente |
 | 9 | Barra, inventario, POS, cierre, analítica | — | pendiente |
 

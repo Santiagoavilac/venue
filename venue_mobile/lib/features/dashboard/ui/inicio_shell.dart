@@ -13,6 +13,7 @@ import '../../access_control/ui/lista_puerta_screen.dart';
 import '../../access_control/ui/rrpps_screen.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/ui/eventos_screen.dart';
+import '../../events/ui/gestion_screen.dart';
 import '../../payments/ui/pagos_screen.dart';
 import '../../teams/ui/gente_screen.dart';
 import '../../vip_tables/ui/mesas_screen.dart';
@@ -59,8 +60,8 @@ List<_Seccion> _seccionesPara(Rol rol) => [
         const _Seccion('Gente', Icons.manage_accounts_outlined,
             Icons.manage_accounts_rounded, GenteScreen()),
       if (rol.veEventos)
-        const _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
-            EventosScreen()),
+        _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
+            rol == Rol.admin ? const GestionEventosScreen() : const EventosScreen()),
       const _Seccion('Cuenta', Icons.person_outline_rounded,
           Icons.person_rounded, CuentaScreen()),
     ];

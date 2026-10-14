@@ -184,10 +184,10 @@ class ReporteRepository {
       _sb.from('mesas').select('precio, combo_qty, c:combos(comision_rrpp,comision_jefe)')
           .eq('evento_id', eventoId).neq('estado', 'disponible'),
       traerTodo((d, h) => _sb.from('entradas').select('precio, estado')
-          .eq('evento_id', eventoId).isFilter('mesa_id', null).order('id').range(d, h)),
+          .eq('evento_id', eventoId).isFilter('mesa_id', null).order('id', ascending: true).range(d, h)),
       traerTodo((d, h) => _sb.from('registros').select('ingreso_at, lista_tipo_id')
-          .eq('evento_id', eventoId).order('id').range(d, h)),
-      _sb.from('lista_tipos').select('id, nombre').eq('evento_id', eventoId).order('orden'),
+          .eq('evento_id', eventoId).order('id', ascending: true).range(d, h)),
+      _sb.from('lista_tipos').select('id, nombre').eq('evento_id', eventoId).order('orden', ascending: true),
     ]);
     return Cierre.calcular(
       stats: r[0], statsMesas: r[1], bonos: r[2], mesas: r[3], entradas: r[4],
@@ -276,9 +276,9 @@ class ReporteRepository {
       detalle(String eventoId, String usuarioId) async {
     final r = await Future.wait<List<Map<String, dynamic>>>([
       _sb.from('registros').select('nombre, ingreso_at, lista_tipo_id, l:lista_tipos(nombre)')
-          .eq('evento_id', eventoId).eq('rrpp_id', usuarioId).order('nombre').limit(1000),
+          .eq('evento_id', eventoId).eq('rrpp_id', usuarioId).order('nombre', ascending: true).limit(1000),
       _sb.from('entradas').select('cliente, code, estado, used_at, mesa_id')
-          .eq('evento_id', eventoId).eq('rrpp_id', usuarioId).order('cliente').limit(1000),
+          .eq('evento_id', eventoId).eq('rrpp_id', usuarioId).order('cliente', ascending: true).limit(1000),
     ]);
     return (registros: r[0], entradas: r[1]);
   }

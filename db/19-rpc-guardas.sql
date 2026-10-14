@@ -117,7 +117,24 @@ insert into impl.rpc_permiso (fn, alcance, roles, guarda, filtro, nota) values
    ' if v_rol in (''jefe'',''rrpp'') and not coalesce((select pr.puede_tickear from profiles pr where pr.id = auth.uid()), false) then raise exception ''No autorizado.'' using errcode = ''42501''; end if;',
    null, null),
 -- ── listas y entradas ────────────────────────────────────────────────
-('registrar_lista',      'lista',  'admin,jefe,rrpp',          impl.g('lista','p_lista','admin,jefe,rrpp'), null, null),
+-- CUPOS: el original no los validaba en el servidor (hay noches con
+-- relacionadores pasados de cupo). Ahora la guarda rechaza lo que excede el
+-- cupo propio (el general del rol o el especial de la persona, según
+-- mis_cupos) y el cupo total de la lista. El admin no tiene tope. Lo que un
+-- jefe o admin anota "a nombre de" otro no cuenta contra su propio cupo.
+('registrar_lista',      'lista',  'admin,jefe,rrpp',
+   impl.g('lista','p_lista','admin,jefe,rrpp') ||
+   ' if v_rol in (''rrpp'',''jefe'') then declare v_cupo int; v_tengo int; v_total int; v_hay int;'
+   ' v_n int := coalesce(array_length(p_nombres, 1), 0); begin'
+   ' select lt.cupo_total into v_total from lista_tipos lt where lt.id = p_lista;'
+   ' if v_total is not null then select count(*) into v_hay from registros rg where rg.lista_tipo_id = p_lista;'
+   ' if v_hay + v_n > v_total then raise exception ''La lista está llena: quedan % lugar(es).'', greatest(v_total - v_hay, 0); end if; end if;'
+   ' if p_a_nombre_de is null then'
+   ' select mc.cupo into v_cupo from impl.mis_cupos((select lt.evento_id from lista_tipos lt where lt.id = p_lista)) mc where mc.lista_tipo_id = p_lista;'
+   ' if v_cupo is not null then select count(*) into v_tengo from registros rg where rg.lista_tipo_id = p_lista and rg.rrpp_id = auth.uid();'
+   ' if v_tengo + v_n > v_cupo then raise exception ''Cupo agotado: te quedan % lugar(es) en esta lista.'', greatest(v_cupo - v_tengo, 0); end if; end if;'
+   ' end if; end; end if;',
+   null, 'cupo propio y cupo total de la lista se hacen cumplir en el servidor'),
 ('eliminar_registro',    'registro','admin,jefe,rrpp',         impl.g('registro','p_registro','admin,jefe,rrpp'), null, 'la función exige además ser quien lo anotó o admin'),
 ('heredar_cupos_lista',  'lista',  'admin',                    impl.g('lista','p_lista','admin'), null, null),
 ('generar_qr_lista',     'registro','admin,jefe,rrpp',
@@ -125,7 +142,18 @@ insert into impl.rpc_permiso (fn, alcance, roles, guarda, filtro, nota) values
    ' if v_rol = ''rrpp'' and not exists (select 1 from registros rg where rg.id = p_registro and auth.uid() in (rg.rrpp_id, rg.cargado_por)) then raise exception ''No autorizado.'' using errcode = ''42501''; end if;',
    null, 'el rrpp solo genera QR de sus invitados'),
 ('generar_qr_lista_masivo','sesión','(interno)',               impl.g('sesion','',''), null, 'la función ya filtra por rol/team registro por registro'),
-('generar_entrada',      'evento', 'admin,jefe,rrpp',          impl.g('evento','p_evento','admin,jefe,rrpp'), null, null),
+-- VENTANA DE VENTA: el original no la aplicaba en el servidor (era "informativa
+-- para la UI": hay emisiones reales fuera de horario). Ahora la guarda la hace
+-- cumplir para relacionadores y jefes, con sus excepciones por team o persona
+-- (ventana_venta ya las resuelve). El admin no tiene tope, y las manillas de
+-- una mesa (p_mesa) tampoco: son parte de un combo ya vendido.
+('generar_entrada',      'evento', 'admin,jefe,rrpp',
+   impl.g('evento','p_evento','admin,jefe,rrpp') ||
+   ' if p_mesa is null and v_rol in (''rrpp'',''jefe'') then declare vv jsonb := impl.ventana_venta(p_evento, auth.uid()); begin'
+   ' if (vv ->> ''desde'') is not null and now() < (vv ->> ''desde'')::timestamptz then raise exception ''La venta de prepagadas todavía no abrió.''; end if;'
+   ' if (vv ->> ''hasta'') is not null and now() > (vv ->> ''hasta'')::timestamptz then raise exception ''La venta de prepagadas ya cerró.''; end if;'
+   ' end; end if;',
+   null, 'fuera de la ventana de venta no se emite (salvo admin y manillas de mesa)'),
 ('anular_entrada',       'entrada','admin,jefe,rrpp',          impl.g('entrada','p_entrada','admin,jefe,rrpp'), null, 'la función exige vendedor o admin'),
 ('eliminar_entrada',     'entrada','admin,jefe,rrpp',          impl.g('entrada','p_entrada','admin,jefe,rrpp'), null, null),
 -- ── mesas ────────────────────────────────────────────────────────────

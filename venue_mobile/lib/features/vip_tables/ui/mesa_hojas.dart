@@ -531,7 +531,7 @@ final _manillasMesaProvider =
       .from('entradas')
       .select('id, code, cliente, precio, estado, used_at, rrpp_id, fase_id, filtro_at')
       .eq('mesa_id', mesaId)
-      .order('created_at');
+      .order('created_at', ascending: true);
   return r.map(Entrada.desde).toList();
 });
 

@@ -113,6 +113,15 @@ $rls$;
 
 -- ── tablas con reglas propias ───────────────────────────────────────
 
+-- eventos: un BORRADOR (publicado = false) lo ve solo el admin del boliche.
+-- La web lo anuncia así ("Borrador · sólo lo ves vos"); sin esto cualquier
+-- rol del boliche lo leía por la API antes de que se publicara.
+drop policy if exists eventos_leer on eventos;
+create policy eventos_leer on eventos for select to authenticated
+  using (rol_en_club(club_id) = 'admin'
+         or (rol_en_club(club_id) is not null and publicado));
+
+
 -- clubs: cada quien ve los suyos; crear/borrar boliches es de la plataforma
 do $$ declare p record; begin
   for p in select polname, polrelid::regclass as t from pg_policy
