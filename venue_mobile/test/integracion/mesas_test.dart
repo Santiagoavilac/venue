@@ -20,7 +20,9 @@ void main() {
     ev = await eventoDe(admin, 'aurora');
     combo = (await rAdmin.combos('aurora')).firstWhere((c) => c.activo).id;
     // dejar el plano limpio por si una corrida anterior quedó a medias
-    for (final m in (await rAdmin.mesas(ev)).where((m) => !m.libre)) {
+    // Solo se limpian las mesas de la prueba: las ventas que alguien haya
+    // cargado a mano en el demo no se tocan.
+    for (final m in (await rAdmin.mesas(ev)).where((m) => !m.libre && m.etiqueta.startsWith('ZZ'))) {
       await rAdmin.estado(m.id, 'disponible');
     }
     for (final m in (await rAdmin.mesas(ev)).where((m) => m.etiqueta.startsWith('ZZ'))) {
@@ -29,13 +31,30 @@ void main() {
     for (final c in (await rAdmin.combos('aurora')).where((c) => c.nombre.startsWith('ZZ'))) {
       await rAdmin.borrarCombo(c.id);
     }
+    // Mesas propias de la prueba: el plano del demo lo puede haber editado
+    // alguien desde la app, así que no se depende de las que haya.
+    for (var i = 1; i <= 3; i++) {
+      await rAdmin.crear(ev, 'alta', 'mesa', 800 + i);
+      final m = (await rAdmin.mesas(ev)).firstWhere((x) => x.etiqueta == 'M${800 + i}');
+      await rAdmin.editarForma(m.id,
+          etiqueta: 'ZZT$i', categoria: 'mesa', w: 14, h: 21, teamId: null, planta: 'alta');
+    }
+  });
+
+  tearDownAll(() async {
+    if (saltear != null) return;
+    for (final m in (await rAdmin.mesas(ev)).where((m) => m.etiqueta.startsWith('ZZ'))) {
+      if (!m.libre) await rAdmin.estado(m.id, 'disponible');
+      await rAdmin.borrar(m.id);
+    }
   });
 
   Future<Mesa> una(String id) async => (await rAdmin.mesas(ev)).firstWhere((m) => m.id == id);
-  Future<Mesa> libre() async => (await rAdmin.mesas(ev)).firstWhere((m) => m.libre);
+  Future<Mesa> libre() async =>
+      (await rAdmin.mesas(ev)).firstWhere((m) => m.libre && m.etiqueta.startsWith('ZZT'));
 
   test('plano, combos y QR de cobro se leen', () async {
-    expect((await rRrpp.mesas(ev)).length, greaterThanOrEqualTo(4));
+    expect((await rRrpp.mesas(ev)).length, greaterThanOrEqualTo(3));
     expect(await rRrpp.combos('aurora'), isNotEmpty);
     expect(await rRrpp.teams('aurora'), isNotEmpty);
     await rRrpp.qrCobro('aurora'); // puede ser null: no hay QR cargado en el demo
@@ -115,7 +134,8 @@ void main() {
   }, skip: saltear);
 
   test('venta en grupo: varias mesas, una sola venta; liberar una libera todas', () async {
-    final libres = (await rAdmin.mesas(ev)).where((m) => m.libre).take(2).toList();
+    final libres = (await rAdmin.mesas(ev))
+        .where((m) => m.libre && m.etiqueta.startsWith('ZZT')).take(2).toList();
     final v = await rRrpp.vender(libres.map((m) => m.id).toList(),
         DatosVenta(cliente: 'Grupo App', comboId: combo, estado: 'reservada', cantidad: 2));
     final a = await una(libres[0].id);
@@ -125,7 +145,7 @@ void main() {
     expect(g.every((m) => m.estado == 'reservada' && m.cliente == 'Grupo App'), isTrue);
     expect(v.etiqueta, contains('+'));
     await rRrpp.estado(libres[1].id, 'disponible');
-    expect((await rAdmin.mesas(ev)).where((m) => !m.libre), isEmpty);
+    expect((await rAdmin.mesas(ev)).where((m) => !m.libre && m.etiqueta.startsWith('ZZT')), isEmpty);
   }, skip: saltear);
 
   test('el portero ve las mesas pero no vende', () async {

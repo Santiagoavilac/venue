@@ -112,7 +112,8 @@ servicio("POST", "/rest/v1/telefono_usuario?on_conflict=user_id", [
     extra={"Prefer": "resolution=merge-duplicates"})
 r = rpc("telefonos_equipo", {"p_club": "aurora"}, J)
 caso("jefe ve teléfonos solo de su team", permitido(r) and r[1] and all(x["user_id"] in (uid["jefe.aurora"], uid["rrpp.aurora"], uid["rrpp2.aurora"]) for x in r[1]), r)
-r = get("telefono_usuario?select=*", J); caso("jefe no lee la tabla de teléfonos", r[1] == [], r)
+r = get("telefono_usuario?select=*", J)
+caso("jefe lee de la tabla de teléfonos solo el suyo", all(x["user_id"] == uid["jefe.aurora"] for x in r[1]), r)
 
 print("\n── puerta ──")
 P = T["portero.aurora"]
