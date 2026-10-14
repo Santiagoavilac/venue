@@ -105,6 +105,10 @@ de sección; con movimiento reducido no queda ninguno. Flujos: clave
 incorrecta, código inexistente en el escáner, pago con comprobante (doble
 toque), Auditoría con filtro, RLS de la auditoría.
 
+Publicada en Vercel (proyecto `venue-web`, contra el Supabase **demo**):
+https://venue-web-amber.vercel.app — se vuelve a publicar con
+`sh tools/web/publicar.sh`. Recorrida ahí con los 9 roles: cero errores.
+
 No verificado en la web: escanear con la cámara real, anotar invitados,
 generar entradas y vender mesas desde la web (esas operaciones están
 probadas contra el servidor en las pruebas de la app, no clic a clic en la
