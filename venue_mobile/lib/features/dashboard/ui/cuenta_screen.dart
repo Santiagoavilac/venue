@@ -6,6 +6,7 @@ import '../../../core/theme/venue_theme.dart';
 import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../../clubs/ui/selector_club_screen.dart';
+import '../../vip_tables/ui/mesa_hojas.dart';
 
 class CuentaScreen extends ConsumerWidget {
   const CuentaScreen({super.key});
@@ -78,17 +79,21 @@ class CuentaScreen extends ConsumerWidget {
                   : null,
             ),
           ),
-        const SizedBox(height: 12),
-        const Card(
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Esta versión de la app cubre el ingreso, el boliche y evento de trabajo y el escáner de puerta. '
-              'Listas, entradas, mesas, pagos, caja y barra siguen operándose desde la web mientras se van sumando acá.',
-              style: TextStyle(color: VenueColors.textoSuave, height: 1.4),
+        // Los combos son de cada boliche: el admin los arma acá (también
+        // siguen en el ⋯ de Mesas). El servidor solo deja escribir al admin.
+        if (rol == Rol.admin && club != null) ...[
+          const SizedBox(height: 12),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              leading: const Icon(Icons.local_bar_outlined),
+              title: const Text('Combos', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('Los de ${club.nombre}'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => hojaCombos(context),
             ),
           ),
-        ),
+        ],
         const SizedBox(height: 20),
         OutlinedButton.icon(
           onPressed: () async {

@@ -773,12 +773,14 @@ const EXTRA_ICONS = {
   filtro: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
   cajalista: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.5 3-5 6-5s5.2 1.5 6 5"/><path d="M16 8h5M16 12h5M16 16h3"/>',
   qrs: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2M20 14v6h-6"/>',
+  combos: '<path d="M7 3h10l-1 8a4 4 0 0 1-8 0L7 3z"/><path d="M12 15v5M8 21h8"/>',
 };
 function accionesMas() {
   const a = [];
   if (me.rol === "admin") a.push(["usuarios", "Usuarios y equipos", abrirUsuarios]);
   if (["admin", "jefe"].includes(me.rol)) a.push(["filtro", "Rechazados en puerta", sheetFiltro]);
   if (me.admin_principal) a.push(["cajalista", "Lista de la caja", sheetCajaFiltro]);
+  if (me.rol === "admin") a.push(["combos", "Combos", sheetCombos]);
   if (me.rol === "admin") a.push(["qrs", "QRs de cobro", sheetQrsCobro]);
   return a;
 }
@@ -5724,6 +5726,14 @@ async function loadFondos(forzar) {
   fondosCache = {};
   (data || []).forEach(f => fondosCache[f.planta] = f.url);
   cacheClub.fondos = club;
+  // se mide cada fondo de antemano: al cambiar de piso el plano ya nace con
+  // la proporción del dibujo y no salta cuando termina de cargar la imagen
+  await Promise.all(Object.values(fondosCache).filter(u => u && !propFondo[u]).map(u => new Promise(ok => {
+    const i = new Image(); i.crossOrigin = "anonymous";
+    i.onload = () => { propFondo[u] = (i.naturalWidth / i.naturalHeight).toFixed(4); ok(); };
+    i.onerror = ok; i.src = u;
+    setTimeout(ok, 2500);   // sin señal no se traba la pantalla: se ajusta al cargar
+  })));
 }
 async function loadCombos(forzar) {
   if (!forzar && cacheClub.combos === club && combosCache.length) return;
@@ -5780,6 +5790,7 @@ const pisosDe = () => {
 const ESTADO_EV = { proximo: "Próximo", activo: "Activo", cerrado: "Cerrado", borrador: "Borrador" };
 const ZOOMS = [1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 let planoZoom = null, planoX = null;   // planoX: centro visible, 0–1
+const propFondo = {};                  // url del fondo → ancho/alto de la imagen
 const zoomPlano = () => planoZoom ?? (innerWidth < 700 ? 1.75 : 1);
 async function screenMesas() {
   await Promise.all([loadMesas(), loadCombos(), loadTeams(), loadFondos()]);
@@ -5830,7 +5841,7 @@ async function screenMesas() {
     </div>
     <div class="plano">
     <div class="canvas-wrap" id="cvWrap">
-      <div class="canvas ${editMode ? "editmode" : ""}" id="cv2" style="--z:${zoomPlano()}">
+      <div class="canvas ${editMode ? "editmode" : ""}" id="cv2" style="--z:${zoomPlano()}${propFondo[fondosCache[planta]] ? `;aspect-ratio:${propFondo[fondosCache[planta]]}` : ""}">
         ${fondosCache[planta] ? `<img class="cv-fondo" src="${esc(fondosCache[planta])}" alt="" crossorigin="anonymous">` : `<div class="watermark">${FLOOR_LABEL[planta] || planta}</div>`}
       </div>
     </div>
@@ -5849,6 +5860,18 @@ async function screenMesas() {
       <span class="hint">${editMode ? (moverMesas ? "Arrastrá para acomodar · tocá para editar" : "Posiciones bloqueadas — activá Mover para arrastrar · tocá para editar") : esPortero ? "Tocá una mesa para ver el nombre y su combo" : "Tocá una mesa para vender o gestionar"}</span>
     </div>`;
   const cv2 = $("#cv2");
+  /* Con fondo, el plano toma la proporción de la imagen: así el dibujo no
+     se estira y las mesas (en % del plano) caen sobre su lugar. */
+  const imgF = cv2.querySelector(".cv-fondo");
+  if (imgF) {
+    const ajustar = () => {
+      if (!imgF.naturalWidth) return;
+      propFondo[imgF.getAttribute("src")] = (imgF.naturalWidth / imgF.naturalHeight).toFixed(4);
+      cv2.style.aspectRatio = propFondo[imgF.getAttribute("src")];
+      window.ScrollTrigger?.refresh();
+    };
+    if (imgF.complete) ajustar(); else imgF.addEventListener("load", ajustar, { once: true });
+  }
   enPlanta.forEach(m => {
     const d = document.createElement("div");
     const libre = m.estado === "disponible", narrow = m.w < 14;

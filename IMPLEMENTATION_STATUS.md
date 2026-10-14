@@ -129,6 +129,19 @@ Ronda de diseño y navegación (2026-10-14):
   plano, colores por estado, zoom (alejar/acercar/ajustar) y la posición
   se conserva cuando el plano se repinta en vivo.
 
+Boliche SitRoom y combos (2026-10-14):
+
+- **SitRoom** cargado en la base principal: evento "Nightfall · Halloween
+  Party" (viernes 30/10/2026, en borrador), planos de planta baja y alta
+  como fondo, y 27 ubicaciones sobre el dibujo: 20 mesas (2–5, 7, 8, 11,
+  12, 14, 15, 19–23 y P1–P5 del patio) y 7 lounges (6, 9, 10, 13, 16, 17,
+  18). Precio de manilla, % y cut quedaron en los valores por defecto del
+  formulario (60 Bs, 50 %, 15): hay que ajustarlos antes de publicar.
+- **El plano toma la proporción del fondo** (web y app): antes la imagen se
+  estiraba a 1000:420. Sin fondo sigue igual.
+- **Combos** a mano: en "Más" (web) y en Cuenta (app) para el admin; siguen
+  también en el ⋯ de Mesas.
+
 Verificado con Chrome real (`tools/web/recorrer.mjs`, `tools/web/flujos.mjs`):
 9 roles × celular (390 px) y escritorio (1440 px), todas las secciones
 cargan, cero errores de consola, ningún ScrollTrigger huérfano al cambiar

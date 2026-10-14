@@ -298,8 +298,10 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                 // tiene de dónde sacarlo y el plano quedaba invisible.
                 final visible = MediaQuery.of(context).size.width - 32;
                 final ancho = visible < 640 ? 640.0 : visible;
+                final proporcion = ref.watch(proporcionPlanoProvider(fondos[planta])).value ??
+                    Plano.proporcion;
                 return SizedBox(
-                  height: ancho / Plano.proporcion,
+                  height: ancho / proporcion,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: InteractiveViewer(
@@ -315,6 +317,7 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                             mesas: enPlanta,
                             planta: planta,
                             fondoUrl: fondos[planta],
+                            aspecto: proporcion,
                             mover: _editando && _mover,
                             teams: teams,
                             alTocar: tocar,

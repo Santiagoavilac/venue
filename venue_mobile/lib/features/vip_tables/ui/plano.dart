@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/venue_theme.dart';
 import '../data/mesas.dart';
@@ -10,8 +13,30 @@ Color colorDeMesa(Mesa m, Color marca) => switch (m.estado) {
       _ => VenueColors.textoSuave,
     };
 
+/// Ancho/alto del fondo de un piso. Con fondo, el plano toma la proporción
+/// de la imagen (igual que la web): el dibujo no se estira y las mesas, que
+/// van en % del lienzo, caen sobre su lugar. Sin fondo, 1000:420.
+final proporcionPlanoProvider =
+    FutureProvider.autoDispose.family<double, String?>((ref, url) async {
+  if (url == null) return Plano.proporcion;
+  final c = Completer<double>();
+  final stream = NetworkImage(url).resolve(ImageConfiguration.empty);
+  late final ImageStreamListener l;
+  l = ImageStreamListener((info, _) {
+    final i = info.image;
+    if (!c.isCompleted) c.complete(i.height == 0 ? Plano.proporcion : i.width / i.height);
+    stream.removeListener(l);
+  }, onError: (_, _) {
+    if (!c.isCompleted) c.complete(Plano.proporcion);
+    stream.removeListener(l);
+  });
+  stream.addListener(l);
+  return c.future;
+});
+
 /// Plano de una planta. Las mesas se ubican en porcentajes del lienzo (la
-/// misma convención de la web: x, y, w, h), sobre una proporción 1000:420.
+/// misma convención de la web: x, y, w, h), sobre la proporción del fondo o,
+/// sin fondo, 1000:420.
 ///
 /// En modo [mover], cada mesa se arrastra; al soltar se informa la posición
 /// nueva ya acotada y ajustada a medios puntos.
@@ -25,6 +50,7 @@ class Plano extends StatefulWidget {
     this.mover = false,
     this.alMover,
     this.teams = const {},
+    this.aspecto = Plano.proporcion,
   });
 
   final List<Mesa> mesas;
@@ -34,6 +60,7 @@ class Plano extends StatefulWidget {
   final ValueChanged<Mesa> alTocar;
   final void Function(Mesa mesa, double x, double y)? alMover;
   final Map<String, String> teams;
+  final double aspecto;
 
   static const proporcion = 1000 / 420;
 
@@ -49,7 +76,7 @@ class _PlanoState extends State<Plano> {
   Widget build(BuildContext context) {
     final marca = Theme.of(context).colorScheme.primary;
     return AspectRatio(
-      aspectRatio: Plano.proporcion,
+      aspectRatio: widget.aspecto,
       child: LayoutBuilder(builder: (context, c) {
         final ancho = c.maxWidth, alto = c.maxHeight;
         return DecoratedBox(
