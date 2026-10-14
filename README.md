@@ -85,6 +85,7 @@ cd venue_mobile && flutter test                                  # app móvil
 | `index.html` | Estructura de todas las pantallas |
 | `styles.css` | Sistema de diseño (tokens de color, tipografía) |
 | `app.js` | Lógica: roles, listas, QR, mesas, barra, boliches |
+| `motion.js` | Movimiento con GSAP + ScrollTrigger (opcional: sin él la web anda igual) |
 | `contabilidad.js` | Exportación de contabilidad a Excel |
 | `config.js` | Credenciales de Supabase (no versionar) |
 | `db/*.sql` | Esquema completo, en orden de aplicación |

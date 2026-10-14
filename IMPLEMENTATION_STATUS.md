@@ -10,6 +10,7 @@ Solo figura como probado lo que se ejecutó de verdad.
 | Bloque | Estado |
 | --- | --- |
 | Seguridad del servidor | aplicada y probada en el demo |
+| Web | **al día con el servidor**, recorrida con los 9 roles en un navegador real, movimiento con GSAP |
 | Paridad web → app (9 etapas) | **todas las pantallas de la web tienen su equivalente en la app** (`docs/PARIDAD.md`) |
 | App en iPhone | compila firmada e instalada; **pantallas sin recorrer a mano una por una** |
 | App en Android | compiló el APK de depuración con la base de la app; **falta recompilar con todo lo nuevo** |
@@ -40,6 +41,7 @@ corta por exceso de logins y la corrida queda esperando.
 | `26-instalacion-limpia` | Defaults, `search_path`, membresía sin team |
 | `27-realtime` | Mesas, entradas e invitados en tiempo real |
 | `28-storage-disenos-lectura` | Permite reemplazar artes, fondos de plano y QRs de cobro |
+| `29-auditoria-solo-lectura` | Quita a las personas TRUNCATE/escritura sobre `audit_log` (grants por defecto de Supabase) |
 | Edge Function `crear-usuario` | Límite de intentos, invitación con vencimiento, rol validado, crear admins solo plataforma |
 
 Verificado en el catálogo: 0 funciones propias ejecutables por anónimos, 0
@@ -66,6 +68,47 @@ tablas sin RLS, esquema interno cerrado, sin el instalador temporal.
 - Relacionadores y jefes ya no pueden pasarse de su cupo ni vender fuera de
   horario (el admin sí).
 - Las invitaciones de team anteriores se regeneraron.
+
+## Web (`index.html`, `app.js`, `motion.js`, `styles.css`)
+
+Puesta al día con el servidor:
+
+- El rol y los boliches de cada persona salen del servidor (`rol_en_club`,
+  `mi_team_en_club`, RLS de `clubs`), no de reglas en el navegador.
+- "Boliches" y la opción de rol Administrador solo aparecen a la
+  plataforma (`es_platform_admin`); el alta sin team queda en el boliche
+  actual.
+- Los pagos se registran con `crear_pago_unico` y una clave por hoja: un
+  doble toque no duplica (verificado: 1 fila).
+- Errores legibles (sin permiso, sesión vencida, sin señal) en vez del
+  texto crudo de Postgres.
+- Campo de código de la puerta para códigos de 10 caracteres.
+- **Auditoría** nueva en el ⋯ del Reporte: quién cambió qué y cuándo, con
+  filtro por tipo. La lee solo el admin del boliche (RLS; un RRPP que la
+  pide por la API recibe 0 filas).
+
+Interfaz: GSAP 3.13 + ScrollTrigger (jsDelivr, versión fija) y todo el
+movimiento en `motion.js`: entrada del login letra por letra, selector de
+boliche escalonado, entrada de cada sección, filas que aparecen al bajar
+(`ScrollTrigger.batch`, tope 150), topbar que se compacta con línea de
+progreso, conteo en KPIs, barras del Reporte, plano de mesas desde el
+centro y latido cuando una mesa cambia en vivo, veredicto del escáner,
+hojas y avisos. En puerta, caja y barra el movimiento es mínimo. Con
+"reducir movimiento" no se anima nada, y si GSAP no carga la web funciona
+igual. Pulido visual al final de `styles.css` (incluye el hueco que quedaba
+entre la barra lateral y el contenido en escritorio).
+
+Verificado con Chrome real (`tools/web/recorrer.mjs`, `tools/web/flujos.mjs`):
+9 roles × celular (390 px) y escritorio (1440 px), todas las secciones
+cargan, cero errores de consola, ningún ScrollTrigger huérfano al cambiar
+de sección; con movimiento reducido no queda ninguno. Flujos: clave
+incorrecta, código inexistente en el escáner, pago con comprobante (doble
+toque), Auditoría con filtro, RLS de la auditoría.
+
+No verificado en la web: escanear con la cámara real, anotar invitados,
+generar entradas y vender mesas desde la web (esas operaciones están
+probadas contra el servidor en las pruebas de la app, no clic a clic en la
+web).
 
 ## App móvil (`venue_mobile/`)
 
@@ -101,7 +144,6 @@ WhatsApp.
 - El libro de contabilidad en Excel o Numbers reales (abre con openpyxl).
 - Los links `venue://` de invitación.
 - Android con todo lo nuevo.
-- La **web** no se volvió a recorrer en el navegador tras las migraciones.
 
 ## Pendiente
 

@@ -63,6 +63,12 @@ const server = createServer(async (req, res) => {
     const hora = new Date().toTimeString().slice(0, 8);
     console.log(`  ${hora}  ${rel}`);
   } catch {
+    // dev-login.js es opcional: si no está, se responde vacío en vez de 404
+    if (req.url.startsWith("/dev-login.js")) {
+      res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store" });
+      res.end("");
+      return;
+    }
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("404");
   }

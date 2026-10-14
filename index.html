@@ -13,7 +13,7 @@
 <!-- vista previa al compartir el link (WhatsApp y afines) -->
 <meta property="og:title" content="Venue — Event Management Platform">
 <meta property="og:description" content="Listas, entradas QR, mesas y control de acceso.">
-<meta property="og:image" content="https://udhkvqdoqbuiwcfzeoqu.supabase.co/storage/v1/object/public/app/icon-512.png">
+<meta property="og:image" content="icon-512.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -131,7 +131,7 @@
     </div>
     <div class="manual">
       <label for="scanCode" class="sr-only">Código de la entrada</label>
-      <input id="scanCode" placeholder="o escribí el código · ej. A2F9B1" autocomplete="off" autocapitalize="characters" enterkeyhint="go">
+      <input id="scanCode" placeholder="o escribí el código" title="Código de 10 caracteres, ej. QHXNG5PZK6" maxlength="24" autocomplete="off" autocapitalize="characters" enterkeyhint="go">
       <button id="btnVal">Validar</button>
     </div>
     <div id="scanResult"></div>
@@ -169,12 +169,14 @@
 <script src="config.js"></script>
 <script src="contabilidad.js"></script>
 <script src="app.js"></script>
-<script>/* dev-login.js es opcional: si no está, la app usa el login normal.
-   Se comprueba antes de inyectarlo para no dejar un 404 en cada carga. */
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+<script src="motion.js"></script>
+<script>/* dev-login.js es opcional y solo existe en la máquina de quien desarrolla.
+   El servidor local (dev.mjs) responde vacío cuando no está, así que se
+   puede pedir directo sin ensuciar la consola con un 404. */
 if (["localhost", "127.0.0.1"].includes(location.hostname)) {
-  fetch("dev-login.js", { method: "HEAD" })
-    .then(r => { if (r.ok) { const s = document.createElement("script"); s.src = "dev-login.js"; document.body.appendChild(s); } })
-    .catch(() => {});
+  const s = document.createElement("script"); s.src = "dev-login.js"; document.body.appendChild(s);
 }</script>
 </body>
 </html>

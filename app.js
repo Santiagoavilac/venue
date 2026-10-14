@@ -135,8 +135,10 @@ let clubsDisponibles = []; // filas de `clubs`, cargadas una vez en boot()
 const clubData = id => clubsDisponibles.find(c => c.id === id) || null;
 const clubNombre = id => clubData(id)?.nombre || id;
 // boliches donde el usuario puede operar (admin: todos los que existan) — usa la identidad base
-const myClubs = () => (me?._rol || me?.rol) === "admin" ? clubsDisponibles.map(c => c.id)
-  : (me?.clubs?.length ? me.clubs : clubsDisponibles.map(c => c.id));
+/* `clubs` ya llega recortado por el servidor (RLS) a los locales donde la
+   persona tiene algún rol: no hay regla que recalcular acá. Antes "sin
+   boliches" valía "todos", y un admin veía todos los locales de la base. */
+const myClubs = () => clubsDisponibles.map(c => c.id);
 let eventos = [];         // eventos del club
 let ev = null;            // evento seleccionado
 let tab = "";
@@ -345,10 +347,24 @@ function toast(msg, type = "ok") {
   span.textContent = msg;
   el.appendChild(span);
   w.appendChild(el);
+  if (window.Motion) return Motion.toast(el);
   requestAnimationFrame(() => el.classList.add("show"));
   setTimeout(() => { el.classList.remove("show"); setTimeout(() => el.remove(), 260); }, 2600);
 }
-const fail = e => { console.error(e); toast(e.message || String(e), "warn"); };
+/* El servidor ahora rechaza por permisos, cupos y horarios. Se traduce lo
+   que venía en crudo de Postgres; los mensajes de negocio (cupo agotado,
+   venta cerrada, mesa ya vendida…) ya llegan escritos para la persona. */
+function mensajeDeError(e) {
+  const m = e?.message || String(e);
+  if (e?.code === "42501" || /permission denied|row-level security|No autorizado/i.test(m))
+    return "No tenés permiso para hacer esto en este boliche.";
+  if (e?.code === "28000" || /No autenticado|JWT expired/i.test(m))
+    return "Tu sesión venció. Volvé a ingresar.";
+  if (esFallaDeRed(e)) return "Sin conexión. Revisá la señal y probá de nuevo.";
+  if (e?.code === "23505") return "Ya existe uno igual.";
+  return m;
+}
+const fail = e => { console.error(e); toast(mensajeDeError(e), "warn"); };
 
 /* ---------- login ---------- */
 $("#btnLogin") && ($("#btnLogin").onclick = login);
@@ -399,21 +415,20 @@ async function login() {
 async function boot() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
-  // perfil, membresías y catálogo de boliches en paralelo: todas dependen
-  // solo del user.id (o de nada) y en serie costaban viajes de red extra
-  const [{ data: prof, error }, { data: mems }, { data: cls_ }] = await Promise.all([
+  // perfil y catálogo de boliches en paralelo. El rol por boliche ya no se
+  // calcula acá con las membresías: lo resuelve el servidor (rol_en_club).
+  const [{ data: prof, error }, { data: cls_ }] = await Promise.all([
     sb.from("profiles").select("*").eq("id", user.id).single(),
-    sb.from("club_membership").select("club_id, rol, team_id").eq("user_id", user.id),
     sb.from("clubs").select("*").eq("activo", true).order("nombre")
   ]);
   if (error || !prof) { fail(error || new Error("Perfil no encontrado")); return; }
   if (!prof.activo) { $("#loginErr").innerHTML = `<div class="err">Usuario desactivado.</div>`; await sb.auth.signOut(); return; }
   me = prof;
   clubsDisponibles = cls_ || [];
-  // identidad base + membresías por boliche (rol/team distinto por club)
+  // administración de la plataforma: crear boliches y nombrar administradores
+  me.plataforma = (await sb.rpc("es_platform_admin")).data === true;
+  // identidad base (el rol efectivo por boliche lo pone applyClubRole)
   me._rol = prof.rol; me._team = prof.team_id;
-  me.memberships = {};
-  (mems || []).forEach(m => me.memberships[m.club_id] = { rol: m.rol, team_id: m.team_id });
   // boliches permitidos: forzar club válido
   const cls = myClubs();
   if (!cls.includes(club)) club = cls[0] || null;
@@ -436,19 +451,17 @@ async function applyClubRole() {
   // (un team que no opera en el nuevo club como filtro dejaba Invitados "vacío")
   listaSelId = null; lsFTeam = ""; lsFSeller = ""; lsRegs = null; lsEvId = null;
   tkQ = ""; tkFTeam = ""; tkFSeller = ""; accHistCat = ""; gnNav = null; gnScroll = {};
-  const mm = me.memberships?.[club];
-  if (me._rol === "admin") { me.rol = "admin"; me.team_id = me._team; }
-  else if (mm) { me.rol = mm.rol; me.team_id = mm.team_id ?? null; }
-  else {
-    // ¿el team base opera en este boliche?
-    let baseTeamAca = false;
-    if (me._team) {
-      const { data: t } = await sb.from("teams").select("clubs").eq("id", me._team).single();
-      baseTeamAca = !t?.clubs || t.clubs.includes(club);
-    }
-    me.rol = (me._rol === "jefe" && !baseTeamAca) ? "rrpp" : me._rol;
-    me.team_id = baseTeamAca ? me._team : null;
-  }
+  /* El rol efectivo y el team en este boliche los resuelve el servidor
+     (rol_en_club / mi_team_en_club), con la misma regla que usan las
+     guardas de las RPC y la app móvil. Calcularlo acá con otra regla hacía
+     que la pantalla ofreciera cosas que la base después rechazaba. */
+  const [{ data: rolAca, error: eRol }, { data: teamAca }] = await Promise.all([
+    sb.rpc("rol_en_club", { p_club: club }),
+    sb.rpc("mi_team_en_club", { p_club: club })
+  ]);
+  if (eRol) console.error(eRol);
+  me.rol = rolAca || me._rol;
+  me.team_id = teamAca ?? null;
   myTeamClubs = null;
   if (me.team_id) {
     const { data: t } = await sb.from("teams").select("clubs").eq("id", me.team_id).single();
@@ -459,6 +472,7 @@ function enterApp() {
   $("#clubPick")?.classList.add("hidden");
   $("#app").classList.remove("hidden");
   buildTabbar();
+  window.Motion?.entrarApp();
   loadEventos().then(() => { header(); tab = homeTab(); setTab(); renderTab(); mostrarAvisos(); });
 }
 
@@ -568,6 +582,7 @@ function showClubPicker(cls) {
       <button class="cp-out" onclick="logout()">Cerrar sesión</button>
     </div>`;
   ov.classList.remove("hidden");
+  window.Motion?.selector(ov);
   ov.querySelectorAll("[data-cp]").forEach(b => b.onclick = async () => {
     club = b.dataset.cp;
     renderClubMenu(cls);
@@ -3064,7 +3079,9 @@ function cutRrpp(perfil) {
 function netoPorManilla() {
   return Math.max(ev.precio_manilla - cutRrpp(), 0);
 }
+let claveDePago = null;
 function sheetCobrar(qrUrl, aRendir = 0) {
+  claveDePago = null;   // hoja nueva, pago nuevo
   const esRendicion = aRendir > 0;
   const aQuien = me.rol === "rrpp" ? "tu jefe" : "el boliche";
   const esAdmin = me.rol === "admin";
@@ -3112,7 +3129,10 @@ function sheetCobrar(qrUrl, aRendir = 0) {
     if (!monto || monto <= 0) return toast("Monto inválido", "warn");
     if (!esAdmin && !urlComp) return toast("Subí la foto del comprobante", "warn");
     $("#pgGo").disabled = true;
-    const { error } = await sb.rpc("crear_pago", { p_evento: ev.id, p_monto: monto, p_concepto: $("#pgC").value, p_nro: $("#pgOp").value, p_comprobante: urlComp });
+    /* La clave identifica ESTE pago: si el envío se repite (doble toque, mala
+       señal) el servidor devuelve el mismo en vez de registrar otro. */
+    claveDePago = claveDePago || crypto.randomUUID();
+    const { error } = await sb.rpc("crear_pago_unico", { p_evento: ev.id, p_monto: monto, p_concepto: $("#pgC").value, p_clave: claveDePago, p_nro: $("#pgOp").value, p_comprobante: urlComp });
     $("#pgGo").disabled = false;
     if (error) return fail(error);
     toast("Pago registrado con su comprobante");
@@ -3324,6 +3344,7 @@ function pintarRes(cls, big, sub, flagCode) {
     ${datos.length ? `<div class="res-datos">${datos.map(d => `<span class="res-dato">${d}</span>`).join("")}</div>` : ""}
     ${o.nota ? `<div class="res-nota">${o.nota}</div>` : ""}
   </div>`;
+  window.Motion?.veredicto($("#scanResult").firstElementChild, cls);
   const fb = $("#scanFlag");
   if (fb) fb.onclick = async () => {
     const { data, error } = await sb.rpc("marcar_filtro_entrada", { p_evento: ev.id, p_code: fb.dataset.code });
@@ -3727,6 +3748,7 @@ async function screenStats() {
       ["bonos", "Bonos", IC.star],
       ["hist", "Histórico", IC.clock],
       ["usuarios", "Usuarios y teams", IC.people],
+      ["audit", "Auditoría", IC.shield],
     ];
     sheet(`<div class="sh-h">Reporte<span class="r-sub">${esc(ev.nombre)}</span></div>
       <div class="mas-lista">${op.map(([k, l, ico]) =>
@@ -3737,6 +3759,7 @@ async function screenStats() {
       if (k === "bonos") return sheetBonos();
       if (k === "hist") return sheetHistorico("mes");
       if (k === "usuarios") return sheetUsuarios();
+      if (k === "audit") return sheetAuditoria();
     });
   };
   /* Exportación contable a Excel · SOLO la cuenta protegida
@@ -4463,7 +4486,7 @@ function sheetNuevoUsuario() {
       <div class="field"><label>Usuario</label><input id="usU" autocapitalize="none"></div>
     </div>
     <div class="row2">
-      <div class="field"><label>Rol</label><select id="usR"><option value="rrpp">Relacionador</option><option value="jefe">Jefe de team</option><option value="portero">Seguridad</option><option value="caja">Caja</option><option value="admin">Admin</option>${me.admin_principal ? `<optgroup label="Barra (fase 2 — todavía no anunciada)"><option value="propietario">Propietario de barra</option><option value="barra">Bartender</option><option value="deposito">Recepción de mercadería</option></optgroup>` : ""}</select></div>
+      <div class="field"><label>Rol</label><select id="usR"><option value="rrpp">Relacionador</option><option value="jefe">Jefe de team</option><option value="portero">Seguridad</option><option value="caja">Caja</option>${me.plataforma ? `<option value="admin">Admin</option>` : ""}${me.admin_principal ? `<optgroup label="Barra (fase 2 — todavía no anunciada)"><option value="propietario">Propietario de barra</option><option value="barra">Bartender</option><option value="deposito">Recepción de mercadería</option></optgroup>` : ""}</select></div>
       <div class="field"><label>Team</label><select id="usT"><option value="">—</option>${teamsDelClub().map(t => `<option value="${t.id}">${esc(t.nombre)}</option>`).join("")}</select></div>
     </div>
     <div class="row2">
@@ -4489,7 +4512,7 @@ function sheetNuevoUsuario() {
     if (!res.ok) return toast(out.error || "Error", "warn");
     // boliches elegidos: sobrescriben lo que se haya heredado del team
     const seleccionados = [...document.querySelectorAll("#usClubs input:checked")].map(i => i.value);
-    await sb.from("profiles").update({ clubs: seleccionados.length ? seleccionados : clubsDisponibles.map(c => c.id) }).eq("usuario", usuario.toLowerCase());
+    await sb.from("profiles").update({ clubs: seleccionados.length ? seleccionados : [club] }).eq("usuario", usuario.toLowerCase());
     toast(`@${usuario} creado`);
     sheetUsuarios();
   };
@@ -4541,7 +4564,7 @@ async function sheetEditarUsuario(g) {
       <div class="an">${esc(g.nombre)}</div><div class="as">@${esc(g.usuario)}</div></div>
     <div class="field"><label>Nombre</label><input id="euN" value="${esc(g.nombre)}"></div>
     <div class="row2">
-      <div class="field"><label>Rol${dobleBoliche ? " base" : ""}</label><select id="euR">${Object.entries(roles).map(([v, l]) => `<option value="${v}"${g.rol === v ? " selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div class="field"><label>Rol${dobleBoliche ? " base" : ""}</label><select id="euR">${Object.entries(roles).filter(([v]) => v !== "admin" || me.plataforma || g.rol === "admin").map(([v, l]) => `<option value="${v}"${g.rol === v ? " selected" : ""}>${l}</option>`).join("")}</select></div>
       <div class="field"><label>Team${dobleBoliche ? " base" : ""}</label><select id="euT">${teamOpts(g.team_id)}</select></div>
     </div>
     <div class="field"><label>Boliches donde opera</label>
@@ -4571,7 +4594,7 @@ async function sheetEditarUsuario(g) {
     const nombre = $("#euN").value.trim();
     if (!nombre) return toast("Poné el nombre", "warn");
     const seleccionados = [...document.querySelectorAll("#euClubs input:checked")].map(i => i.value);
-    const clubs = seleccionados.length ? seleccionados : clubsDisponibles.map(c => c.id);
+    const clubs = seleccionados.length ? seleccionados : [club];
     const { error } = await sb.from("profiles").update({
       nombre, rol: $("#euR").value, team_id: $("#euT").value || null, clubs
     }).eq("id", g.id);
@@ -5152,7 +5175,7 @@ async function screenEventos() {
         <p class="in-s">Gestioná tu próximo evento y accedé al historial.</p>
       </div>
       <div style="display:flex;gap:8px">
-        ${me.rol === "admin" ? `<button class="btn ghost2" id="irBoliches" title="Administrar boliches">Boliches</button>` : ""}
+        ${me.plataforma ? `<button class="btn ghost2" id="irBoliches" title="Administrar boliches">Boliches</button>` : ""}
         <button class="btn primary in-nuevo" id="evNuevoBtn">＋ Crear nuevo evento</button>
       </div>
     </header>
@@ -6100,6 +6123,81 @@ async function nuevaMesa(cat) {
   screenMesas();
 }
 
+/* Auditoría: quién cambió qué y cuándo en este boliche. Lee audit_log,
+   que llenan los triggers del servidor (db/25); la política de lectura
+   deja verla solo a la plataforma y al admin del boliche. Solo lectura. */
+const AUD_TIPOS = [
+  ["", "Todo"], ["pagos", "Pagos"], ["entradas", "Entradas"], ["registros", "Invitados"],
+  ["mesas", "Mesas"], ["profiles,club_membership", "Personas"], ["eventos", "Eventos"],
+  ["teams", "Teams"], ["bar_ventas", "Barra"], ["clubs", "Boliche"],
+];
+const AUD_TABLA = { pagos: "Pago", entradas: "Entrada", registros: "Invitado", mesas: "Mesa", profiles: "Persona",
+  club_membership: "Membresía", eventos: "Evento", teams: "Team", bar_ventas: "Venta de barra", clubs: "Boliche" };
+const AUD_OP = { INSERT: ["alta", "ok"], UPDATE: ["cambio", "warn"], DELETE: ["baja", "bad"] };
+const AUD_IGNORAR = new Set(["id", "updated_at", "created_at", "evento_id", "club_id"]);
+const AUD_ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+function audValor(v) {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "string" && AUD_ISO.test(v))
+    return new Date(v).toLocaleString("es-BO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const t = typeof v === "object" ? JSON.stringify(v) : String(v);
+  return t.length > 38 ? t.slice(0, 37) + "…" : t;
+}
+function audResumen(r) {
+  const a = r.antes || {}, d = r.despues || {};
+  const fila = r.op === "DELETE" ? a : d;
+  const nombre = fila.nombre || fila.cliente || fila.etiqueta || fila.usuario || fila.code || fila.concepto || "";
+  if (r.op !== "UPDATE") return { nombre, cambios: [] };
+  const cambios = Object.keys(d)
+    .filter(k => !AUD_IGNORAR.has(k) && JSON.stringify(a[k]) !== JSON.stringify(d[k]))
+    .slice(0, 4).map(k => {
+      // un id suelto no le dice nada a nadie: se dice qué pasó con él
+      if (/_id$|_por$/.test(k)) return [k.replace(/_id$|_por$/, "").replace(/_/g, " "),
+        a[k] ? "asignado" : "—", d[k] ? (a[k] ? "otro" : "asignado") : "quitado"];
+      return [k.replace(/_/g, " "), audValor(a[k]), audValor(d[k])];
+    });
+  return { nombre, cambios };
+}
+async function sheetAuditoria(filtro = "") {
+  sheet(`<div class="sh-h">Auditoría<span class="r-sub">${esc(clubData(club)?.nombre || club)}</span></div>
+    <div class="hf-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${AUD_TIPOS.map(([k, l]) =>
+      `<button class="hf-chip${k === filtro ? " on" : ""}" data-aud="${k}">${esc(l)}</button>`).join("")}</div>
+    <div id="audLista">${skeleton(4)}</div>`);
+  document.querySelectorAll("#sheetBody [data-aud]").forEach(b => b.onclick = () => sheetAuditoria(b.dataset.aud));
+  try {
+    let q = sb.from("audit_log").select("id,at,actor,tabla,op,antes,despues").eq("club_id", club)
+      .order("at", { ascending: false }).limit(120);
+    if (filtro) q = q.in("tabla", filtro.split(","));
+    const { data, error } = await q;
+    if (error) throw error;
+    const ids = [...new Set((data || []).map(r => r.actor).filter(Boolean))];
+    const nombres = {};
+    if (ids.length) {
+      const { data: ps } = await sb.from("profiles").select("id,nombre,usuario").in("id", ids);
+      (ps || []).forEach(p => nombres[p.id] = p.nombre || "@" + p.usuario);
+    }
+    const lista = $("#audLista");
+    if (!lista) return;   // la hoja se cerró o cambió mientras cargaba
+    if (!data?.length) { lista.innerHTML = `<div class="empty">Sin movimientos registrados${filtro ? " de este tipo" : ""}.</div>`; return; }
+    lista.innerHTML = data.map(r => {
+      const { nombre, cambios } = audResumen(r);
+      const [opTxt, opCls] = AUD_OP[r.op] || [r.op, ""];
+      const quien = r.actor ? (nombres[r.actor] || "Alguien del equipo") : "Sistema";
+      const cuando = new Date(r.at).toLocaleString("es-BO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      return `<div class="list-row aud-row">
+        <div style="min-width:0;flex:1">
+          <div style="font-weight:600">${esc(AUD_TABLA[r.tabla] || r.tabla)}${nombre ? ` · ${esc(audValor(nombre))}` : ""}
+            <span class="pill ${opCls}" style="margin-left:6px;font-size:10.5px">${esc(opTxt)}</span></div>
+          ${cambios.map(([k, x, y]) => `<div class="aud-cambio"><span>${esc(k)}</span> ${esc(x)} → <b>${esc(y)}</b></div>`).join("")}
+          <div style="font-size:12px;color:var(--text-3);margin-top:3px">${esc(quien)} · ${esc(cuando)}</div>
+        </div>
+      </div>`;
+    }).join("") + (data.length === 120 ? `<div class="hint" style="text-align:center;margin-top:10px">Se muestran los últimos 120.</div>` : "");
+  } catch (e) {
+    const lista = $("#audLista");
+    if (lista) lista.innerHTML = `<div class="empty">${esc(mensajeDeError(e))}</div>`;
+  }
+}
 function sheet(html) { $("#sheetBody").innerHTML = html; $("#sheet").classList.add("open"); $("#scrim").classList.add("show"); }
 function closeSheet() { $("#sheet").classList.remove("open"); $("#scrim").classList.remove("show"); }
 
