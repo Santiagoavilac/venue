@@ -16,6 +16,7 @@ import '../../events/ui/eventos_screen.dart';
 import '../../payments/ui/pagos_screen.dart';
 import '../../vip_tables/ui/mesas_screen.dart';
 import '../../access_control/ui/accesos_screen.dart';
+import '../../analytics/ui/reporte_screen.dart';
 import 'cuenta_screen.dart';
 
 class _Seccion {
@@ -47,6 +48,9 @@ List<_Seccion> _seccionesPara(Rol rol) => [
       if (rol.veEventos)
         const _Seccion('Mesas', Icons.table_bar_outlined,
             Icons.table_bar_rounded, MesasScreen()),
+      if (rol.vende)
+        _Seccion(rol == Rol.admin ? 'Reporte' : 'Stats', Icons.bar_chart_outlined,
+            Icons.bar_chart_rounded, const ReporteScreen()),
       if (rol.veEventos)
         const _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
             EventosScreen()),

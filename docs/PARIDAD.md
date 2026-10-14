@@ -41,7 +41,17 @@ fue probada todavía a mano en un teléfono.
 | 4 | Detalle del pago con captura; adjuntar o cambiar (`sheetVoucher`) | ídem | hecho · probado contra el demo |
 | 4 | Admin: avanzar estado pendiente → pagado → verificado | ídem | hecho · probado contra el demo |
 | 4 | Admin: QRs de cobro del boliche (`sheetQrsCobro`) · Jefe: QR de su team (`set_team_qr`) | ídem | hecho · probado contra el demo (subir la imagen: sin probar) |
-| 5 | Reporte, stats, liquidación, contabilidad Excel | — | pendiente |
+| 5 | Cierre del evento / stats de team / mis stats (`screenStats`) | `analytics/ui/reporte_screen.dart` | hecho · probado contra el demo |
+| 5 | Liquidación "lo que se paga al boliche" y manillas de externos (`pintarLiquidacion`) | ídem | hecho · probado contra el demo |
+| 5 | Reporte de fases (`pintarFases`) | ídem | hecho |
+| 5 | Copiar cierre, desglose por comisiones | ídem | hecho |
+| 5 | Comisiones por team con Bs por manilla editables (`sheetComisiones`) | `analytics/ui/reporte_hojas.dart` | hecho · probado contra el demo |
+| 5 | Bonos (`sheetBonos`) | ídem | hecho · probado contra el demo |
+| 5 | Histórico y ranking (`sheetHistorico`) | ídem | hecho · probado contra el demo |
+| 5 | Teléfonos del equipo (`sheetTelefonos`) | ídem | hecho · probado contra el demo |
+| 5 | Nombre por nombre y eventos pasados (`sheetRrppDetalle`, `sheetHistorialRrpp`, `sheetHistTeam`) | ídem | hecho · probado contra el demo |
+| 5 | Reporte de filtro (`sheetFiltro`) | ídem | hecho |
+| 5 | Contabilidad a Excel (`contabilidad.js`) | `analytics/data/contabilidad.dart`, `xlsx.dart` | hecho · mismas fórmulas; el archivo abre con openpyxl; **falta abrirlo en Excel/Numbers reales** |
 | 6 | Mi team, Gente, boliches | — | pendiente |
 | 7 | Eventos (admin), listas, fases, avisos | — | pendiente |
 | 8 | Caja | — | pendiente |
@@ -52,8 +62,8 @@ fue probada todavía a mano en un teléfono.
 | Rol | Secciones |
 | --- | --- |
 | Seguridad | Escáner · Puerta · RRPPs · Mesas · Eventos · Cuenta |
-| Administrador | Accesos (Listas, Entradas, Resumen, Historial) · Escáner · Pagos · Mesas · Eventos · Cuenta |
-| Jefe, Relacionador | Accesos (Listas, Entradas, Resumen) · Pagos · Mesas · Eventos · Cuenta |
+| Administrador | Accesos (Listas, Entradas, Resumen, Historial) · Escáner · Pagos · Mesas · Reporte · Eventos · Cuenta |
+| Jefe, Relacionador | Accesos (Listas, Entradas, Resumen) · Pagos · Mesas · Stats · Eventos · Cuenta |
 | Caja, Propietario, Barra, Recepción | Cuenta |
 
 Con esto, **el rol Seguridad ya tiene en la app todo lo que tiene en la web
