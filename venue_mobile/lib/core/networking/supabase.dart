@@ -38,5 +38,11 @@ String mensajeDeError(Object e) {
   if (esFallaDeRed(e)) return 'Sin conexión. Revisá la señal y probá de nuevo.';
   if (e is PostgrestException) return e.message;
   if (e is AuthException) return e.message;
+  if (e is StorageException) return 'No se pudo subir el archivo: ${e.message}';
+  if (e is FormatException) return e.message;
+  // Lo desconocido se muestra tal cual: "error inesperado" no le sirve a
+  // nadie para resolverlo ni para reportarlo.
+  final t = e.toString();
+  if (t.isNotEmpty && t.length < 180) return t;
   return 'Ocurrió un error inesperado.';
 }

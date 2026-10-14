@@ -141,7 +141,12 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
       valor: mesas,
       reintentar: () => ref.invalidate(mesasProvider),
       datos: (todas) {
-        final pisos = pisosDe(todas);
+        // Los pisos con mesas, más el que se eligió a mano: un piso nuevo
+        // todavía no tiene mesas y aun así hay que poder pararse en él.
+        final conMesas = pisosDe(todas);
+        final pisos = ordenPisos
+            .where((p) => conMesas.contains(p) || p == _planta)
+            .toList();
         final planta = pisos.contains(_planta) ? _planta! : pisos.first;
         final enPlanta = todas.where((m) => m.planta == planta).toList();
         final vendidas = todas.where((m) => !m.libre).toList();
@@ -269,47 +274,74 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                   if (todas.isEmpty)
                     _Accion('Copiar de otro evento', Icons.content_copy_rounded,
                         () => _copiarDeOtro(ev, club)),
-                  for (final p in ordenPisos.where((p) => !pisos.contains(p)).take(1))
-                    _Accion('Piso: ${etiquetaPiso[p]}', Icons.layers_outlined,
-                        () => setState(() => _planta = p)),
+                  if (ordenPisos.any((p) => !pisos.contains(p)))
+                    PopupMenuButton<String>(
+                      tooltip: 'Agregar un piso',
+                      onSelected: (p) {
+                        setState(() => _planta = p);
+                        avisar(context,
+                            '${etiquetaPiso[p]} agregado: sumale mesas o un fondo');
+                      },
+                      itemBuilder: (_) => [
+                        for (final p in ordenPisos.where((p) => !pisos.contains(p)))
+                          PopupMenuItem(value: p, child: Text(etiquetaPiso[p] ?? p)),
+                      ],
+                      child: const _Etiqueta('Agregar piso', Icons.layers_outlined),
+                    ),
                 ],
               ]),
               const SizedBox(height: 12),
               // El plano se puede ampliar y desplazar con dos dedos. En modo
               // mover, un dedo arrastra la mesa y el plano queda quieto.
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: InteractiveViewer(
-                  minScale: 1,
-                  maxScale: 5,
-                  panEnabled: !_mover,
-                  constrained: false,
-                  child: SizedBox(
-                    width: (MediaQuery.of(context).size.width - 32).clamp(640.0, 2000.0),
-                    child: RepaintBoundary(
-                      key: _planoKey,
-                      child: Plano(
-                        mesas: enPlanta,
-                        planta: planta,
-                        fondoUrl: fondos[planta],
-                        mover: _editando && _mover,
-                        teams: teams,
-                        alTocar: tocar,
-                        alMover: (m, x, y) async {
-                          try {
-                            await repo.mover(m.id, x, y);
-                            ref.invalidate(mesasProvider);
-                          } catch (e) {
-                            if (context.mounted) {
-                              avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
-                            }
-                          }
-                        },
+              Builder(builder: (context) {
+                // El visor necesita un alto propio: dentro de una lista no
+                // tiene de dónde sacarlo y el plano quedaba invisible.
+                final visible = MediaQuery.of(context).size.width - 32;
+                final ancho = visible < 640 ? 640.0 : visible;
+                return SizedBox(
+                  height: ancho / Plano.proporcion,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 5,
+                      panEnabled: !_mover,
+                      constrained: false,
+                      child: SizedBox(
+                        width: ancho,
+                        child: RepaintBoundary(
+                          key: _planoKey,
+                          child: Plano(
+                            mesas: enPlanta,
+                            planta: planta,
+                            fondoUrl: fondos[planta],
+                            mover: _editando && _mover,
+                            teams: teams,
+                            alTocar: tocar,
+                            alMover: (m, x, y) async {
+                              try {
+                                await repo.mover(m.id, x, y);
+                                ref.invalidate(mesasProvider);
+                              } catch (e) {
+                                if (context.mounted) {
+                                  avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+                                }
+                              }
+                            },
+                          ),
+                        ),
                       ),
                     ),
                   ),
+                );
+              }),
+              if ((MediaQuery.of(context).size.width - 32) < 640)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text('← deslizá el plano de lado →',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: VenueColors.textoSuave, fontSize: 12)),
                 ),
-              ),
               const SizedBox(height: 10),
               const LeyendaPlano(),
               const SizedBox(height: 6),
@@ -340,6 +372,27 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
       },
     );
   }
+}
+
+class _Etiqueta extends StatelessWidget {
+  const _Etiqueta(this.texto, this.icono);
+  final String texto;
+  final IconData icono;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: VenueColors.linea),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icono, size: 18),
+          const SizedBox(width: 8),
+          Text(texto, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        ]),
+      );
 }
 
 class _Accion extends StatelessWidget {
