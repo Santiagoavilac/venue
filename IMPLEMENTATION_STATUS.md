@@ -47,6 +47,7 @@ corta por exceso de logins y la corrida queda esperando.
 | `26-instalacion-limpia` | Defaults, `search_path`, membresía sin team |
 | `27-realtime` | Mesas, entradas e invitados en tiempo real |
 | `28-storage-disenos-lectura` | Permite reemplazar artes, fondos de plano y QRs de cobro |
+| `30-reporte-filtro-jefe` | "Rechazados en puerta" vuelve a estar para el jefe, acotado a su team |
 | `29-auditoria-solo-lectura` | Quita a las personas TRUNCATE/escritura sobre `audit_log` (grants por defecto de Supabase) |
 | Edge Function `crear-usuario` | Límite de intentos, invitación con vencimiento, rol validado, crear admins solo plataforma |
 
@@ -104,12 +105,37 @@ hojas y avisos. En puerta, caja y barra el movimiento es mínimo. Con
 igual. Pulido visual al final de `styles.css` (incluye el hueco que quedaba
 entre la barra lateral y el contenido en escritorio).
 
+
+Ronda de diseño y navegación (2026-10-14):
+
+- **Pagos fuera de la web.** Los pagos de manillas se resuelven por
+  WhatsApp. Se quitaron la sección, la hoja de pago y el QR de manillas del
+  frontend. En la base no se borró nada: la tabla `pagos`, su historial y
+  `crear_pago_unico` siguen ahí (y la app móvil todavía los usa).
+- **"Más"** reúne las secciones que no entran en la barra inferior y los
+  accesos secundarios: Usuarios y equipos, Rechazados en puerta, Lista de la
+  caja y QRs de cobro (estos últimos son los de las mesas y antes vivían en
+  Pagos). En escritorio, los mismos accesos van al pie de la barra lateral.
+  El perfil queda solo para la cuenta.
+- **Sin menú hamburguesa.** En el celular el boliche se cambia tocando su
+  marca, arriba a la izquierda.
+- **Diseño sobrio.** Sin emojis en la interfaz (íconos de línea; solo
+  quedan en los mensajes que se mandan por WhatsApp), sin degradados ni
+  brillos, una sola tipografía para leer, etiquetas sin mayúsculas
+  espaciadas, badges/chips/botones/pestañas unificados. El selector de
+  evento se oculta cuando hay un solo evento (ya lo dice la barra de
+  arriba).
+- **Planimetría.** Plano en tono oscuro, mesas sólidas que escalan con el
+  plano, colores por estado, zoom (alejar/acercar/ajustar) y la posición
+  se conserva cuando el plano se repinta en vivo.
+
 Verificado con Chrome real (`tools/web/recorrer.mjs`, `tools/web/flujos.mjs`):
 9 roles × celular (390 px) y escritorio (1440 px), todas las secciones
 cargan, cero errores de consola, ningún ScrollTrigger huérfano al cambiar
 de sección; con movimiento reducido no queda ninguno. Flujos: clave
-incorrecta, código inexistente en el escáner, pago con comprobante (doble
-toque), Auditoría con filtro, RLS de la auditoría.
+incorrecta, código inexistente en el escáner, plano con zoom y hoja de
+mesa, Auditoría con filtro, RLS de la auditoría (los accesos de "Más" se
+abren uno por uno en el recorrido).
 
 Publicada en Vercel (proyecto `venue-web`, contra la base principal):
 https://venue-web-amber.vercel.app — se vuelve a publicar con

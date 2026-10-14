@@ -36,7 +36,7 @@ for (const rol of ROLES) {
     // avisos / pedido de teléfono que tapen la pantalla
     for (const sel of ["#avOk", "#telLuego"]) { const b = page.locator(sel); if (await b.count() && await b.isVisible()) { await b.click(); await page.waitForTimeout(500); } }
     await page.waitForFunction(() => document.querySelectorAll("#tabbar button").length, null, { timeout: 10000 }).catch(() => {});
-    const tabs = await page.evaluate(() => [...document.querySelectorAll("#tabbar button")].map(b => [b.dataset.t, b.textContent.trim()]));
+    const tabs = await page.evaluate(() => [...document.querySelectorAll("#tabbar button[data-t]")].map(b => [b.dataset.t, b.textContent.trim()]));
     const visto = [];
     for (const [t, etiqueta] of tabs) {
       await page.evaluate(x => irATab(x), t);
@@ -47,6 +47,24 @@ for (const rol of ROLES) {
       visto.push(etiqueta + (roto ? "✗" : cargando ? "…" : "✓"));
       await page.screenshot({ path: `${OUT}/${rol}-${t}-${nombre}.png`, fullPage: false });
     }
+    // accesos de "Más": cada uno abre su hoja con contenido real
+    const extras = await page.evaluate(() => [...document.querySelectorAll("#tabbar button[data-x]")].map(b => b.dataset.x));
+    for (const x of extras) {
+      await page.evaluate(k => document.querySelector(`#tabbar [data-x="${k}"]`).click(), x);
+      await page.waitForTimeout(1800);
+      // "Usuarios y equipos" es una pantalla completa; el resto, hojas
+      const h = await page.evaluate(() => document.querySelector("#sheet.open")
+        ? { abierta: true, txt: document.querySelector("#sheetBody").innerText }
+        : { abierta: !document.querySelector("#main .sk-wrap") && !!document.querySelector("#main")?.innerText.trim(), txt: document.querySelector("#main")?.innerText || "" });
+      const malo = !h.abierta || /\$\{|undefined|No pudimos/.test(h.txt);
+      if (malo) { fallas++; errores.push(`MÁS ${x}: ${h.abierta ? h.txt.slice(0, 80) : "no abrió"}`); }
+      visto.push("+" + x + (malo ? "✗" : "✓"));
+      if (nombre === "movil") await page.screenshot({ path: `${OUT}/${rol}-mas-${x}.png` });
+      await page.evaluate(() => closeSheet()); await page.waitForTimeout(300);
+    }
+    // texto de plantilla sin resolver en cualquier pantalla
+    const crudo = await page.evaluate(() => /\$\{ico/.test(document.body.innerHTML));
+    if (crudo) { fallas++; errores.push("hay ${ico(...)} sin resolver en la página"); }
     const st = await page.evaluate(() => window.ScrollTrigger ? ScrollTrigger.getAll().length : -1);
     const huerf = await page.evaluate(() => window.ScrollTrigger ? ScrollTrigger.getAll().filter(t => t.trigger && !t.trigger.isConnected).length : 0);
     const ocultos = await page.evaluate(() => [...document.querySelectorAll("#main *")].filter(e => e.style.visibility === "hidden").length);

@@ -3197,61 +3197,165 @@ button.hm-m:hover{background:var(--surface-2)}
 }
 .nav-items:not(:has(button.on)) .nav-ind{display:none}
 
-/* ---------- Superficies: borde y elevación consistentes ---------- */
-.stat,.lst-card,.rc,.cat-row{
-  border-color:var(--border-strong);
-  box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 10px 24px -18px rgba(0,0,0,.9);
-  transition:border-color var(--t) var(--ease),box-shadow var(--t) var(--ease),transform var(--t) var(--ease);
+/* ===================================================================
+   SOBRIO · una sola familia visual para toda la web
+   ===================================================================
+   Producto de trabajo, no demo: superficies planas con borde fino,
+   un solo acento (el color del boliche) usado con moderación, sin
+   degradados decorativos, sin brillos, sin mayúsculas espaciadas en
+   cada etiqueta y sin emojis. Radios: 12 tarjetas, 10 controles,
+   6 badges.
+   =================================================================== */
+:root{--r:12px;--r-sm:10px;--r-lg:14px}
+
+/* fondos sin resplandor: la marca se nota en el acento, no en una nube */
+.app,.login{background:var(--bg)}
+.login{background:#000}
+.ev-hero::before,.hm-hero::before,.ev-card::before{display:none}
+.ev-hero,.hm-hero,.ev-card{background:var(--surface)}
+.stat,.rc,.lst-card,.cat-row{background:var(--surface)}
+
+/* ---------- Tarjetas ---------- */
+.stat,.lst-card,.rc,.cat-row,.rp-cierre,.ev-met{
+  border:1px solid var(--border-strong);border-radius:var(--r);box-shadow:none;
 }
 @media(hover:hover){
-  .stat:hover,.rc:hover{
-    border-color:color-mix(in srgb,var(--brand-primary) 38%,var(--border-strong));
-    box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 14px 30px -18px var(--brand-glow);
-  }
   .list-row{transition:background var(--t-fast) var(--ease)}
-  .list-row:hover{background:color-mix(in srgb,var(--surface-2) 60%,transparent)}
+  .list-row:hover{background:color-mix(in srgb,var(--surface-2) 55%,transparent)}
 }
-.stat .k{letter-spacing:.1em}
-.stat .v{text-shadow:0 0 18px color-mix(in srgb,currentColor 10%,transparent)}
+.rp-cierre{background:var(--surface)}
+.rp-cierre::before{display:none}
 
-/* ---------- Botones y campos ---------- */
-.btn.primary{position:relative;overflow:hidden;isolation:isolate}
-.btn.primary::after{
-  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
-  background:linear-gradient(180deg,rgba(255,255,255,.14),transparent 55%);
+/* ---------- Tipografía de datos ----------
+   Etiquetas en minúscula normal y números en la tipografía de la
+   interfaz con cifras tabulares: se leen como dato, no como decoración. */
+.stat .k,.rp-cierre-k,.ev-met-k{
+  text-transform:none;letter-spacing:0;font-size:12px;font-weight:500;color:var(--text-muted);
 }
-@media(hover:hover){
-  .btn.primary:hover{box-shadow:0 14px 34px -12px var(--brand-glow),inset 0 1px 0 rgba(255,255,255,.16)}
+.stat .v,.rp-cierre-v,.cf-nv{
+  font-family:var(--ui);font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;text-shadow:none;
 }
-.login .btn.primary::after{display:none}
-.field input,.field select,.field textarea{
-  transition:border-color var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease);
+.stat .v{font-size:24px}
+.rp-cierre-v{font-size:30px}
+.sh-h{font-family:var(--ui);font-weight:600;letter-spacing:-.01em}
+
+/* ---------- Badges (estado) ----------
+   Uno solo: texto chico, fondo tenue, radio 6. Sin MAYÚSCULAS, sin
+   bordes de color, sin pulsos. */
+.pago-chip,.tkst,.pill,.tag-estado,.flag-badge,.estado-hoy{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11.5px;font-weight:600;letter-spacing:0;text-transform:none;
+  padding:2px 7px;border-radius:6px;border:none;white-space:nowrap;line-height:1.5;
 }
+.tag-estado{text-transform:capitalize}
+.estado-hoy{background:var(--surface-3);color:var(--text-secondary)}
+.estado-vivo{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:500;color:var(--ok);white-space:nowrap;
+}
+.estado-vivo::before{
+  content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent);
+}
+
+/* ---------- Chips (filtros) y segmentos ---------- */
+.hf-chip,.segbtn{
+  border-radius:var(--r-sm);border:1px solid var(--border-strong);
+  background:transparent;color:var(--text-secondary);font-weight:500;
+}
+.hf-chip.on,.segbtn.on{
+  background:var(--surface-3);border-color:color-mix(in srgb,var(--text-primary) 28%,transparent);
+  color:var(--text-primary);
+}
+
+/* ---------- Botones ----------
+   Principal: color sólido del boliche, sin degradado ni sombra de
+   color. Secundario: contorno. Mismo radio y alto en toda la web. */
+.btn{border-radius:var(--r-sm);font-weight:600;letter-spacing:0}
+.btn.primary{background:var(--brand-primary);box-shadow:none;filter:none}
+.btn.primary:hover{filter:brightness(1.08);box-shadow:none}
+.btn.primary:active{filter:brightness(.94)}
+.login .btn.primary{background:#fff}
+.btn.ghost2,.ghost{background:transparent;border:1px solid var(--border-strong)}
+@media(hover:hover){.btn.ghost2:hover,.ghost:hover{background:var(--surface-2)}}
+.ghost{border-radius:var(--r-sm)}
+.checkin{border-radius:var(--r-sm)}
+
+/* íconos dentro de botones: tamaño fijo (la regla base .ic ocupa todo) */
+.btn .ic,.ghost .ic,.checkin .ic,.flagbtn .ic,.pw-eye .ic,.scan-actions .btn .ic,.mas-op .ic,.relmark .ic{width:18px;height:18px;flex-shrink:0}
+.btn:has(> .ic:only-child),.scan-actions .btn{display:inline-flex;align-items:center;justify-content:center}
+.relmark .ic{width:13px;height:13px}
+.relmark{background:var(--surface-3);color:var(--text-secondary)}
+.sh-ico{width:52px;height:52px;margin:2px auto 10px;border-radius:14px;display:grid;place-items:center;
+  background:var(--surface-3);color:var(--text-primary)}
+.sh-ico .ic{width:24px;height:24px}
+
+/* ---------- Campos ---------- */
+.field input,.field select,.field textarea{border-radius:var(--r-sm);
+  transition:border-color var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
 .field input:focus,.field select:focus,.field textarea:focus{
-  border-color:var(--brand-primary);
-  box-shadow:0 0 0 3px var(--brand-soft);
-  outline:none;
+  border-color:color-mix(in srgb,var(--brand-primary) 70%,var(--border-strong));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--brand-primary) 18%,transparent);outline:none;
 }
-:focus-visible{outline:2px solid var(--brand-secondary);outline-offset:2px}
+:focus-visible{outline:2px solid color-mix(in srgb,var(--brand-primary) 80%,#fff);outline-offset:2px}
 
-/* ---------- Hojas: un poco más de profundidad ---------- */
+/* ---------- Selector de evento ----------
+   Con un solo evento se oculta (la barra de arriba ya lo dice). Con
+   varios, pestañas de texto con subrayado, no píldoras. */
+.evsel.solo{display:none}
+.evsel{gap:4px;border-bottom:1px solid var(--border);padding-bottom:0}
+.evsel button{
+  display:inline-flex;align-items:center;gap:8px;
+  background:none;border:none;border-radius:0;padding:10px 12px 11px;
+  color:var(--text-muted);font-size:13.5px;font-weight:500;position:relative;
+}
+.evsel button.on{background:none;color:var(--text-primary)}
+.evsel button.on::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;border-radius:2px;background:var(--brand-primary)}
+.evs-d{font-size:12px;color:var(--text-muted);font-weight:400}
+.tb-ev.vivo .tb-ev-nm::after{
+  content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:8px;vertical-align:middle;
+  background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent);
+}
+
+/* ---------- Topbar sin hamburguesa ----------
+   En el celular el boliche se cambia desde su marca, a la izquierda;
+   las secciones viven en la barra inferior y en "Más". */
+@media(max-width:999px){
+  .tb-club{display:flex;padding:5px;border-radius:var(--r-sm)}
+  .tb-club #tbClubName{display:none}
+  .tb-club .chev{display:none}
+  .tb-ctx{gap:6px}
+  .topbar{gap:8px}
+}
+
+/* ---------- Barra lateral: accesos secundarios ---------- */
+.nav-sep{padding:14px 11px 6px;font-size:11.5px;font-weight:500;color:var(--text-muted)}
+.nav-mini .nav-sep span{display:none}
+.nav-mini .nav-sep{padding:8px 0;border-top:1px solid var(--border);margin:6px 8px 0}
+.gsap-on .nav-items button.on,.nav-items button.on{box-shadow:none}
+.nav-ind,.nav-items button.on{box-shadow:none}
+.nav-ind{background:var(--surface-2)}
+.nav-items button.on{color:var(--text-primary);background:var(--surface-2)}
+.nav-items button.on .ic{color:var(--brand-secondary)}
+.gsap-on .nav-items button.on{background:none}
+.botnav button.on{color:var(--text-primary)}
+.botnav button.on .ic{color:var(--brand-secondary)}
+
+/* ---------- Hoja "Más" ---------- */
+.mas-op{display:flex;align-items:center;gap:12px;text-align:left;border-radius:var(--r-sm)}
+.mas-op span{flex:1}
+.mas-op .mas-chev{width:16px;height:16px;color:var(--text-muted)}
+.mas-op.on{border-color:color-mix(in srgb,var(--text-primary) 28%,transparent)}
+.mas-item{border-radius:var(--r)}
+
+/* ---------- Avisos y hojas ---------- */
 .sheet{box-shadow:0 -24px 60px -20px rgba(0,0,0,.8)}
-.scrim{backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
-
-/* ---------- Avisos ---------- */
-.toast{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  background:color-mix(in srgb,var(--surface-3) 88%,transparent)}
-
-/* ---------- Plano de mesas y escáner ---------- */
-.chip{will-change:auto}
-.res.res-v2{transform-origin:center top}
+.scrim{backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.toast{border-radius:var(--r-sm)}
 
 /* ---------- Login: letras del logotipo en 3D ---------- */
 .vn-logo{perspective:600px}
 .vn-l{display:inline-block;transform-origin:50% 100%}
-
-/* ---------- Estados vacíos ---------- */
-.empty{border:1px dashed var(--border-strong);border-radius:var(--r);background:color-mix(in srgb,var(--surface) 60%,transparent)}
 
 /* ---------- Auditoría ---------- */
 .pill.warn{background:var(--warn-bg);color:var(--warn)}
@@ -3260,3 +3364,160 @@ button.hm-m:hover{background:var(--surface-2)}
 .aud-cambio{font-size:12.5px;color:var(--text-2);margin-top:3px;font-family:var(--mono);overflow-wrap:anywhere}
 .aud-cambio span{color:var(--text-3)}
 .aud-cambio b{color:var(--text-primary);font-weight:600}
+
+/* ===================================================================
+   PLANIMETRÍA
+   ===================================================================
+   El plano es el contenido: el fondo se aparta (gris tenue) y las mesas
+   son superficies sólidas que se leen sobre cualquier dibujo. Las
+   mesas escalan con el plano (container queries), así con zoom o en un
+   celular no tapan medio salón. El zoom agranda el plano entero y se
+   recorre deslizando.
+   =================================================================== */
+.plano{position:relative}
+.canvas-wrap{overflow:auto;border-radius:var(--r);border:1px solid var(--border-strong);background:var(--surface);
+  overscroll-behavior-x:contain;scrollbar-width:thin}
+.canvas{
+  width:calc(100% * var(--z,1));min-width:0;border:none;border-radius:0;box-shadow:none;
+  container-type:inline-size;
+  background:
+    linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px),
+    var(--surface);
+  background-size:24px 24px,24px 24px,auto;
+}
+.canvas.editmode{outline:1px dashed color-mix(in srgb,var(--brand-primary) 70%,transparent);outline-offset:-6px}
+.cv-fondo{opacity:.3;filter:grayscale(1) contrast(1.1)}
+.canvas.editmode .cv-fondo{opacity:.45}
+.watermark{font-family:var(--ui);font-weight:600;letter-spacing:.08em;font-size:clamp(18px,4cqw,40px);color:rgba(255,255,255,.05)}
+
+/* mesas: una sola forma, el estado manda el color */
+.chip,.chip.mesa,.chip.lounge,.chip.free{
+  height:auto;min-height:clamp(28px,7.2cqw,60px);
+  padding:clamp(3px,.8cqw,8px) clamp(4px,.9cqw,10px);
+  border-radius:clamp(6px,1.1cqw,12px);
+  background:color-mix(in srgb,var(--surface-elevated) 94%,transparent);
+  border:1px solid var(--border-strong);box-shadow:0 2px 10px -4px rgba(0,0,0,.7);
+  gap:1px;backdrop-filter:blur(2px);
+}
+.chip.free{border-style:dashed;border-color:color-mix(in srgb,var(--text-primary) 22%,transparent)}
+.chip .id{font-size:clamp(8px,1.25cqw,11px);font-weight:600;letter-spacing:.02em;opacity:1;color:var(--text-muted)}
+.chip .nm,.chip.narrow .nm{font-size:clamp(9px,1.45cqw,13px);font-weight:600;color:var(--text-primary);line-height:1.15}
+.chip.free .nm{color:var(--text-muted);font-weight:500}
+.chip.mesa .id,.chip.lounge .id{color:var(--text-muted)}
+.chip.mesa .nm,.chip.lounge .nm{color:var(--text-primary)}
+.chip.lounge{border-radius:clamp(10px,2cqw,20px)}
+.chip.e-reservada{background:color-mix(in srgb,var(--warn) 16%,var(--surface-elevated));border-color:color-mix(in srgb,var(--warn) 55%,transparent)}
+.chip.e-pagada{background:color-mix(in srgb,var(--ok) 15%,var(--surface-elevated));border-color:color-mix(in srgb,var(--ok) 55%,transparent)}
+.chip.e-pagada.no-verif{border-style:dashed;border-color:color-mix(in srgb,var(--warn) 65%,transparent)}
+.chip.e-ocupada{background:color-mix(in srgb,var(--brand-primary) 20%,var(--surface-elevated));border-color:color-mix(in srgb,var(--brand-primary) 60%,transparent)}
+.st-dot{width:clamp(5px,.9cqw,8px);height:clamp(5px,.9cqw,8px);top:clamp(3px,.6cqw,6px);right:clamp(3px,.6cqw,6px)}
+.st-dot.ocupada{background:var(--brand-secondary)}
+.chip.sel{box-shadow:0 0 0 2px var(--brand-primary),0 8px 24px -8px rgba(0,0,0,.8)}
+@media(hover:hover){.chip:hover{border-color:color-mix(in srgb,var(--text-primary) 45%,transparent)}}
+.chip .relmark{width:clamp(14px,2cqw,19px)!important;height:clamp(14px,2cqw,19px)!important;font-size:clamp(8px,1.1cqw,10px)!important;
+  color:#111;box-shadow:0 0 0 2px var(--surface)}
+
+/* zoom */
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;align-items:center;z-index:9;
+  background:color-mix(in srgb,var(--surface-elevated) 92%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border:1px solid var(--border-strong);border-radius:var(--r-sm);padding:2px;box-shadow:0 6px 20px -8px rgba(0,0,0,.8)}
+.zoom button{min-width:34px;height:32px;border:none;background:none;color:var(--text-secondary);border-radius:8px;
+  display:grid;place-items:center;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;padding:0 6px}
+.zoom button .ic{width:16px;height:16px}
+.zoom .zoom-v{min-width:46px;color:var(--text-primary)}
+@media(hover:hover){.zoom button:hover{background:var(--surface-3);color:var(--text-primary)}}
+
+/* leyenda: mismas muestras que las mesas */
+.legend{gap:14px;padding:12px 2px 2px;font-size:12px;color:var(--text-secondary)}
+.legend .sw{width:12px;height:12px;border-radius:4px;border:1px solid var(--border-strong);background:var(--surface-elevated)}
+.legend .sw.libre{border-style:dashed;border-color:color-mix(in srgb,var(--text-primary) 30%,transparent);background:transparent}
+.legend .sw.reservada{background:color-mix(in srgb,var(--warn) 30%,var(--surface-elevated));border-color:var(--warn)}
+.legend .sw.pagada{background:color-mix(in srgb,var(--ok) 30%,var(--surface-elevated));border-color:var(--ok)}
+.legend .sw.ocupada{background:color-mix(in srgb,var(--brand-primary) 35%,var(--surface-elevated));border-color:var(--brand-primary)}
+.legend .hint{flex-basis:100%;margin-left:0;font-size:12px;color:var(--text-muted)}
+@media(min-width:760px){.legend .hint{flex-basis:auto;margin-left:auto}}
+
+/* cabecera del plano: pisos como segmentos compactos, acciones en una línea */
+.floors{display:inline-flex;width:auto;max-width:100%;margin:0 0 12px!important;padding:3px;border-radius:var(--r-sm);
+  background:var(--surface);border:1px solid var(--border-strong)}
+.floors button{flex:0 0 auto;padding:7px 14px;font-size:13px;border-radius:8px}
+.floors .ind{display:none}
+.floors button.on{background:var(--surface-3);color:var(--text-primary)}
+.ms-acc{gap:6px}
+.ms-acc .ghost{min-height:36px;padding:8px 12px;font-size:13px}
+.ms-t{font-size:20px;font-weight:600}
+.ms-s b{font-family:var(--ui);font-weight:600}
+@media(max-width:759px){
+  .ms-h{margin-bottom:10px}
+  .floors{display:flex;width:100%}
+  .floors button{flex:1}
+  .ms-acc{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}
+  .ms-acc::-webkit-scrollbar{display:none}
+  .ms-acc .ghost{flex-shrink:0}
+}
+
+/* botones con ícono y texto */
+.btn .ic:not(:only-child),.ghost .ic:not(:only-child){display:inline-block;vertical-align:-4px;margin-right:6px}
+.ghost .ic:not(:only-child){width:15px;height:15px;vertical-align:-3px;margin-right:4px}
+.floors.solo{display:none!important}
+/* el dibujo se invierte: líneas claras sobre fondo oscuro, como un plano
+   técnico. Así acompaña el tema en vez de ser una mancha gris. */
+.cv-fondo{filter:invert(1) grayscale(1) contrast(1.05);opacity:.42}
+.canvas.editmode .cv-fondo{opacity:.55}
+
+/* nombre del boliche: dato, no logotipo luminoso. El color del local ya
+   está en su marca cuadrada. */
+.wm-club{font-family:var(--ui);font-weight:600;color:var(--text-primary);text-shadow:none;letter-spacing:-.01em}
+.club-name .wm-club,.nav-club .club-name{font-size:15px}
+.nav-club .club-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-club-sub{font-size:12px;letter-spacing:0}
+.nav-club{background:transparent}
+.cp-name.wm-club{font-size:18px}
+.chip.free{border-color:color-mix(in srgb,var(--text-primary) 38%,transparent);background:color-mix(in srgb,var(--surface-elevated) 96%,transparent)}
+.chip.free .nm{color:var(--text-secondary)}
+
+/* ---------- Tipografía unificada ----------
+   Una sola voz: Sora para todo lo que se lee. La monoespaciada queda
+   solo para códigos (entradas, usuarios, teclas) y la tipografía
+   "display" solo para marcas y tickets. Etiquetas sin MAYÚSCULAS
+   espaciadas: se leen como interfaz, no como cartel. */
+.ac-h2,.ac-tot-k,.ac-via-k,.bsc-tit,.cf-nk,.eh-cnt,.ev-dia,.ev-met-k,.ev-nm,.gn-cab,.hm-borr,.hm-h2,.hm-k,.hm-nm,
+.in-h2,.rp-cierre-k,.rp-cierre-tk,.rs-tit,.stat .k,.tm-d-k,.tm-p-jefe,.us-off,.us-yo,.eh-name,.fase-chip,.oro-chip,.cola-cta{
+  text-transform:none!important;letter-spacing:0!important;
+}
+.ac-h2,.hm-h2,.in-h2,.rs-tit,.gn-cab{font-size:13px;font-weight:600;color:var(--text-secondary)}
+.ac-tot-k,.ac-via-k,.hm-k,.tm-d-k,.cf-nk,.ev-dia{font-size:12px;font-weight:500;color:var(--text-muted)}
+.ac-lista-n,.ac-tot-pct,.ac-tot-v,.ac-via-v,.com-total,.dt-f.ok .dt-v,.eh-cnt b,.en-s b,.ev-acc-n,.ev-met b,.ev-num,
+.hm-prog-tx b,.hm-t-h,.hm-v,.iv-ok,.iv-s b,.lst-cnt b,.ms-s b,.nc-cnt,.qtot,.qval,.rp-cd-v,.rp-d-v,.rp-lp-v,.rp-lq-v,
+.rs-f b,.rs-total b,.tm-cnt,.tm-s b,.chip .num,.aud-cambio{
+  font-family:var(--ui)!important;font-variant-numeric:tabular-nums;letter-spacing:-.01em;
+}
+.acct .an,.club-name,.cp-name,.eh-name,.ev-nm,.hm-nm,.rc-t,.rp-cierre-v,.rp-k-v,.sh-h,.sh-name{
+  font-family:var(--ui)!important;font-weight:600;letter-spacing:-.015em;
+}
+.ev-nm,.hm-nm{font-size:22px}
+.acct .avatar{background:var(--surface-3);color:var(--text-primary);border-color:var(--border-strong)}
+.ev-mk{width:26px;height:26px;border-radius:7px;background:var(--brand-primary);color:#fff;
+  display:inline-grid;place-items:center;font-size:13px;font-weight:700;font-family:var(--ui)}
+.ev-mk svg{width:16px;height:16px}
+/* sub-pestañas: mismo lenguaje que chips y segmentos */
+.ac-subs{border-color:var(--border-strong);border-radius:var(--r-sm);padding:3px}
+.ac-sub{border-radius:8px;font-weight:500}
+.ac-sub.on{background:var(--surface-3);color:var(--text-primary);font-weight:600}
+.ac-t,.ms-t,.in-t,.iv-t{font-size:22px;font-weight:600;letter-spacing:-.02em}
+
+/* KPIs dentro de las pantallas: la grilla vieja era de 4 columnas fijas y
+   con su propio margen lateral, así que con 2 o 3 datos quedaban tarjetas
+   angostas con el ícono encima de la etiqueta. Ahora llenan el ancho. */
+.screen .stats{padding:0;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{position:relative}
+.stat:has(.st-ic) .k{padding-right:26px}
+.st-ic{top:12px;right:12px;width:18px;height:18px;border-radius:0;background:none!important;color:var(--text-muted)!important}
+.st-ic svg{width:16px;height:16px}
+.ph-actions{justify-content:flex-start}
+.btn.primary{background:var(--brand-primary)!important;box-shadow:none!important}
+.login .btn.primary{background:#fff!important}
+.login .btn.primary:disabled{background:#3a3a40!important}
+.manual input::placeholder{text-transform:none;letter-spacing:0;font-family:var(--ui)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}

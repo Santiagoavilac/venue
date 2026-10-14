@@ -1,21 +1,11 @@
 // Flujos reales de la web contra el demo, con un navegador de verdad.
 // Uso: (cd tools/web && npm i playwright-core@1.56.0) y con `node dev.mjs 5173`
-// corriendo: node tools/web/flujos.mjs  · Escribe en el demo: registra un pago
-// de 1 Bs con concepto "Prueba web …" que hay que borrar después.
+// corriendo: node tools/web/flujos.mjs  · Solo lee: no escribe en la base.
 import { chromium } from "playwright-core";
-import { deflateSync, crc32 } from "node:zlib";
 const BASE = "http://localhost:5173", OUT = "flujos";
 import { mkdirSync } from "node:fs"; mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch({ channel: "chrome", headless: true });
 let fallas = 0;
-function pngBlanco(w = 40, h = 40) {
-  const fila = Buffer.concat([Buffer.from([0]), Buffer.alloc(w * 3, 255)]);
-  const trozo = (t, d) => { const l = Buffer.alloc(4); l.writeUInt32BE(d.length); const c = Buffer.alloc(4);
-    c.writeUInt32BE(crc32(Buffer.concat([Buffer.from(t), d])) >>> 0); return Buffer.concat([l, Buffer.from(t), d, c]); };
-  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr.set([8, 2, 0, 0, 0], 8);
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), trozo("IHDR", ihdr),
-    trozo("IDAT", deflateSync(Buffer.concat(Array(h).fill(fila)))), trozo("IEND", Buffer.alloc(0))]);
-}
 const ok = (c, m) => { console.log((c ? "✓ " : "✗ ") + m); if (!c) fallas++; };
 async function entrar(rol, w = 390) {
   const ctx = await b.newContext({ viewport: { width: w, height: 844 }, deviceScaleFactor: 2 });
@@ -59,23 +49,26 @@ async function entrar(rol, w = 390) {
   await ctx.close();
 }
 
-// 3 · rrpp: registrar un pago con comprobante; doble toque no duplica
-const marca = "Prueba web " + Date.now();
+// 3 · sin módulo de Pagos; plano de mesas con zoom y mesas que se tocan
 {
   const { p, ctx, errs } = await entrar("rrpp.aurora");
-  await p.evaluate(() => irATab("pagos")); await p.waitForTimeout(2000);
-  await p.click("#btnPagar"); await p.waitForSelector("#pgGo");
-  await p.fill("#pgM", "1"); await p.fill("#pgC", marca);
-  await p.setInputFiles("#pgFile", { name: "comprobante.png", mimeType: "image/png", buffer: pngBlanco() });
-  await p.waitForFunction(() => !document.querySelector("#pgGo").disabled, null, { timeout: 15000 });
-  await p.screenshot({ path: `${OUT}/pago-hoja.png` });
-  await p.evaluate(() => { const g = document.querySelector("#pgGo"); g.click(); g.disabled = false; g.click(); });
-  await p.waitForTimeout(3000);
-  await p.screenshot({ path: `${OUT}/pago-hecho.png` });
+  const tabs = await p.$$eval("#tabbar [data-t], #botnav [data-t]", bs => bs.map(b => b.dataset.t));
+  ok(!tabs.includes("pagos"), `rrpp sin Pagos en la navegación (${[...new Set(tabs)].join(", ")})`);
+  await p.evaluate(() => irATab("mesas")); await p.waitForSelector("#cv2 .chip", { timeout: 15000 }); await p.waitForTimeout(900);
+  const z0 = await p.$eval("#cv2", c => c.style.getPropertyValue("--z"));
+  const w0 = await p.$eval("#cv2", c => c.getBoundingClientRect().width);
+  await p.click('[data-zoom="1"]'); await p.waitForTimeout(300);
+  const w1 = await p.$eval("#cv2", c => c.getBoundingClientRect().width);
+  ok(w1 > w0, `zoom +: el plano pasa de ${Math.round(w0)} a ${Math.round(w1)} px (arrancó en ${z0})`);
+  await p.click('[data-zoom="0"]'); await p.waitForTimeout(300);
+  const w2 = await p.$eval("#cv2", c => c.getBoundingClientRect().width), ww = await p.$eval("#cvWrap", c => c.clientWidth);
+  ok(Math.abs(w2 - ww) < 4, "ajustar: el plano entra justo en el ancho");
+  await p.locator("#cv2 .chip").first().click(); await p.waitForTimeout(800);
+  ok(await p.evaluate(() => !!document.querySelector("#sheet.open")), "tocar una mesa abre su hoja");
+  await p.screenshot({ path: `${OUT}/mesa-hoja.png` });
   ok(!errs.length, "rrpp sin errores de consola " + errs.join(" | "));
   await ctx.close();
 }
-console.log("MARCA=" + marca);
 
 // 4 · admin: hoja de Auditoría desde el Reporte, con filtro
 for (const w of [390, 1440]) {

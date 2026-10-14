@@ -256,9 +256,9 @@ function sheetDesgloseTeam(teamId, teamNombre) {
   sheet(`
     <div class="sh-h">Desglose · ${esc(teamNombre)}<span class="r-sub">${esc(ev.nombre)}</span></div>
     <p class="hint" style="margin:0 0 14px">Copia el registro en texto para mandarlo por WhatsApp.</p>
-    <button class="btn primary" id="dgMan">📋 Manillas prepagadas</button>
+    <button class="btn primary" id="dgMan">Manillas prepagadas</button>
     <div style="height:10px"></div>
-    <button class="btn ghost2" id="dgPue">📋 Compras en puerta</button>`);
+    <button class="btn ghost2" id="dgPue">Compras en puerta</button>`);
   $("#dgMan").onclick = () => copyDesgloseTeam(teamId, teamNombre, "manillas");
   $("#dgPue").onclick = () => copyDesgloseTeam(teamId, teamNombre, "puerta");
 }
@@ -487,7 +487,7 @@ async function mostrarAvisos() {
     const a = pend[i];
     if (!a) { closeSheet(); setTimeout(pedirTelefono, 400); return; }
     sheet(`
-      <div style="text-align:center;font-size:30px;margin-bottom:4px">📣</div>
+      <div class="sh-ico">${ico("megafono")}</div>
       <div class="sh-h" style="justify-content:center;text-align:center">${esc(a.titulo)}</div>
       <p style="white-space:pre-wrap;font-size:15px;line-height:1.5;color:var(--text-2);margin:6px 0 18px;text-align:center">${esc(a.mensaje)}</p>
       <button class="btn primary" id="avOk">Entendido${pend.length > 1 ? ` (${i + 1}/${pend.length})` : ""}</button>`);
@@ -521,7 +521,7 @@ async function pedirTelefono() {
   // el que vende es el que tiene que dar el número; el de puerta no se traba
   const obliga = ["rrpp", "jefe"].includes(me.rol);
   sheet(`
-    <div style="text-align:center;font-size:30px;margin-bottom:4px">📱</div>
+    <div class="sh-ico">${ico("telefono")}</div>
     <div class="sh-h" style="justify-content:center;text-align:center">Registrá tu WhatsApp</div>
     <p style="font-size:14px;line-height:1.5;color:var(--text-2);margin:6px 0 16px;text-align:center">
       Es para poder avisarte los cambios de horario, el cierre de venta y lo de tu rendición
@@ -635,6 +635,7 @@ function pintarEvTopbar() {
   if (!ev) { nm.textContent = "Sin evento"; if (meta) meta.textContent = ""; return; }
   nm.textContent = ev.nombre;
   if (meta) meta.textContent = fmtF(ev.fecha);
+  $("#tbEv")?.classList.toggle("vivo", enCurso(ev));
 }
 
 async function loadEventos() {
@@ -663,8 +664,10 @@ async function loadListaTipos() {
 function renderEvsel() {
   const hoyISO = new Date().toLocaleDateString("sv-SE"); // yyyy-mm-dd local
   $("#evsel").innerHTML = eventos.length
-    ? eventos.map(e => `<button data-ev="${e.id}" class="${ev && ev.id === e.id ? "on" : ""}">${esc(e.nombre)} · ${fmtF(e.fecha)}${enCurso(e) ? ' <span class="live-badge">● EN VIVO</span>' : e.fecha === hoyISO ? ' <span class="hoy-badge">HOY</span>' : ""}</button>`).join("")
+    ? eventos.map(e => `<button data-ev="${e.id}" class="${ev && ev.id === e.id ? "on" : ""}"><span class="evs-n">${esc(e.nombre)}</span><span class="evs-d">${fmtF(e.fecha)}</span>${enCurso(e) ? '<span class="estado-vivo">En vivo</span>' : e.fecha === hoyISO ? '<span class="estado-hoy">Hoy</span>' : ""}</button>`).join("")
     : `<button class="on" disabled>Sin eventos próximos</button>`;
+  // Con un solo evento la fila repite lo que ya dice la barra de arriba.
+  $("#evsel").classList.toggle("solo", eventos.length <= 1);
 }
 $("#evsel").onclick = async e => {
   const b = e.target.closest("button[data-ev]"); if (!b) return;
@@ -685,6 +688,17 @@ $("#clubBtn").onclick = abrirClubs;
 $("#tbClub") && ($("#tbClub").onclick = abrirClubs);
 // El selector de evento de la topbar lleva a Eventos, donde se cambia.
 $("#tbEv") && ($("#tbEv").onclick = () => {
+  // con varios eventos, la barra de arriba es el selector
+  if (eventos.length > 1) {
+    sheet(`<div class="sh-h">Evento</div>
+    <div class="mas-lista">${eventos.map(e => `<button class="mas-op${ev && ev.id === e.id ? " on" : ""}" data-sev="${e.id}">
+      <span style="flex:1;text-align:left">${esc(e.nombre)}<span class="evs-d" style="display:block">${fmtF(e.fecha)}</span></span>
+      ${enCurso(e) ? '<span class="estado-vivo">En vivo</span>' : ""}</button>`).join("")}</div>`);
+    document.querySelectorAll("#sheetBody [data-sev]").forEach(b => b.onclick = () => {
+      closeSheet(); document.querySelector(`#evsel button[data-ev="${b.dataset.sev}"]`)?.click();
+    });
+    return;
+  }
   if (tabsFor().some(([t]) => t === "eventos")) irATab("eventos");
   else toast(ev ? `${ev.nombre} · ${fmtF(ev.fecha)}` : "Sin evento activo");
 });
@@ -704,6 +718,30 @@ $("#clubMenu").onclick = async e => {
 };
 
 /* ---------- tabs por rol ---------- */
+/* Íconos de línea para acciones (mismo trazo que la navegación). Reemplazan
+   a los emojis: cada sistema dibuja los emojis a su manera y le quitaban
+   coherencia y seriedad a la interfaz. */
+const ICO_PATHS = {
+  sonido: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+  mudo: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/>',
+  filtro: '<path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/>',
+  bandera: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  recargar: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  megafono: '<path d="M4 10v4h3l8 5V5L7 10z"/><path d="M18.5 9a4 4 0 0 1 0 6"/>',
+  telefono: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17.5h2"/>',
+  imagen: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 16l-5-5-8 8.5"/>',
+  recibir: '<path d="M12 3v11M8 10l4 4 4-4"/><path d="M4 17v3h16v-3"/>',
+  salida: '<path d="M6 4h12l-5 7v7h3M9 18h3"/><path d="M6 4l6 7"/>',
+  ajuste: '<path d="M12 4v16M5 8h14M5 8l-2.5 6h5zM19 8l-2.5 6h5z"/>',
+  baja: '<path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13"/>',
+  deshacer: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  atras: '<path d="M15 6l-6 6 6 6"/>',
+  mas: '<path d="M12 5v14M5 12h14"/>',
+  menos: '<path d="M5 12h14"/>',
+  ojo: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+};
+const ico = (k, cls = "") => `<svg viewBox="0 0 24 24" class="ic ${cls}" aria-hidden="true">${ICO_PATHS[k]}</svg>`;
+
 const TAB_ICONS = {
   accesos: '<path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h7"/><path d="M10 12h11M17.5 8.5L21 12l-3.5 3.5"/>',
   home: '<path d="M3 10.5L12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M9.5 20v-5.5h5V20"/>',
@@ -715,7 +753,6 @@ const TAB_ICONS = {
   eventos: '<path d="M3 10.5L12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M9.5 20v-5.5h5V20"/>',
   escaner: '<path d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2M16 4h2a2 2 0 012 2v2M16 20h2a2 2 0 002-2v-2M7 12h10"/>',
   lista: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
-  pagos: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>',
   caja: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.5 3-5 6-5s5.2 1.5 6 5"/><path d="M16 8h5M16 12h5M16 16h3"/>',
   /* consulta de relacionadores en puerta: grupo de gente, distinto del de
      caja (que lleva las rayas de la lista) para no confundirlos */
@@ -728,6 +765,32 @@ const TAB_ICONS = {
   barcierre: '<path d="M4 5h16v14H4z"/><path d="M4 10h16M9 14h6"/>',
   baranalitica: '<path d="M4 20V9M10 20V4M16 20v-7M22 20H2"/>'
 };
+/* Accesos secundarios o administrativos. No son secciones de todos los
+   días: viven en "Más" (celular) y al pie de la barra lateral
+   (escritorio), no en el perfil, que queda solo para la cuenta. */
+const EXTRA_ICONS = {
+  usuarios: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.5 3-5 6-5s5.2 1.5 6 5"/><path d="M17 7v6M14 10h6"/>',
+  filtro: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  cajalista: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.5 3-5 6-5s5.2 1.5 6 5"/><path d="M16 8h5M16 12h5M16 16h3"/>',
+  qrs: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2M20 14v6h-6"/>',
+};
+function accionesMas() {
+  const a = [];
+  if (me.rol === "admin") a.push(["usuarios", "Usuarios y equipos", abrirUsuarios]);
+  if (["admin", "jefe"].includes(me.rol)) a.push(["filtro", "Rechazados en puerta", sheetFiltro]);
+  if (me.admin_principal) a.push(["cajalista", "Lista de la caja", sheetCajaFiltro]);
+  if (me.rol === "admin") a.push(["qrs", "QRs de cobro", sheetQrsCobro]);
+  return a;
+}
+// entrar a usuarios siempre aterriza en la raíz (los filtros y el historial
+// interno de niveles siguen vivos para navegar de nuevo)
+function abrirUsuarios() {
+  gnNav = null;
+  try { history.pushState({ tab: "gente", nav: null }, "", "#gente/usuarios"); } catch { /* file:// */ }
+  sheetUsuarios();
+}
+const MAS_TABS = 4;   // secciones que entran en la barra inferior del celular
+
 // ¿la persona lidera su team en el boliche actual? (jefe solo donde vive su team)
 const lideraAca = () => !!me.team_id && (!myTeamClubs || myTeamClubs.includes(club));
 function tabsFor() {
@@ -745,17 +808,17 @@ function tabsFor() {
     // "eventos" es el Inicio: la gestión del evento es la puerta de entrada.
     // "accesos" agrupa listas, entradas, scanner e historial: es la misma
     // pregunta operativa vista de distintas formas.
-    const t = [["eventos", "Inicio"], ["accesos", "Accesos"], ["pagos", "Pagos"], ["mesas", "Mesas"], ["stats", "Reporte"]];
-    if (lideraAca()) t.splice(4, 0, ["team", "Team"]);  // admin que además lidera un team acá
+    const t = [["eventos", "Inicio"], ["accesos", "Accesos"], ["mesas", "Mesas"], ["stats", "Reporte"]];
+    if (lideraAca()) t.splice(3, 0, ["team", "Team"]);  // admin que además lidera un team acá
     return t;
   }
   if (me.rol === "jefe") {
-    const t = [["accesos", "Accesos"], ["pagos", "Pagos"], ["mesas", "Mesas"]];
+    const t = [["accesos", "Accesos"], ["mesas", "Mesas"]];
     if (lideraAca()) t.push(["team", "Mi team"]);       // jefe solo en el boliche de su team
     t.push(["stats", me.rol === "jefe" && lideraAca() ? "Stats" : "Mis stats"]);
     return t;
   }
-  return [["accesos", "Accesos"], ["pagos", "Pagos"], ["mesas", "Mesas"], ["stats", "Mis stats"]];
+  return [["accesos", "Accesos"], ["mesas", "Mesas"], ["stats", "Mis stats"]];
 }
 const homeTab = () => tabsFor()[0][0];
 /* La navegación sale de una sola fuente (tabsFor) y se pinta en dos
@@ -763,35 +826,49 @@ const homeTab = () => tabsFor()[0][0];
    una es la forma natural de su dispositivo, no la misma comprimida. */
 function buildTabbar() {
   const items = tabsFor();
+  const extras = accionesMas();
   $("#tabbar").innerHTML = items.map(([t, l]) =>
-    `<button data-t="${t}" title="${esc(l)}"><svg viewBox="0 0 24 24" class="ic">${TAB_ICONS[t]}</svg><span>${esc(l)}</span></button>`).join("");
+    `<button data-t="${t}" title="${esc(l)}"><svg viewBox="0 0 24 24" class="ic">${TAB_ICONS[t]}</svg><span>${esc(l)}</span></button>`).join("")
+    + (extras.length ? `<div class="nav-sep" role="presentation"><span>Más</span></div>` + extras.map(([k, l]) =>
+      `<button data-x="${k}" title="${esc(l)}"><svg viewBox="0 0 24 24" class="ic">${EXTRA_ICONS[k]}</svg><span>${esc(l)}</span></button>`).join("") : "");
 
   // En el celular entran cuatro; el resto va detrás de "Más".
   const bn = $("#botnav");
   if (bn) {
-    const vis = items.slice(0, 4), resto = items.slice(4);
+    const mas = items.length > MAS_TABS || extras.length;
+    const vis = items.slice(0, mas ? MAS_TABS : items.length), resto = items.slice(vis.length);
     bn.innerHTML = vis.map(([t, l]) =>
       `<button data-t="${t}"><svg viewBox="0 0 24 24" class="ic">${TAB_ICONS[t]}</svg><span>${esc(l)}</span></button>`).join("")
-      + (resto.length ? `<button data-mas="1"><svg viewBox="0 0 24 24" class="ic"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>Más</span></button>` : "");
+      + ((resto.length || extras.length) ? `<button data-mas="1"><svg viewBox="0 0 24 24" class="ic"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>Más</span></button>` : "");
   }
   setTab();
 }
 
 const irATab = t => { tab = t; setTab(); renderTab(); cerrarNav(); };
-$("#tabbar").onclick = e => { const b = e.target.closest("button"); if (b) irATab(b.dataset.t); };
+$("#tabbar").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.x) return accionesMas().find(([k]) => k === b.dataset.x)?.[2]();
+  irATab(b.dataset.t);
+};
 $("#botnav") && ($("#botnav").onclick = e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.mas) return sheetMasTabs();
   irATab(b.dataset.t);
 });
 
-/* Las secciones que no entran en la barra inferior del celular. */
+/* "Más" del celular: las secciones que no entran en la barra inferior y
+   los accesos secundarios (usuarios, rechazados, lista de la caja, QRs). */
 function sheetMasTabs() {
-  const resto = tabsFor().slice(4);
-  sheet(`<div class="sh-h">Más secciones</div>
-    <div class="mas-grid">${resto.map(([t, l]) =>
-      `<button class="mas-item" data-mt="${t}"><svg viewBox="0 0 24 24" class="ic">${TAB_ICONS[t]}</svg><span>${esc(l)}</span></button>`).join("")}</div>`);
+  const resto = tabsFor().slice(MAS_TABS), extras = accionesMas();
+  sheet(`<div class="sh-h">Más</div>
+    ${resto.length ? `<div class="mas-grid">${resto.map(([t, l]) =>
+      `<button class="mas-item" data-mt="${t}"><svg viewBox="0 0 24 24" class="ic">${TAB_ICONS[t]}</svg><span>${esc(l)}</span></button>`).join("")}</div>` : ""}
+    ${extras.length ? `<div class="mas-lista"${resto.length ? ' style="margin-top:14px"' : ""}>${extras.map(([k, l]) =>
+      `<button class="mas-op" data-mx="${k}"><svg viewBox="0 0 24 24" class="ic">${EXTRA_ICONS[k]}</svg><span>${esc(l)}</span>
+        <svg viewBox="0 0 24 24" class="ic mas-chev"><path d="M9 6l6 6-6 6"/></svg></button>`).join("")}</div>` : ""}`);
   document.querySelectorAll("#sheetBody [data-mt]").forEach(b => b.onclick = () => { closeSheet(); irATab(b.dataset.mt); });
+  document.querySelectorAll("#sheetBody [data-mx]").forEach(b => b.onclick = () =>
+    extras.find(([k]) => k === b.dataset.mx)?.[2]());
 }
 
 function setTab() {
@@ -799,7 +876,7 @@ function setTab() {
     b.classList.toggle("on", b.dataset.t === tab));
   // "Más" queda marcado cuando la sección activa vive dentro de él.
   const mas = document.querySelector("#botnav [data-mas]");
-  if (mas) mas.classList.toggle("on", !tabsFor().slice(0, 4).some(([t]) => t === tab));
+  if (mas) mas.classList.toggle("on", !tabsFor().slice(0, MAS_TABS).some(([t]) => t === tab));
 }
 
 /* Menú lateral: fijo en escritorio, deslizable en celular. */
@@ -807,10 +884,6 @@ const cerrarNav = () => {
   $("#app").classList.remove("nav-open");
   $("#navScrim") && $("#navScrim").classList.remove("show");
 };
-$("#tbMenu") && ($("#tbMenu").onclick = () => {
-  $("#app").classList.add("nav-open");
-  $("#navScrim").classList.add("show");
-});
 $("#navScrim") && ($("#navScrim").onclick = cerrarNav);
 
 /* Contraer la barra lateral: en jornadas largas se gana ancho para las
@@ -861,7 +934,7 @@ function renderTab() {
   if (tab === "rrpps") return conPantalla(screenRrppsPuerta);   // consulta del portero
   if (!ev && tab !== "eventos") {
     const verHist = ["rrpp", "jefe"].includes(me.rol);
-    $("#main").innerHTML = `<div class="empty">No hay eventos próximos en este boliche.${me.rol === "admin" ? " Creá uno en Eventos." : ""}</div>${verHist ? `<div style="text-align:center;margin-top:8px"><button class="btn ghost2" style="width:auto;padding:10px 18px" id="btnHistVacio">📅 Ver eventos pasados</button></div>` : ""}`;
+    $("#main").innerHTML = `<div class="empty">No hay eventos próximos en este boliche.${me.rol === "admin" ? " Creá uno en Eventos." : ""}</div>${verHist ? `<div style="text-align:center;margin-top:8px"><button class="btn ghost2" style="width:auto;padding:10px 18px" id="btnHistVacio">Ver eventos pasados</button></div>` : ""}`;
     const bh = $("#btnHistVacio"); if (bh) bh.onclick = sheetHistorialRrpp;
     return;
   }
@@ -869,7 +942,6 @@ function renderTab() {
   if (tab === "mesas") return conPantalla(screenMesas);
   if (tab === "entradas") return conPantalla(screenEntradas);
   if (tab === "listas") return conPantalla(screenListas);
-  if (tab === "pagos") return conPantalla(screenPagos);
   if (tab === "stats") return conPantalla(screenStats);
   if (tab === "team") return conPantalla(screenTeam);
   if (tab === "eventos") return conPantalla(screenEventos);
@@ -994,14 +1066,14 @@ async function screenEntradas() {
         ${canSell ? `<button class="ghost en-cfg" id="btnCfg" title="Configuración">Configuración ⋯</button>` : ""}
       </div>
     </div>
-    ${truncado ? `<div class="hint" style="color:var(--danger);margin:0 0 10px">⚠️ Hay más de ${tks.length} entradas y no entraron todas — los conteos de esta pantalla están incompletos. Mirá el Reporte.</div>` : ""}
+    ${truncado ? `<div class="hint" style="color:var(--danger);margin:0 0 10px">Hay más de ${tks.length} entradas y no entraron todas — los conteos de esta pantalla están incompletos. Mirá el Reporte.</div>` : ""}
     ${canSell && ev.venta_por_fases ? (fase
       ? `<div class="en-fase ok">Fase abierta: <b>${esc(fase.nombre)}</b> · ${fmtBs(fase.precio)} Bs${fase.quedan_team != null ? ` · te quedan ${fase.quedan_team} de tu team` : fase.quedan != null ? ` · quedan ${fase.quedan}` : ""}</div>`
       : `<div class="en-fase bad">No hay ninguna fase de venta abierta ahora mismo</div>`) : ""}
     ${canSell && miVentana?.hasta ? `<div class="en-fase ${new Date(miVentana.hasta) < new Date() ? "bad" : ""}">${new Date(miVentana.hasta) < new Date() ? "Ya cerró tu venta de prepagadas" : "Podés vender prepagadas hasta las " + hora(miVentana.hasta)}${miVentana.origen === "team" ? " (horario de tu team)" : miVentana.origen === "persona" ? " (horario tuyo)" : ""}</div>` : ""}
     <div id="tkView"></div>
     ${canSell ? `<div class="cta-zona" id="genZona">
-      <button class="btn primary cta-abrir" id="btnGenOpen"${ev.venta_por_fases && !fase ? " disabled" : ""}>＋ Generar entrada</button>
+      <button class="btn primary cta-abrir" id="btnGenOpen"${ev.venta_por_fases && !fase ? " disabled" : ""}>Generar entrada</button>
     </div>` : ""}
     <div class="en-tools">
       ${tks.length > 8 ? `<div class="en-buscar"><input id="tkFilter" placeholder="Buscar por nombre o código…" autocomplete="off"></div>` : ""}
@@ -1093,7 +1165,7 @@ async function screenEntradas() {
   const zona = $("#genZona");
   const btnAbrir = () => {
     if (!zona) return;
-    zona.innerHTML = `<button class="btn primary cta-abrir" id="btnGenOpen"${ev.venta_por_fases && !fase ? " disabled" : ""}>＋ Generar entrada</button>`;
+    zona.innerHTML = `<button class="btn primary cta-abrir" id="btnGenOpen"${ev.venta_por_fases && !fase ? " disabled" : ""}>Generar entrada</button>`;
     conectarAbrirGen();
   };
   function conectarAbrirGen() {
@@ -1209,7 +1281,7 @@ async function screenEntradas() {
     const n = marcados().length;
     barra.classList.toggle("hidden", n === 0);
     cuenta.textContent = `${n} marcada${n === 1 ? "" : "s"}`;
-    $("#tkTandaGo").textContent = `📤 Enviar (${n})`;
+    $("#tkTandaGo").textContent = `Enviar (${n})`;
   };
   document.querySelectorAll("#tkList [data-pick]").forEach(c => c.onchange = refrescarBarra);
   /* Exportar lo seleccionado: se copia al portapapeles en columnas, listo
@@ -1485,7 +1557,7 @@ async function enviarTanda(tks) {
     }
     toast(`${files.length} entradas descargadas`);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = `📤 Enviar (${tks.length})`; }
+    if (btn) { btn.disabled = false; btn.textContent = `Enviar (${tks.length})`; }
   }
 }
 
@@ -2232,7 +2304,7 @@ async function screenListas(soloPintar) {
             datos de esa lista. Acá sólo aparece cuando no hay ninguna
             abierta, para que agregar no quede sin acceso. */
         canAdd && listaTipos.length && !listaSelId
-          ? `<button class="btn primary iv-add" data-addlt="${listaTipos[0].id}">＋ Agregar invitados</button>` : ""}
+          ? `<button class="btn primary iv-add" data-addlt="${listaTipos[0].id}">Agregar invitados</button>` : ""}
     </div>
     <div class="iv-tools">
       <div class="iv-buscar"><input id="lsBuscar" placeholder="Buscar por nombre en todas las listas…" autocomplete="off"></div>
@@ -2254,7 +2326,7 @@ async function screenListas(soloPintar) {
       <span id="lsTandaN">0 marcados</span>
       <div style="display:flex;gap:7px">
         <button class="btn ghost2" id="lsTandaOff" style="padding:9px 13px">Limpiar</button>
-        <button class="btn primary" id="lsTandaGo" style="padding:9px 15px">📤 Enviar</button>
+        <button class="btn primary" id="lsTandaGo" style="padding:9px 15px">Enviar</button>
       </div>
     </div>
     <div id="lsAcordeon">${listaTipos.map(l => {
@@ -2287,7 +2359,7 @@ async function screenListas(soloPintar) {
         ${on ? `<div class="lst-body">
           ${canAdd ? `
           <div class="cta-zona" data-zona="${l.id}">
-            <button class="btn primary cta-abrir" data-addlt="${l.id}" data-dentro="1">＋ Agregar invitados</button>
+            <button class="btn primary cta-abrir" data-addlt="${l.id}" data-dentro="1">Agregar invitados</button>
             <span class="iv-cupo">${cupoTxt}</span>
           </div>` : ""}
           ${rs.length > 1 ? `<button class="btn ghost2 accbtn ${lsSortAcc ? "primary" : ""}" id="lstSort" style="margin-bottom:12px">${accLabel(lsSortAcc)}</button>` : ""}
@@ -2408,7 +2480,7 @@ async function screenListas(soloPintar) {
     const n = lsMarcados.size;
     if (lsBarra) lsBarra.classList.toggle("hidden", n === 0);
     if (lsCuenta) lsCuenta.textContent = `${n} marcado${n === 1 ? "" : "s"}`;
-    const g = $("#lsTandaGo"); if (g) g.textContent = `📤 Enviar (${n})`;
+    const g = $("#lsTandaGo"); if (g) g.textContent = `Enviar (${n})`;
   };
   qsa("#main [data-lpick]").forEach(c => c.onchange = () => {
     if (c.checked) lsMarcados.add(c.dataset.lpick); else lsMarcados.delete(c.dataset.lpick);
@@ -2522,7 +2594,7 @@ async function screenListas(soloPintar) {
     // Cerrar devuelve el botón sin tocar el QR, los filtros ni el scroll.
     const bc = $("#addCerrar");
     if (bc) bc.onclick = () => {
-      zonaL.innerHTML = `<button class="btn primary cta-abrir" data-addlt="${lt.id}" data-dentro="1">＋ Agregar invitados</button>`;
+      zonaL.innerHTML = `<button class="btn primary cta-abrir" data-addlt="${lt.id}" data-dentro="1">Agregar invitados</button>`;
       conectarAgregarLista();
     };
 
@@ -2574,7 +2646,7 @@ async function screenListaPuerta() {
     <div class="sh-h">Lista en puerta · ${esc(ev.nombre)}</div>
     <div style="display:flex;gap:8px;align-items:flex-start">
       <div class="field" style="flex:1"><input id="pq" placeholder="Buscar nombre…" autocomplete="off"></div>
-      <button class="ghost" id="pqRefresh" title="Traer lo último" style="padding:13px 15px;flex-shrink:0">🔄</button>
+      <button class="ghost" id="pqRefresh" title="Traer lo último" style="padding:13px 15px;flex-shrink:0" aria-label="Traer lo último">${ico("recargar")}</button>
     </div>
     <div class="hint" style="margin:-4px 0 10px">Buscá por nombre y marcá el ingreso. Sirve para los de lista y también para los que compraron manilla pero no tienen el QR a mano.</div>
     <div id="prows"><div class="empty">Escribí al menos 2 letras.</div></div>`;
@@ -2611,7 +2683,7 @@ async function screenListaPuerta() {
         <div class="r-l"><span class="relmark" style="${r.sin_tope ? "background:rgba(232,181,48,.16);color:#e8b530" : "background:var(--mesa-bg);color:var(--mesa)"}">Q</span>
           <span>${esc(r.nombre)}${r.sin_tope ? ` <span class="oro-chip">de la casa</span>` : ""}${r.filtro_at ? ` <span class="flag-badge">no pasó filtro</span>` : ""}<br><small style="color:var(--text-3)">${esc(r.lista)} · #${esc(r.code)} · ${r.sin_tope ? "invitación de" : "vendió"} ${esc(r.rrpp)}</small></span></div>
         <div style="display:flex;gap:6px;align-items:center">
-          ${r.sin_tope ? "" : `<button class="flagbtn${r.filtro_at ? " on" : ""}" data-flag-e="${esc(r.code)}" title="Marcar: no pasó el control del boliche">⚑</button>`}
+          ${r.sin_tope ? "" : `<button class="flagbtn${r.filtro_at ? " on" : ""}" data-flag-e="${esc(r.code)}" title="Marcar: no pasó el control del boliche" aria-label="Marcar: no pasó el control del boliche">${ico("bandera")}</button>`}
           ${r.estado === "anulada"
             ? `<span class="tkst" style="background:var(--danger-bg);color:var(--danger);font-size:11px">anulada</span>`
             : r.ingreso_at
@@ -2625,7 +2697,7 @@ async function screenListaPuerta() {
         <div class="r-l"><span class="relmark">${esc((r.rrpp || "?")[0])}</span>
           <span>${esc(r.nombre)}${r.filtro_at ? ` <span class="flag-badge">no pasó filtro</span>` : ""}<br><small style="color:var(--text-3)">${esc(r.lista || "")} · lo anotó ${esc(r.rrpp || "?")}</small></span></div>
         <div style="display:flex;gap:6px;align-items:center">
-          ${r.sin_tope ? "" : `<button class="flagbtn${r.filtro_at ? " on" : ""}" data-flag="${r.id}" data-nom="${esc(r.nombre)}" title="Marcar: no pasó el control del boliche">⚑</button>`}
+          ${r.sin_tope ? "" : `<button class="flagbtn${r.filtro_at ? " on" : ""}" data-flag="${r.id}" data-nom="${esc(r.nombre)}" title="Marcar: no pasó el control del boliche" aria-label="Marcar: no pasó el control del boliche">${ico("bandera")}</button>`}
           ${r.ingreso_at
             ? `<span class="ce-time">${hora(r.ingreso_at)}</span><button class="cebox on" data-unreg="${r.id}" title="Tocá para desmarcar">✓</button>`
             : `<button class="cebox" data-reg="${r.id}" aria-label="Marcar ingreso"></button>`}
@@ -2634,13 +2706,13 @@ async function screenListaPuerta() {
     document.querySelectorAll("#prows [data-flag-e]").forEach(b => b.onclick = async () => {
       const { data, error: e2 } = await sb.rpc("marcar_filtro_entrada", { p_evento: ev.id, p_code: b.dataset.flagE });
       if (e2) return fail(e2);
-      toast(data.marcado ? `⚑ ${data.nombre} marcado — vendió ${data.rrpp}` : `Marca quitada a ${data.nombre}`, data.marcado ? "warn" : "ok");
+      toast(data.marcado ? `${data.nombre} marcado — vendió ${data.rrpp}` : `Marca quitada a ${data.nombre}`, data.marcado ? "warn" : "ok");
       buscar();
     });
     document.querySelectorAll("#prows [data-flag]").forEach(b => b.onclick = async () => {
       const { data, error: e2 } = await sb.rpc("marcar_filtro_registro", { p_registro: b.dataset.flag });
       if (e2) return fail(e2);
-      toast(data.marcado ? `⚑ ${data.nombre} marcado — lo trajo ${data.rrpp}` : `Marca quitada a ${data.nombre}`, data.marcado ? "warn" : "ok");
+      toast(data.marcado ? `${data.nombre} marcado — lo trajo ${data.rrpp}` : `Marca quitada a ${data.nombre}`, data.marcado ? "warn" : "ok");
       buscar();
     });
     // manilla prepagada sin QR a mano: pasa por el MISMO camino que el escáner,
@@ -2830,8 +2902,8 @@ async function screenCaja() {
       ? ` Evento: <b style="color:var(--text-2)">${esc(evActivo.nombre)}</b>${evActivo.estado === "cerrado" ? " (ya cerrado — se sigue pudiendo marcar)" : ""}.`
       : ` <span style="color:var(--warn)">Este boliche todavía no tiene ningún evento creado — pedile al admin que lo cree para poder marcar.</span>`}</div>
     ${filtroOn ? `<div class="hint" style="margin:-6px 0 12px;color:var(--accent-2)">
-      ⚑ Lista filtrada: sólo los que cargaron prepagadas en este evento${gente.length ? ` (${gente.length})` : ""}. Si falta alguien, se agrega desde “Lista de la caja” en el perfil.</div>` : ""}
-    <div class="field"><input id="cjBuscar" placeholder="🔍 Buscar relacionador…" autocomplete="off"></div>
+      Lista filtrada: sólo los que cargaron prepagadas en este evento${gente.length ? ` (${gente.length})` : ""}. Si falta alguien, se agrega desde “Lista de la caja” en el perfil.</div>` : ""}
+    <div class="field"><input id="cjBuscar" placeholder="Buscar relacionador…" autocomplete="off"></div>
     <div id="cjResultados" class="hidden"></div>
     <div id="cjTeams">${teams.map(t => `
       <div class="lst-card ${cajaSel === t ? "open" : ""}" data-cjt="${esc(t)}">
@@ -2928,8 +3000,8 @@ async function screenRrppsPuerta() {
     <div class="hint" style="margin:0 0 12px">Buscá al relacionador para ver a qué team pertenece.${
       evA ? ` Evento: <b style="color:var(--text-2)">${esc(evA.nombre)}</b>.` : ""}</div>
     ${filtroOn ? `<div class="hint" style="margin:-6px 0 12px;color:var(--accent-2)">
-      ⚑ Lista filtrada: sólo los que cargaron prepagadas en este evento.</div>` : ""}
-    <div class="field"><input id="rpBuscar" placeholder="🔍 Buscar relacionador…" autocomplete="off"></div>
+      Lista filtrada: sólo los que cargaron prepagadas en este evento.</div>` : ""}
+    <div class="field"><input id="rpBuscar" placeholder="Buscar relacionador…" autocomplete="off"></div>
     <div id="rpResultados" class="hidden"></div>
     <div id="rpTeams">${teams.map(t => `
       <div class="lst-card ${rpSel === t ? "open" : ""}" data-rpt="${esc(t)}">
@@ -2953,236 +3025,6 @@ async function screenRrppsPuerta() {
     rtm.classList.add("hidden"); rres.classList.remove("hidden");
     rres.innerHTML = hits.map(fila).join("")
       || `<div class="empty">Sin resultados para “${esc(rb.value.trim())}”.</div>`;
-  };
-}
-
-/* ============================================================
-   PAGOS QR DE COBRO (rrpp registra · admin verifica · jefe ve su team)
-   pendiente → pagado → verificado (solo admin avanza estados)
-   ============================================================ */
-const PAGO_LABEL = { pendiente: "Pendiente", pagado: "Pagado", verificado: "Verificado" };
-let lastPagos = [];
-async function screenPagos() {
-  const canPayQ = ["rrpp", "jefe"].includes(me.rol);
-  const [{ data: pagos, error }, { data: clubRow }, { data: teamRow }, { count: vendidasCnt }] = await conDatos("pagos", () => Promise.all([
-    sb.from("pagos").select("*, p:profiles!pagos_rrpp_id_fkey(nombre)")
-      .eq("evento_id", ev.id).order("created_at", { ascending: false }).limit(1000),
-    sb.from("clubs").select("qr_cobro_url").eq("id", club).single(),
-    me.team_id ? sb.from("teams").select("qr_cobro_url").eq("id", me.team_id).single() : Promise.resolve({ data: null }),
-    // el conteo del resumen del relacionador viajaba en una SEGUNDA tanda
-    canPayQ ? sb.from("entradas").select("id", { count: "exact", head: true })
-      .eq("evento_id", ev.id).eq("rrpp_id", me.id).is("mesa_id", null).neq("estado", "anulada")
-      : Promise.resolve({ count: 0 })
-  ]));
-  if (error) throw error;   // lo muestra conPantalla con Reintentar
-  lastPagos = pagos || [];
-  const clubQr = clubRow?.qr_cobro_url || null;
-  const teamQr = teamRow?.qr_cobro_url || null;
-  // el rrpp le rinde a su jefe (QR del team, SIN caer al del boliche — la plata
-  // de cada team va a su jefe); jefe/otros al boliche (QR del club)
-  const qrUrl = me.rol === "rrpp" ? teamQr : clubQr;
-  const aRendirA = me.rol === "rrpp" ? "tu jefe" : "el boliche";
-  const sum = arr => arr.reduce((a, p) => a + +p.monto, 0);
-  const ver = lastPagos.filter(p => p.estado === "verificado");
-  const pen = lastPagos.filter(p => p.estado !== "verificado");
-  const canPay = ["rrpp", "jefe"].includes(me.rol);
-  // resumen del relacionador: lo que genera (su parte por manilla) y lo que debe rendir al boliche
-  let miResumen = "", aRendir = 0;
-  if (canPay) {
-    const v = vendidasCnt || 0;   // ya vino en la tanda inicial
-    const cut = cutRrpp();
-    const misPagos = sum(lastPagos.filter(p => p.rrpp_id === me.id));
-    const recaudado = v * ev.precio_manilla, genero = v * cut;
-    aRendir = Math.max(recaudado - genero - misPagos, 0);
-    miResumen = `
-      <div class="stat" style="grid-column:1/-1"><span class="k">Lo que generás (${fmtBs(cut)} Bs × ${v} manilla${v === 1 ? "" : "s"})</span><span class="v ok">${fmtBs(genero)} Bs</span></div>
-      <div class="stat"><span class="k">Cobraste (${v} × ${fmtBs(ev.precio_manilla)})</span><span class="v">${fmtBs(recaudado)} Bs</span></div>
-      <div class="stat"><span class="k">A rendir a ${aRendirA}${misPagos ? ` <small>(ya rendiste ${fmtBs(misPagos)})</small>` : ""}</span><span class="v" style="color:var(--warn)">${fmtBs(aRendir)} Bs</span></div>`;
-  }
-  $("#main").innerHTML = `
-    <div class="sh-h">Pagos · ${esc(ev.nombre)}<span class="r-sub">${lastPagos.length} pagos · ${fmtBs(sum(lastPagos))} Bs</span>
-      <button class="ghost" id="pgQrCobro" style="min-height:36px;padding:8px 13px;font-size:12.5px">QR de cobro</button></div>
-    <div class="stats" style="margin-bottom:12px">
-      <div class="stat st-ok"><span class="st-ic ok">${IC.shield}</span><span class="k">Verificados</span><span class="v ok">${ver.length} · ${fmtBs(sum(ver))} Bs</span></div>
-      <div class="stat st-vio"><span class="st-ic vio">${IC.clock}</span><span class="k">Por verificar</span><span class="v">${pen.length} · ${fmtBs(sum(pen))} Bs</span></div>
-    </div>
-    ${miResumen ? `<div class="stats" style="margin-bottom:12px">${miResumen}</div>` : ""}
-    ${canPay ? `<button class="btn primary" id="btnPagar" style="font-size:17px">💳 PAGAR → ${fmtBs(aRendir > 0 ? aRendir : netoPorManilla())} Bs</button>
-    <div class="hint" style="margin:8px 0 4px">PAGAR = transferí a ${aRendirA} lo que te queda por rendir (el monto se puede editar). "A rendir" = cobrado − tu comisión − lo ya rendido.${me.rol === "rrpp" && !teamQr ? " ⚠️ Tu jefe todavía no subió su QR de cobro — pedíselo antes de transferir." : ""}</div>` : ""}
-    ${me.rol === "admin" ? `<div class="ph-actions" style="margin:4px 0 10px">
-      <button class="ghost" id="btnQrCobro">💳 QRs de cobro</button>
-    </div>` : ""}
-    ${me.rol === "jefe" && me.team_id ? `<div class="ph-actions" style="margin:4px 0 10px">
-      <button class="ghost" id="btnQrTeam">${teamQr ? "Mi QR ✓ · cambiar (lo ven mis relacionadores)" : "Subir mi QR de cobro (para mis relacionadores)"}</button>
-    </div>` : ""}
-    <div class="sh-h" style="margin-top:14px">Movimientos</div>
-    <div>${lastPagos.map(pg => `
-      <div class="list-row rc">
-        <div class="r-l" style="cursor:pointer;flex:1;min-width:0;gap:11px;align-items:flex-start" data-vou="${pg.id}">
-          <span class="pago-chip ${pg.estado}">${PAGO_LABEL[pg.estado]}</span>
-          <span class="rc-body">
-            <span class="rc-nm">${fmtBs(pg.monto)} Bs — ${esc(pg.p?.nombre || "?")}</span>
-            <span class="rc-sub">${IC.clock2}<span>${hora(pg.created_at)}${pg.concepto ? " · " + esc(pg.concepto) : ""}${pg.comprobante_url ? " · 📎 captura" : ""}</span></span>
-          </span>
-        </div>
-        ${me.rol === "admin" && pg.estado !== "verificado"
-          ? `<button class="checkin" data-adv="${pg.id}" data-next="${pg.estado === "pendiente" ? "pagado" : "verificado"}">${pg.estado === "pendiente" ? "→ Pagado" : "→ Verificar"}</button>` : ""}
-      </div>`).join("") || `<div class="empty">Sin pagos registrados en este evento.</div>`}
-    </div>
-    <input type="file" id="compFile" accept="image/*" class="hidden">
-    <input type="file" id="qrCobroFile" accept="image/*" class="hidden">`;
-  const bp = $("#btnPagar"); if (bp) bp.onclick = () => sheetCobrar(qrUrl, aRendir);
-  // El QR de cobro vive acá: es plata, no control de acceso. Misma utilidad.
-  const bqc = $("#pgQrCobro"); if (bqc) bqc.onclick = sheetQrManillas;
-  qsa("#main [data-vou]").forEach(r => r.onclick = () => sheetVoucher(r.dataset.vou));
-  qsa("#main [data-adv]").forEach(b => b.onclick = async () => {
-    const { error: e2 } = await sb.rpc("estado_pago", { p_pago: b.dataset.adv, p_estado: b.dataset.next });
-    if (e2) return fail(e2);
-    toast(`Pago marcado como ${PAGO_LABEL[b.dataset.next].toLowerCase()}`);
-    screenPagos();
-  });
-  const bq = $("#btnQrCobro");
-  if (bq) bq.onclick = sheetQrsCobro;
-  const bqt = $("#btnQrTeam");
-  if (bqt) bqt.onclick = () => {
-    const inp = $("#qrCobroFile");
-    inp.onchange = async () => {
-      const f = inp.files[0]; if (!f) return;
-      toast("Guardando tu QR…");
-      try {
-        const dataUrl = await comprimirImg(f, 900, 0.82);   // reduce cualquier captura a un tamaño chico
-        const { error: e2 } = await sb.rpc("set_team_qr", { p_url: dataUrl });
-        if (e2) return fail(e2);
-        toast("Tu QR quedó cargado — lo ven tus relacionadores");
-        screenPagos();
-      } catch (e) { fail(e); }
-    };
-    inp.click();
-  };
-}
-
-/* Comisión del relacionador por manilla ingresada. Son 15 Bs FIJOS: es lo
-   arreglado con la persona, no un porcentaje del cover. Si sube el precio
-   de la manilla la comisión no se mueve — antes sí se movía, y con la
-   manilla a 70 se iba sola a 17,50.
-   Orden: acuerdo propio de la persona → monto del evento → cuenta vieja,
-   por si algún evento quedara sin monto cargado. */
-function cutRrpp(perfil) {
-  const yo = perfil || me;
-  if (yo?.cut_rel != null) return +yo.cut_rel;
-  if (ev?.cut_rrpp != null) return +ev.cut_rrpp;
-  return ev.precio_manilla * (1 - ev.pct_boliche / 100) * (ev.pct_rrpp / 100);
-}
-
-/* lo que le queda al relacionador por cada manilla después de su comisión
-   (60 de precio − 15 de comisión = 45 a rendir) */
-function netoPorManilla() {
-  return Math.max(ev.precio_manilla - cutRrpp(), 0);
-}
-let claveDePago = null;
-function sheetCobrar(qrUrl, aRendir = 0) {
-  claveDePago = null;   // hoja nueva, pago nuevo
-  const esRendicion = aRendir > 0;
-  const aQuien = me.rol === "rrpp" ? "tu jefe" : "el boliche";
-  const esAdmin = me.rol === "admin";
-  // sin nada pendiente, se propone lo de UNA manilla ya sin comisión (no el precio al público)
-  const sugerido = esRendicion ? aRendir : netoPorManilla();
-  sheet(`
-    <div class="sh-h">${esRendicion ? "Rendir a " + aQuien : "Pagar a " + aQuien} · ${esc(ev.nombre)}</div>
-    ${qrUrl ? `<img src="${esc(qrUrl)}" alt="QR de cobro" style="width:100%;max-width:300px;display:block;margin:0 auto 14px;border-radius:14px;background:#fff;padding:10px">`
-      : `<div class="empty" style="margin-bottom:12px">Todavía no hay QR de cobro cargado — pedíselo antes de transferir.</div>`}
-    <div class="row2">
-      <div class="field"><label>Monto Bs</label><input id="pgM" type="number" value="${sugerido}"></div>
-      <div class="field"><label>N° de operación (opcional)</label><input id="pgOp" autocomplete="off"></div>
-    </div>
-    ${!esRendicion ? `<div class="hint" style="margin:-4px 0 10px">${fmtBs(netoPorManilla())} Bs por manilla — es el precio de ${fmtBs(ev.precio_manilla)} menos tu comisión. Si rendís varias, multiplicá.</div>` : ""}
-    <div class="field"><label>Concepto</label><input id="pgC" value="${esRendicion ? "Rendición" : "Manilla"} ${esc(ev.nombre)}"></div>
-    <div id="pgPrev"></div>
-    <button class="btn ghost2" id="pgFoto">📷 ${esAdmin ? "Adjuntar comprobante (opcional)" : "Subir foto del comprobante"}</button>
-    <div style="height:9px"></div>
-    <button class="btn primary" id="pgGo"${esAdmin ? "" : " disabled"}>Registrar pago hecho</button>
-    <input type="file" id="pgFile" accept="image/*" class="hidden">
-    <p class="hint" style="margin-top:10px">${esAdmin
-      ? "El pago nace <b>pendiente</b> hasta que lo verifiques contra el extracto."
-      : "Sin la foto de la transferencia el pago no se puede registrar. Nace <b>pendiente</b> hasta que el admin lo verifique contra el extracto."}</p>`);
-  let urlComp = null;
-  const inpPg = $("#pgFile");
-  inpPg.onchange = async () => {
-    const f = inpPg.files[0]; if (!f) return;
-    const bf = $("#pgFoto"); bf.disabled = true; bf.textContent = "Subiendo…";
-    try {
-      const blob = await dataUrlToBlob(await comprimirImg(f, 1100, 0.8));
-      const path = `${me.id}/pago-${Date.now()}.jpg`;
-      const { error: e1 } = await sb.storage.from("comprobantes").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
-      if (e1) throw e1;
-      urlComp = sb.storage.from("comprobantes").getPublicUrl(path).data.publicUrl;
-      $("#pgPrev").innerHTML = `<img src="${esc(urlComp)}" alt="comprobante" style="width:100%;max-width:240px;display:block;margin:0 auto 10px;border-radius:12px;border:1px solid var(--line-2)">`;
-      bf.textContent = "📷 Cambiar foto";
-      const go = $("#pgGo"); if (go) go.disabled = false;
-      toast("Comprobante cargado");
-    } catch (e) { fail(e); bf.textContent = "📷 Reintentar"; }
-    bf.disabled = false;
-  };
-  $("#pgFoto").onclick = () => inpPg.click();
-  $("#pgGo").onclick = async () => {
-    const monto = +$("#pgM").value;
-    if (!monto || monto <= 0) return toast("Monto inválido", "warn");
-    if (!esAdmin && !urlComp) return toast("Subí la foto del comprobante", "warn");
-    $("#pgGo").disabled = true;
-    /* La clave identifica ESTE pago: si el envío se repite (doble toque, mala
-       señal) el servidor devuelve el mismo en vez de registrar otro. */
-    claveDePago = claveDePago || crypto.randomUUID();
-    const { error } = await sb.rpc("crear_pago_unico", { p_evento: ev.id, p_monto: monto, p_concepto: $("#pgC").value, p_clave: claveDePago, p_nro: $("#pgOp").value, p_comprobante: urlComp });
-    $("#pgGo").disabled = false;
-    if (error) return fail(error);
-    toast("Pago registrado con su comprobante");
-    closeSheet(); screenPagos();
-  };
-}
-
-async function sheetVoucher(id) {
-  const pg = lastPagos.find(p => p.id === id); if (!pg) return;
-  const puedeAdj = pg.estado !== "verificado" && (pg.rrpp_id === me.id || me.rol === "admin");
-  sheet(`
-    <div class="voucher">
-      <div class="v-head">${esc(clubNombre(club).toUpperCase())} · COMPROBANTE DE PAGO</div>
-      <div style="margin:10px 0 2px"><span class="pago-chip ${pg.estado}">${PAGO_LABEL[pg.estado]}</span></div>
-      <div class="v-monto">${fmtBs(pg.monto)} Bs</div>
-      <div class="v-line"><span>Concepto</span><b>${esc(pg.concepto || "—")}</b></div>
-      <div class="v-line"><span>Fecha y hora</span><b>${new Date(pg.created_at).toLocaleString("es-BO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })}</b></div>
-      <div class="v-line"><span>Cobró</span><b>${esc(pg.p?.nombre || "—")}</b></div>
-      <div class="v-line"><span>N° operación</span><b>${esc(pg.nro_operacion || "—")}</b></div>
-      ${pg.comprobante_url ? `<img src="${esc(pg.comprobante_url)}" alt="captura" style="width:100%;border-radius:10px;margin-top:12px">` : ""}
-    </div>
-    ${puedeAdj ? `<button class="btn ghost2" id="vAdj" style="margin-top:12px">${pg.comprobante_url ? "Cambiar captura" : "📎 Adjuntar captura de la transferencia"}</button>` : ""}
-    ${me.rol === "admin" && pg.estado !== "pendiente" ? `<button class="btn ghost2" id="vBack" style="margin-top:10px">↩︎ Volver a ${pg.estado === "verificado" ? "pagado" : "pendiente"}</button>
-    <div class="hint" style="margin:8px 0 0">Por si verificaste o avanzaste un pago sin querer — lo devuelve un paso.</div>` : ""}`);
-  const vb = $("#vBack");
-  if (vb) vb.onclick = async () => {
-    const prev = pg.estado === "verificado" ? "pagado" : "pendiente";
-    const { error } = await sb.rpc("estado_pago", { p_pago: pg.id, p_estado: prev });
-    if (error) return fail(error);
-    toast(`Pago devuelto a ${prev}`, "warn");
-    closeSheet(); screenPagos();
-  };
-  const ba = $("#vAdj");
-  if (ba) ba.onclick = () => {
-    const inp = $("#compFile"); if (!inp) return;
-    inp.onchange = async () => {
-      const f = inp.files[0]; if (!f) return;
-      toast("Subiendo captura…");
-      // las fotos de celu vienen de 2-3 MB: se achican antes de subir
-      const blob = await dataUrlToBlob(await comprimirImg(f, 1100, 0.8));
-      const path = `${me.id}/${pg.id}.jpg`;
-      const { error: e1 } = await sb.storage.from("comprobantes").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
-      if (e1) return fail(e1);
-      const { data: { publicUrl } } = sb.storage.from("comprobantes").getPublicUrl(path);
-      const { error: e2 } = await sb.rpc("adjuntar_comprobante", { p_pago: pg.id, p_url: publicUrl + "?v=" + Date.now() });
-      if (e2) return fail(e2);
-      toast("Comprobante adjuntado");
-      closeSheet(); screenPagos();
-    };
-    inp.click();
   };
 }
 
@@ -3269,7 +3111,7 @@ async function validar(raw) {
       nombre: esc(r.cliente),
       titulo: r.lista ? esc(r.lista_nombre || "Lista")
         : r.mesa ? "Manilla de combo"
-        : r.sin_tope ? "Entrada de la casa 🥇" : "Entrada prepagada",
+        : r.sin_tope ? "Entrada de la casa" : "Entrada prepagada",
       // Quién lo consiguió: información de apoyo, después del cliente.
       quien: [r.rrpp ? esc(r.rrpp) : null, r.team ? `Team ${esc(r.team)}` : null].filter(Boolean).join(" · "),
       // La hora queda a la vista: es lo que se consulta si vuelve a pasar.
@@ -3335,7 +3177,7 @@ function pintarRes(cls, big, sub, flagCode) {
     <div class="res-top">
       <svg viewBox="0 0 24 24" class="ic res-ic">${RES_ICONS[cls]}</svg>
       <span class="res-vd">${VEREDICTO[cls] || ""}</span>
-      ${flagCode ? `<button class="flagbtn" id="scanFlag" data-code="${esc(flagCode)}" title="Marcar: no pasó el control del boliche">⚑</button>` : ""}
+      ${flagCode ? `<button class="flagbtn" id="scanFlag" data-code="${esc(flagCode)}" title="Marcar: no pasó el control del boliche" aria-label="Marcar: no pasó el control del boliche">${ico("bandera")}</button>` : ""}
     </div>
     ${o.nombre ? `<div class="res-nm">${o.nombre}</div>` : ""}
     <div class="res-tp">${o.titulo || ""}</div>
@@ -3351,7 +3193,7 @@ function pintarRes(cls, big, sub, flagCode) {
     if (error) return fail(error);
     if (data.resultado !== "ok") return toast("No se encontró la entrada", "warn");
     fb.classList.toggle("on", data.marcado);
-    toast(data.marcado ? `⚑ ${data.nombre} marcado — lo vendió ${data.rrpp}` : `Marca quitada a ${data.nombre}`, data.marcado ? "warn" : "ok");
+    toast(data.marcado ? `${data.nombre} marcado — lo vendió ${data.rrpp}` : `Marca quitada a ${data.nombre}`, data.marcado ? "warn" : "ok");
   };
 }
 async function renderScan() {
@@ -3426,7 +3268,7 @@ $("#scanCode").addEventListener("keydown", e => { if (e.key === "Enter") validar
 $("#btnSonido") && (function () {
   const b = $("#btnSonido");
   const pintar = () => {
-    b.textContent = scanMudo ? "🔇" : "🔊";
+    b.innerHTML = ico(scanMudo ? "mudo" : "sonido");
     b.setAttribute("aria-pressed", String(scanMudo));
     b.title = scanMudo ? "Activar el pitido del escáner" : "Silenciar el pitido del escáner";
     b.classList.toggle("on", scanMudo);
@@ -3708,7 +3550,7 @@ async function screenStats() {
     </div>
     ${["rrpp", "jefe"].includes(me.rol) ? `<div class="ph-actions" style="margin-bottom:14px;justify-content:flex-start">
       ${me.rol === "rrpp" ? `<button class="btn ghost2" style="width:auto" id="btnMisNombres">Ver mis nombres</button>` : ""}
-      <button class="btn ghost2" style="width:auto" id="btnHistStats">📅 Eventos pasados</button>
+      <button class="btn ghost2" style="width:auto" id="btnHistStats">Eventos pasados</button>
     </div>` : ""}
     ${me.rol === "admin" ? `
     <details class="rp-det">
@@ -3814,7 +3656,7 @@ async function sheetRrppDetalle(rrppId, nombre, evObj, onBack) {
       ${ingreso ? `<span class="ce-time">${hora(ingreso)}</span><span class="cebox on">✓</span>` : `<span class="tkst" style="background:var(--surface-3);color:var(--text-3);font-size:11px">sin ingresar</span>`}
     </div>`;
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="rdBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="rdBack">${ico("atras")}Volver</button>
     <div class="sh-h">${esc(nombre)}<span class="r-sub">${esc(e0.nombre)}${e0.fecha ? " · " + fmtF(e0.fecha) : ""}</span></div>
     <div class="stats" style="grid-template-columns:1fr 1fr;padding:0 0 14px">
       <div class="stat"><span class="k">Lista (entraron / anotó)</span><span class="v"><span class="ok">${ceL}</span>/${caL}</span></div>
@@ -3868,7 +3710,7 @@ async function sheetHistTeam(evObj) {
     cr: a.cr + +r.comision_rrpp + r.cm_r, cj: a.cj + +r.comision_jefe + r.cm_j, mv: a.mv + r.mv
   }), { an: 0, in: 0, ev_: 0, eu: 0, cr: 0, cj: 0, mv: 0 });
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="htBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="htBack">${ico("atras")}Volver</button>
     <div class="sh-h">Mi team<span class="r-sub">${esc(evObj.nombre)}${evObj.fecha ? " · " + fmtF(evObj.fecha) : ""}</span></div>
     <div class="stats" style="grid-template-columns:1fr 1fr;padding:0 0 14px">
       <div class="stat"><span class="k">Anotados en listas</span><span class="v">${tot.an}</span></div>
@@ -3900,7 +3742,7 @@ async function sheetHistorico(rango) {
     sb.rpc("ranking_rrpp", { p_club: club, p_desde: desde })
   ]);
   if (error) return fail(error);
-  const medal = i => i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+  const medal = i => `${i + 1}.`;
   sheet(`
     <div class="sh-h">Histórico · ${clubNombre(club)}</div>
     <div>${(hist || []).map(h => `
@@ -4049,7 +3891,7 @@ async function sheetTelefonos() {
         : `<button class="checkin" style="background:var(--warn-bg,var(--surface-3));color:var(--warn)" data-tel-ed="${g.user_id}" data-tel-nom="${esc(g.nombre)}" data-tel-val="">Cargar</button>`}
     </div>`;
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="telBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="telBack">${ico("atras")}Volver</button>
     <div class="sh-h">WhatsApp del equipo<span class="r-sub">${con.length} de ${gente.length} cargados</span></div>
     <div class="stats" style="grid-template-columns:1fr 1fr;padding:0 0 12px">
       <div class="stat st-ok"><span class="k">Ya lo cargaron</span><span class="v ok">${con.length}</span></div>
@@ -4070,7 +3912,7 @@ async function sheetTelefonos() {
     toast(`${con.length} números copiados`);
   };
   $("#telCopyFalta").onclick = () => {
-    if (!sin.length) return toast("Ya cargaron todos 🎉");
+    if (!sin.length) return toast("Ya cargaron todos");
     copyText(`Faltan pasar su WhatsApp:\n${sin.map(g => `• ${g.nombre}${g.team ? " (" + g.team + ")" : ""}`).join("\n")}`);
     toast(`${sin.length} nombres copiados`);
   };
@@ -4089,7 +3931,7 @@ function conectarEditarTel(volver) {
    pantalla —no sólo una fila dentro de un panel ya abierto. */
 function editarTelDe(id, nom, actual, volver) {
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="teBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="teBack">${ico("atras")}Volver</button>
     <div class="sh-h">${esc(nom)}<span class="r-sub">WhatsApp</span></div>
     <div class="field"><label>Celular</label>
       <input id="teN" type="tel" inputmode="numeric" placeholder="71234567" value="${actual ? esc(actual.startsWith("591") ? actual.slice(3) : actual) : ""}"></div>
@@ -4202,7 +4044,7 @@ async function screenGente() {
         <h2 class="iv-t">Administración de usuarios y equipos</h2>
         <p class="iv-s">${clubNom} · <b>${gente.length}</b> personas · <b>${teamsDelClub().length}</b> teams</p>
       </div>
-      <button class="btn primary iv-add" id="gnNuevo">＋ ${genteTab === "usuarios" ? "Nuevo usuario" : "Nuevo team"}</button>
+      <button class="btn primary iv-add" id="gnNuevo">${genteTab === "usuarios" ? "Nuevo usuario" : "Nuevo team"}</button>
     </div>
     <nav class="ac-subs gn-tabs" role="tablist">
       <button role="tab" class="ac-sub${genteTab === "usuarios" ? " on" : ""}" data-gt="usuarios">Usuarios</button>
@@ -4251,7 +4093,7 @@ function gnListaUsuarios(gente, telPorId) {
           <option value="1"${gnFEstado === "1" ? " selected" : ""}>Activos</option>
           <option value="0"${gnFEstado === "0" ? " selected" : ""}>Pausados</option>
         </select>
-        <button class="btn ghost2 gn-wa" id="gnTels">📱 WhatsApp</button>
+        <button class="btn ghost2 gn-wa" id="gnTels">WhatsApp</button>
       </div>
     </div>
     <div class="gn-tabla">
@@ -4335,13 +4177,13 @@ function gnVistaTeam(t) {
   const rrpps = miembros.filter(g => g._effRol === "rrpp");
   const invite = `${location.origin}${location.pathname}?invite=${t.invite_code}`;
   $("#main").innerHTML = `
-    <button class="btn ghost2 gn-volver" id="gnBack">← Todos los teams</button>
+    <button class="btn ghost2 gn-volver" id="gnBack">${ico("atras")}Todos los teams</button>
     <div class="iv-h">
       <div class="iv-h-tx">
         <h2 class="iv-t">${esc(t.nombre)}</h2>
         <p class="iv-s">${jefes.length ? `Jefe: <b>${esc(jefes.map(j => j.nombre).join(", "))}</b> · ` : ""}<b>${rrpps.length}</b> RRPP · <b>${miembros.length}</b> miembro${miembros.length === 1 ? "" : "s"} · ${clubTag(t.clubs)}</p>
       </div>
-      ${ev ? `<button class="btn primary iv-add" id="gnResumen">📋 Copiar resumen</button>` : ""}
+      ${ev ? `<button class="btn primary iv-add" id="gnResumen">Copiar resumen</button>` : ""}
     </div>
     <div class="dt-acc" style="flex-wrap:wrap;margin-bottom:16px">
       <button class="btn ghost2" id="ftInv">Copiar link de registro</button>
@@ -4387,7 +4229,7 @@ async function gnVistaUsuario(g) {
   const tel = gnTels[g.id] || "";
   const esRel = ["rrpp", "jefe"].includes(g._effRol);
   $("#main").innerHTML = `
-    <button class="btn ghost2 gn-volver" id="gnBack">← ${desdeTeam ? `Volver a ${esc(desdeTeam.nombre)}` : "Volver"}</button>
+    <button class="btn ghost2 gn-volver" id="gnBack">${ico("atras")}${desdeTeam ? `Volver a ${esc(desdeTeam.nombre)}` : "Volver"}</button>
     ${desdeTeam ? `<p class="gn-miga">Teams / ${esc(desdeTeam.nombre)} / <b>${esc(g.nombre)}</b></p>` : ""}
     <div class="iv-h">
       <div class="iv-h-tx" style="display:flex;gap:12px;align-items:center">
@@ -4409,12 +4251,12 @@ async function gnVistaUsuario(g) {
       <div id="gnStats"></div>
     </div>
     ${cuentaProtegida(g)
-      ? `<p class="hint gn-protegida" style="margin-top:14px">🛡️ Cuenta protegida — solo su dueño puede modificarla.</p>`
+      ? `<p class="hint gn-protegida" style="margin-top:14px">Cuenta protegida — solo su dueño puede modificarla.</p>`
       : `<div class="dt-acc" style="flex-wrap:wrap;margin-top:14px">
       <button class="btn primary" id="fuEdit">Editar</button>
       <button class="btn ghost2" id="fuPausa">${g.activo ? "Pausar" : "Activar"}</button>
       <button class="btn ghost2" id="fuTel">${tel ? "Cambiar número" : "Cargar número"}</button>
-      <button class="btn ghost2" id="fuClave">🔑 Resetear clave</button>
+      <button class="btn ghost2" id="fuClave">Resetear clave</button>
     </div>`}`;
   $("#gnBack").onclick = () => gnIr(desdeTeam ? { tipo: "team", id: desdeTeam.id } : null);
   gnConectarAccionesUsuario(g, tel);
@@ -4466,12 +4308,12 @@ async function sheetFichaUsuario(g) {
       <div id="gnStatsSheet"></div>
     </div>
     ${cuentaProtegida(g)
-      ? `<p class="hint gn-protegida">🛡️ Cuenta protegida — solo su dueño puede modificarla.</p>`
+      ? `<p class="hint gn-protegida">Cuenta protegida — solo su dueño puede modificarla.</p>`
       : `<div class="dt-acc" style="flex-wrap:wrap">
       <button class="btn primary" id="fuEdit">Editar</button>
       <button class="btn ghost2" id="fuPausa">${g.activo ? "Pausar" : "Activar"}</button>
       <button class="btn ghost2" id="fuTel">${tel ? "Cambiar número" : "Cargar número"}</button>
-      <button class="btn ghost2" id="fuClave">🔑 Resetear clave</button>
+      <button class="btn ghost2" id="fuClave">Resetear clave</button>
     </div>`}`);
   gnConectarAccionesUsuario(g, tel);
   gnPintarStats(g, esRel, "#gnStatsSheet");
@@ -4577,7 +4419,7 @@ async function sheetEditarUsuario(g) {
       ${misClubs.map(bloqueBoliche).join("")}` : ""}</div>
     <button class="btn primary" id="euGo">Guardar</button>
     <div style="height:12px"></div>
-    <button class="btn ghost2" id="euClave">🔑 Cambiar contraseña</button>
+    <button class="btn ghost2" id="euClave">Cambiar contraseña</button>
     <div style="height:10px"></div>
     <button class="btn danger" id="euDel">Eliminar usuario</button>
     <p class="hint" style="margin-top:8px">Si ya cargó manillas o listas, la cuenta se bloquea y deja de aparecer, pero lo que vendió sigue figurando con su nombre en los desgloses.</p>`);
@@ -4679,7 +4521,7 @@ function sheetEditarTeam(t, onDone) {
 function sheetBoliches() {
   sheet(`
     <div class="sh-h">Boliches<span class="r-sub">${clubsDisponibles.length}</span></div>
-    <button class="btn primary" id="clNuevo">＋ Nuevo boliche</button>
+    <button class="btn primary" id="clNuevo">Nuevo boliche</button>
     <div style="margin-top:14px">${clubsDisponibles.map(c => `
       <div class="list-row rc">
         <div class="r-l" style="flex:1">
@@ -4840,8 +4682,8 @@ async function screenTeam() {
       <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Link de registro: ${inviteUrl}</span>
       <button class="checkin" id="btnInv" style="flex-shrink:0">Copiar</button></div>` : ""}
     ${me.team_id && ev ? `<div class="ph-actions" style="margin-bottom:14px;justify-content:flex-start">
-      <button class="ghost" id="dgMan">📋 Manillas prepagadas</button>
-      <button class="ghost" id="dgPue">📋 Compras en puerta</button></div>` : ""}
+      <button class="ghost" id="dgMan">Manillas prepagadas</button>
+      <button class="ghost" id="dgPue">Compras en puerta</button></div>` : ""}
     <div class="row2">
       <div class="field"><label>Nombre</label><input id="nuNombre"></div>
       <div class="field"><label>Usuario</label><input id="nuUser" autocapitalize="none"></div>
@@ -4925,7 +4767,7 @@ async function screenTeamAdmin() {
       </div>
     </div>
     <div class="cta-zona" id="tmZona">
-      <button class="btn primary cta-abrir" id="btnNTOpen">＋ Crear team</button>
+      <button class="btn primary cta-abrir" id="btnNTOpen">Crear team</button>
     </div>
     <div class="tm-lista">${teams.map(t => {
       // Miembros de este team, con el jefe primero: es a quien se busca.
@@ -5011,7 +4853,7 @@ async function screenTeamAdmin() {
      formulario donde está, no un bloque siempre abierto. */
   const zonaT = $("#tmZona");
   const botonNT = () => {
-    zonaT.innerHTML = `<button class="btn primary cta-abrir" id="btnNTOpen">＋ Crear team</button>`;
+    zonaT.innerHTML = `<button class="btn primary cta-abrir" id="btnNTOpen">Crear team</button>`;
     conectarNT();
   };
   function conectarNT() {
@@ -5081,7 +4923,7 @@ function filaEvento(e) {
     <button class="ev-fila-nm" data-sel="${e.id}">
       <span class="ev-fila-t">${esc(e.nombre)}</span>
       <span class="ev-fila-e">
-        ${enCurso(e) ? '<span class="live-badge">● EN VIVO</span>' : `<span class="tag-estado ${esc(e.estado)}">${esc(e.estado)}</span>`}
+        ${enCurso(e) ? '<span class="estado-vivo">En vivo</span>' : `<span class="tag-estado ${esc(e.estado)}">${esc(ESTADO_EV[e.estado] || e.estado)}</span>`}
         ${e.publicado === false ? '<span class="ev-borr sm">Borrador</span>' : ""}
       </span>
     </button>
@@ -5102,7 +4944,7 @@ async function screenEventos() {
           <h1 class="in-t">Inicio</h1>
           <p class="in-s">Todavía no hay ningún boliche creado.</p>
         </div>
-        ${me.rol === "admin" ? `<button class="btn primary in-nuevo" id="irBoliches">＋ Crear boliche</button>` : ""}
+        ${me.rol === "admin" ? `<button class="btn primary in-nuevo" id="irBoliches">Crear boliche</button>` : ""}
       </header>
       <div class="empty">${me.rol === "admin"
         ? "Creá el primer boliche para empezar a cargar eventos."
@@ -5131,9 +4973,9 @@ async function screenEventos() {
     <section class="ev-card">
       <div class="ev-card-h">
         <span class="ev-mk">${clubMarkHTML(club)}</span>
-        ${enCurso(ev) ? '<span class="live-badge">● EN VIVO</span>'
-          : ev.fecha === hoyISO ? '<span class="hoy-badge">HOY</span>'
-          : `<span class="tag-estado ${esc(ev.estado)}">${esc(ev.estado)}</span>`}
+        ${enCurso(ev) ? '<span class="estado-vivo">En vivo</span>'
+          : ev.fecha === hoyISO ? '<span class="estado-hoy">Hoy</span>'
+          : `<span class="tag-estado ${esc(ev.estado)}">${esc(ESTADO_EV[ev.estado] || ev.estado)}</span>`}
         ${ev.publicado === false ? '<span class="ev-borr">Borrador · sólo lo ves vos</span>' : ""}
       </div>
 
@@ -5176,7 +5018,7 @@ async function screenEventos() {
       </div>
       <div style="display:flex;gap:8px">
         ${me.plataforma ? `<button class="btn ghost2" id="irBoliches" title="Administrar boliches">Boliches</button>` : ""}
-        <button class="btn primary in-nuevo" id="evNuevoBtn">＋ Crear nuevo evento</button>
+        <button class="btn primary in-nuevo" id="evNuevoBtn">Crear nuevo evento</button>
       </div>
     </header>
 
@@ -5202,7 +5044,7 @@ async function screenEventos() {
     </section>
 
     <div class="lst-card ${evPanelOpen ? "open" : ""}" id="evNewCard" ${evPanelOpen ? "" : "hidden"}>
-      <div class="lst-head"><span class="lst-nm">＋ Crear evento</span><span class="lst-cnt">${evPanelOpen ? "cerrar" : "abrir"}</span></div>
+      <div class="lst-head"><span class="lst-nm">Crear evento</span><span class="lst-cnt">${evPanelOpen ? "cerrar" : "abrir"}</span></div>
       ${evPanelOpen ? `<div class="lst-body">
         <div class="row2">
           <div class="field"><label>Nombre</label><input id="evNombre" placeholder="PECULIAR"></div>
@@ -5428,7 +5270,7 @@ async function sheetNuevoCliente() {
   function paso2(ltId) {
     const lt = listaTipos.find(l => l.id === ltId);
     $("#sheetBody").innerHTML = `
-      <div class="sh-h"><button class="nc-back" id="ncBack">←</button>${esc(lt.nombre)}<span class="r-sub">paso 2 · nombres</span></div>
+      <div class="sh-h"><button class="nc-back" id="ncBack" aria-label="Volver">${ico("atras")}</button>${esc(lt.nombre)}<span class="r-sub">paso 2 · nombres</span></div>
       <div class="field"><label>Nombres — un nombre completo por línea</label>
         <textarea id="ncNom" rows="4" autocomplete="off" placeholder="Andre Queirolo&#10;Jose Menacho&#10;Horacio Sandoval"></textarea></div>
       <button class="btn primary" id="ncGo">Anotar en ${esc(lt.nombre)}</button>
@@ -5474,7 +5316,7 @@ async function sheetEditarEvento(evId) {
     <div class="field"><label>QR válido hasta · opcional (después de esa hora el QR no ingresa)</label>
       <input id="eeQr" type="datetime-local" value="${e.entrada_hasta ? new Date(new Date(e.entrada_hasta).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ""}"></div>
     <p class="hint" style="margin:-4px 0 14px">La hora tope para anotar en cada lista se edita desde <b>Listas</b> (o el ⋮ de cada lista) → "Anotar hasta".</p>
-    <button class="btn ghost2" id="eeFases" style="margin-bottom:14px">🎫 Fases de preventa${e.venta_por_fases ? " · ACTIVADAS" : ""}</button>
+    <button class="btn ghost2" id="eeFases" style="margin-bottom:14px">Fases de preventa${e.venta_por_fases ? " · ACTIVADAS" : ""}</button>
     <div class="sh-h" style="font-size:14px;margin-top:6px">Cómo se venden las mesas</div>
     <div class="field"><label>Reservas</label>
       <div class="seg"><button type="button" class="segbtn ${e.permite_reserva !== false ? "on" : ""}" data-sw="res" data-v="1">Se puede reservar</button><button type="button" class="segbtn ${e.permite_reserva === false ? "on" : ""}" data-sw="res" data-v="0">Solo pagada</button></div></div>
@@ -5534,7 +5376,7 @@ async function sheetListas(evId) {
     return p.length ? p.join(" · ") : "sin límite";
   };
   $("#sheetBody").innerHTML = `
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="slBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="slBack">${ico("atras")}Volver</button>
     <div class="sh-h">Listas de ${esc(e.nombre)}</div>
     <div>${(lts || []).map((l, i) => {
       const vent = l.registro_desde || l.registro_hasta
@@ -5641,7 +5483,7 @@ function sheetEditarLista(l, evId, onDone, onBack) {
   const listo = onDone || (() => sheetListas(evId));
   const toLocal = ts => ts ? new Date(new Date(ts).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="elBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="elBack">${ico("atras")}Volver</button>
     <div class="sh-h">Editar lista</div>
     <div class="row2">
       <div class="field"><label>Nombre</label><input id="elN" value="${esc(l.nombre)}"></div>
@@ -5860,7 +5702,7 @@ async function barrerReservasVencidas() {
   try {
     const { data: lib } = await sb.rpc("liberar_reservas_vencidas", { p_evento: ev.id });
     const mias = (lib?.liberadas || []).filter(x => x.vendido_por === me.id);
-    if (mias.length) toast(`⏳ Se liberó ${mias.map(x => x.etiqueta).join(", ")} — la reserva venció sin pago`, "warn");
+    if (mias.length) toast(`Se liberó ${mias.map(x => x.etiqueta).join(", ")} — la reserva venció sin pago`, "warn");
   } catch (e) { /* si falla, el plano carga igual */ }
 }
 async function loadMesas() {
@@ -5933,6 +5775,12 @@ const pisosDe = () => {
   const p = FLOOR_ORDER.filter(f => presentes.includes(f));
   return p.length ? p : ["alta", "baja"];
 };
+/* zoom del plano: null = automático (en el celular arranca acercado para
+   que las mesas se lean; en escritorio, ajustado al ancho) */
+const ESTADO_EV = { proximo: "Próximo", activo: "Activo", cerrado: "Cerrado", borrador: "Borrador" };
+const ZOOMS = [1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+let planoZoom = null, planoX = null;   // planoX: centro visible, 0–1
+const zoomPlano = () => planoZoom ?? (innerWidth < 700 ? 1.75 : 1);
 async function screenMesas() {
   await Promise.all([loadMesas(), loadCombos(), loadTeams(), loadFondos()]);
   const pisos = pisosDe();
@@ -5953,12 +5801,12 @@ async function screenMesas() {
       <div class="ms-h-tx">
         <h2 class="ms-t">Mesas</h2>
         <p class="ms-s"><b>${oc.length}</b> de <b>${mesas.length}</b> ${esPortero ? "ocupadas" : "vendidas"}${
-          !esPortero && oc.length ? ` · <b>${fmtBs(oc.reduce((a, m) => a + (+m.precio || 0), 0))}</b> Bs` : ""}</p>
+          !esPortero && oc.length ? ` · <b>${fmtBs(oc.reduce((a, m) => a + (+m.precio || 0), 0))}</b> Bs` : ""}${pisos.length < 2 ? ` · ${esc(FLOOR_LABEL[planta] || planta)}` : ""}</p>
       </div>
       <div class="ms-h-acc" id="msAcc"></div>
     </div>
-    ${misRes.length ? `<div class="hint" style="color:var(--warn);margin:0 0 10px">⏳ Reservas sin pago: ${misRes.map(x => `${esc(x.etiqueta)} vence ${vence(x)}`).join(" · ")} — confirmá el pago o se liberan solas.</div>` : ""}
-    <div class="floors" style="margin:0 0 12px"><span class="ind" style="width:calc(${(100 / pisos.length).toFixed(2)}% - 5px);transform:translateX(${pisos.indexOf(planta) * 100}%)"></span>
+    ${misRes.length ? `<div class="hint" style="color:var(--warn);margin:0 0 10px">Reservas sin pago: ${misRes.map(x => `${esc(x.etiqueta)} vence ${vence(x)}`).join(" · ")} — confirmá el pago o se liberan solas.</div>` : ""}
+    <div class="floors${pisos.length < 2 ? " solo" : ""}" style="margin:0 0 12px"><span class="ind" style="width:calc(${(100 / pisos.length).toFixed(2)}% - 5px);transform:translateX(${pisos.indexOf(planta) * 100}%)"></span>
       ${pisos.map(f => `<button data-f="${f}" class="${planta === f ? "on" : ""}">${FLOOR_LABEL[f] || f}</button>`).join("")}</div>
     <div class="ms-acc">
       ${/* Afuera lo que se usa durante el evento: confirmar pagos, el
@@ -5972,26 +5820,32 @@ async function screenMesas() {
       ${me.rol === "admin" && editMode ? `
         <button class="ghost editing-on" id="btnEd">Listo</button>
         <button class="ghost${moverMesas ? " ms-mover" : ""}" id="btnLock">${moverMesas ? "Mover: activado" : "Posiciones bloqueadas"}</button>
-        <button class="ghost" id="btnAddM">＋ Mesa</button>
-        <button class="ghost" id="btnAddL">＋ Lounge</button>
+        <button class="ghost" id="btnAddM">Agregar mesa</button>
+        <button class="ghost" id="btnAddL">Agregar lounge</button>
         <button class="ghost" id="btnFondo">Fondo del ${FLOOR_LABEL[planta] || planta}${fondosCache[planta] ? " ✓" : ""}</button>
         ${!mesas.length ? `<button class="ghost" id="btnCopy">Copiar de otro evento</button>` : ""}
       ` : ""}
       ${/* Sólo el admin configura el plano: para el resto quedaría vacío. */""}
       ${!editMode && me.rol === "admin" ? `<button class="ghost ev-mas" id="msMas" title="Configuración del plano" aria-label="Configuración del plano">⋯</button>` : ""}
     </div>
-    <div class="canvas-wrap">
-      <div class="canvas ${editMode ? "editmode" : ""}" id="cv2">
+    <div class="plano">
+    <div class="canvas-wrap" id="cvWrap">
+      <div class="canvas ${editMode ? "editmode" : ""}" id="cv2" style="--z:${zoomPlano()}">
         ${fondosCache[planta] ? `<img class="cv-fondo" src="${esc(fondosCache[planta])}" alt="" crossorigin="anonymous">` : `<div class="watermark">${FLOOR_LABEL[planta] || planta}</div>`}
       </div>
     </div>
-    ${planta && pisos.length > 1 ? `<div class="hint" style="text-align:center;margin:6px 0 0;opacity:.6" id="scrollHint">← deslizá el plano de lado →</div>` : ""}
+    <div class="zoom" role="group" aria-label="Zoom del plano">
+      <button data-zoom="-1" aria-label="Alejar" title="Alejar">${ico("menos")}</button>
+      <button data-zoom="0" class="zoom-v" aria-label="Ajustar al ancho" title="Ajustar al ancho">${Math.round(zoomPlano() * 100)}%</button>
+      <button data-zoom="1" aria-label="Acercar" title="Acercar">${ico("mas")}</button>
+    </div>
+    </div>
     <input type="file" id="fondoFile" accept="image/*" class="hidden">
     <div class="legend">
-      <span><i class="sw" style="background:var(--surface-3);border:1.5px dashed var(--line-2)"></i>Libre</span>
-      <span><i class="sw" style="background:rgba(246,180,74,.4)"></i>Reservada</span>
-      <span><i class="sw" style="background:rgba(61,220,151,.4)"></i>Pagada</span>
-      <span><i class="sw" style="background:var(--accent-soft)"></i>Ocupada</span>
+      <span><i class="sw libre"></i>Libre</span>
+      <span><i class="sw reservada"></i>Reservada</span>
+      <span><i class="sw pagada"></i>Pagada</span>
+      <span><i class="sw ocupada"></i>Ocupada</span>
       <span class="hint">${editMode ? (moverMesas ? "Arrastrá para acomodar · tocá para editar" : "Posiciones bloqueadas — activá Mover para arrastrar · tocá para editar") : esPortero ? "Tocá una mesa para ver el nombre y su combo" : "Tocá una mesa para vender o gestionar"}</span>
     </div>`;
   const cv2 = $("#cv2");
@@ -6013,11 +5867,28 @@ async function screenMesas() {
     } else d.onclick = () => sheetMesa(m);
     cv2.appendChild(d);
   });
-  const wrap = document.querySelector(".canvas-wrap"), sh = $("#scrollHint");
-  if (wrap && sh) {
-    const chk = () => { sh.style.display = wrap.scrollWidth > wrap.clientWidth + 4 ? "" : "none"; };
-    chk(); wrap.addEventListener("scroll", () => { sh.style.opacity = "0"; }, { once: true });
-    window.addEventListener("resize", chk, { once: true });
+  /* Zoom: el plano escala entero (mesas en % del plano) y se recorre
+     deslizando. Al cambiar el zoom se conserva el punto que se miraba. */
+  const wrap = $("#cvWrap");
+  qsa("#main [data-zoom]").forEach(b => b.onclick = () => {
+    const d = +b.dataset.zoom, z0 = zoomPlano();
+    const i = ZOOMS.indexOf(z0);
+    const z = d === 0 ? 1 : ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? ZOOMS.findIndex(x => x >= z0) : i) + d))];
+    const cx = (wrap.scrollLeft + wrap.clientWidth / 2) / wrap.scrollWidth;
+    planoZoom = z;
+    $("#cv2").style.setProperty("--z", z);
+    qsa("#main .zoom-v").forEach(v => v.textContent = Math.round(z * 100) + "%");
+    wrap.scrollLeft = cx * wrap.scrollWidth - wrap.clientWidth / 2;
+  });
+  // El plano se repinta solo (tiempo real): se vuelve al mismo lugar que
+  // se estaba mirando. La primera vez arranca centrado.
+  if (wrap) {
+    wrap.scrollLeft = planoX == null
+      ? (wrap.scrollWidth - wrap.clientWidth) / 2
+      : planoX * wrap.scrollWidth - wrap.clientWidth / 2;
+    wrap.addEventListener("scroll", () => {
+      planoX = (wrap.scrollLeft + wrap.clientWidth / 2) / wrap.scrollWidth;
+    }, { passive: true });
   }
   qsa("#main .floors button").forEach(b => b.onclick = () => { planta = b.dataset.f; screenMesas(); });
   /* Acciones secundarias del plano. Eran hasta ocho botones al mismo
@@ -6317,7 +6188,7 @@ function pintarBusqueda(q, regs, tks, mesas) {
     return `<button class="bsc-item" data-ir-lista="${r.id}">
       <span class="bsc-ic ${dentro ? "ok" : ""}">${dentro ? "✓" : "○"}</span>
       <span class="bsc-body">
-        <span class="bsc-nm">${esc(r.nombre)}${r.filtro_at ? ` <span class="flag-badge">⚑ marcado</span>` : ""}</span>
+        <span class="bsc-nm">${esc(r.nombre)}${r.filtro_at ? ` <span class="flag-badge">Marcado</span>` : ""}</span>
         <span class="bsc-sub">${esc(nomLista(r.lista_tipo_id))}${nomVend(r.rrpp_id) ? ` · ${esc(nomVend(r.rrpp_id))}` : ""}</span>
       </span>
       <span class="bsc-est ${dentro ? "ok" : "pend"}">${dentro ? "Ingresó " + hora(r.ingreso_at) : "Sin ingresar"}</span>
@@ -6518,13 +6389,13 @@ async function sheetMesa(m) {
         <div class="field"><label>¿Cómo pagó?</label>
           <div class="seg"><button type="button" class="segbtn on" data-mp="transferencia">Transferencia</button><button type="button" class="segbtn" data-mp="efectivo">Efectivo</button></div></div>
         <div id="vmCompBox">
-          <button type="button" class="btn ghost2" id="vmVerQr">💳 Ver QR para que pague</button>
+          <button type="button" class="btn ghost2" id="vmVerQr">Ver QR para que pague</button>
           <div id="vmQrBox"></div>
           <div style="height:9px"></div>
         </div>
         <div id="vmCompPrev"></div>
         <div id="vmFotoBox">
-          <button type="button" class="btn ghost2" id="vmFoto">📷 Subir foto del comprobante</button>
+          <button type="button" class="btn ghost2" id="vmFoto">Subir foto del comprobante</button>
           <div style="height:9px"></div>
         </div>
         <input type="file" id="vmFile" accept="image/*" class="hidden">
@@ -6564,7 +6435,7 @@ async function sheetMesa(m) {
     let qrAbierto = false;
     $("#vmVerQr").onclick = async () => {
       const box = $("#vmQrBox");
-      if (qrAbierto) { box.innerHTML = ""; qrAbierto = false; $("#vmVerQr").textContent = "💳 Ver QR para que pague"; return; }
+      if (qrAbierto) { box.innerHTML = ""; qrAbierto = false; $("#vmVerQr").textContent = "Ver QR para que pague"; return; }
       const { data: qrs } = await sb.from("qr_cobro").select("*").eq("club_id", club).eq("activo", true).order("orden");
       const q = (qrs || [])[0];
       if (!q) return toast("El admin todavía no cargó ningún QR de cobro", "warn");
@@ -6586,9 +6457,9 @@ async function sheetMesa(m) {
       try {
         urlCompVenta = await subirComprobanteMesa(f, m.id);
         $("#vmCompPrev").innerHTML = `<img src="${esc(urlCompVenta)}" alt="comprobante" style="width:100%;max-width:220px;display:block;margin:0 auto 10px;border-radius:12px;border:1px solid var(--line-2)">`;
-        bf.textContent = "📷 Cambiar foto";
+        bf.textContent = "Cambiar foto";
         toast("Comprobante cargado");
-      } catch (e) { fail(e); bf.textContent = "📷 Reintentar"; }
+      } catch (e) { fail(e); bf.textContent = "Reintentar"; }
       bf.disabled = false; sincPago();
     };
     $("#vmFoto").onclick = () => vmFile.click();
@@ -6646,7 +6517,7 @@ async function sheetMesa(m) {
         if (!e2) ok++;
       }
       $("#vmGo").disabled = false;
-      if (estado === "reservada") toast(`⏳ ${data.etiqueta} reservada${ok ? ` · ${ok} manilla(s) con QR` : ""} — tenés ${HORAS_RESERVA} h para confirmar el pago o se libera sola`, "warn");
+      if (estado === "reservada") toast(`${data.etiqueta} reservada${ok ? ` · ${ok} manilla(s) con QR` : ""} — tenés ${HORAS_RESERVA} h para confirmar el pago o se libera sola`, "warn");
       else if (!esAdminV) toast(`${data.etiqueta} pagada en ${metodoPago} · por verificar${ok ? ` · ${ok} manilla(s)` : ""}`, "warn");
       else toast(`${data.etiqueta} vendida · ${fmtBs(data.precio)} Bs${ok ? ` · ${ok} manilla(s) con QR` : ""}`);
       closeSheet(); screenMesas();
@@ -6693,9 +6564,9 @@ async function sheetMesa(m) {
       ${vend?.nombre ? `<div class="r-sub" style="font-size:13px;color:var(--accent-2);margin-top:3px">Vendió: ${esc(vend.nombre)}</div>` : ""}
       ${teamVend ? `<div class="r-sub" style="font-size:13px;color:var(--accent-2);margin-top:2px">Team: ${esc(teamVend.nombre)}</div>` : ""}
       ${prim.pagada_at ? `<div class="r-sub" style="font-size:13px;color:var(--ok);margin-top:3px">Cobró: ${esc(pagBy?.nombre || "—")} · ${hora(prim.pagada_at)}</div>` : ""}
-      ${m.estado === "pagada" && !prim.pago_verificado ? `<div class="r-sub" style="font-size:13px;color:var(--warn);margin-top:3px">⏳ Pago por verificar${prim.metodo_pago ? ` · cobrado en ${esc(prim.metodo_pago)}` : ""} — falta que el admin lo confirme</div>` : ""}
+      ${m.estado === "pagada" && !prim.pago_verificado ? `<div class="r-sub" style="font-size:13px;color:var(--warn);margin-top:3px">Pago por verificar${prim.metodo_pago ? ` · cobrado en ${esc(prim.metodo_pago)}` : ""} — falta que el admin lo confirme</div>` : ""}
       ${m.estado === "pagada" && prim.pago_verificado && prim.verificado_at ? `<div class="r-sub" style="font-size:13px;color:var(--ok);margin-top:3px">✓ Pago verificado</div>` : ""}
-      ${m.estado === "reservada" && (prim.reservada_at || m.reservada_at) ? `<div class="r-sub" style="font-size:13px;color:var(--warn);margin-top:3px">⏳ Vence ${hora(new Date((prim.reserva_vence_at || m.reserva_vence_at) || new Date(prim.reservada_at || m.reservada_at).getTime() + HORAS_RESERVA * 36e5))} — si no se paga, se libera sola</div>` : ""}
+      ${m.estado === "reservada" && (prim.reservada_at || m.reservada_at) ? `<div class="r-sub" style="font-size:13px;color:var(--warn);margin-top:3px">Vence ${hora(new Date((prim.reserva_vence_at || m.reserva_vence_at) || new Date(prim.reservada_at || m.reservada_at).getTime() + HORAS_RESERVA * 36e5))} — si no se paga, se libera sola</div>` : ""}
       ${prim.comprobante_url ? `<div style="margin-top:10px"><img src="${esc(prim.comprobante_url)}" alt="comprobante" style="width:100%;max-width:260px;border-radius:12px;border:1px solid var(--line-2);display:block"><div class="hint" style="margin-top:4px">Comprobante de pago</div></div>` : ""}
       ${prim.botellas?.length ? `<div class="r-sub" style="font-size:13px;color:var(--text-2);margin-top:2px">Botellas: ${esc(prim.botellas.join(", "))}</div>` : ""}
       ${puedeMan ? `
@@ -6714,9 +6585,9 @@ async function sheetMesa(m) {
       : `<div class="hint" style="margin:8px 0 4px">La mesa ya tiene sus ${incluidas} manillas con QR. Para más, editá las "manillas extra" de la mesa.</div>`) : ""}` : ""}
       <div style="height:14px"></div>
       ${soloVer ? `<div class="hint" style="text-align:center">Vista de jefe — solo lectura</div>` : `
-      <button class="btn ghost2" id="mzEditar">✏️ Editar nombre y combo</button><div style="height:9px"></div>
-      ${m.estado !== "pagada" ? `<button class="btn ghost2" id="mzCobrar">💳 Mostrar QR de cobro</button><div style="height:9px"></div>` : ""}
-      ${m.estado !== "pagada" ? `<button class="btn primary" id="mzPagar">📎 Marcar pagada${esGrupo ? " (grupo)" : ""} — con comprobante</button><div style="height:9px"></div>` : ""}
+      <button class="btn ghost2" id="mzEditar">Editar nombre y combo</button><div style="height:9px"></div>
+      ${m.estado !== "pagada" ? `<button class="btn ghost2" id="mzCobrar">Mostrar QR de cobro</button><div style="height:9px"></div>` : ""}
+      ${m.estado !== "pagada" ? `<button class="btn primary" id="mzPagar">Marcar pagada${esGrupo ? " (grupo)" : ""} — con comprobante</button><div style="height:9px"></div>` : ""}
       ${m.estado === "pagada" && !prim.pago_verificado && me.rol === "admin" ? `
         <button class="btn primary" id="mzVerif">✓ Confirmar que el pago entró</button><div style="height:9px"></div>
         <button class="btn danger" id="mzRech">✕ Rechazar — volver a reservada</button><div style="height:9px"></div>` : ""}
@@ -6853,14 +6724,14 @@ let qrCobroSel = null;
 async function sheetQrMesa(m, prim, nMesas) {
   const { data: qrs } = await sb.from("qr_cobro").select("*").eq("club_id", club).eq("activo", true).order("orden");
   const lista = qrs || [];
-  if (!lista.length) return toast("El admin todavía no cargó ningún QR de cobro (Pagos → QR de cobro)", "warn");
+  if (!lista.length) return toast("El admin todavía no cargó ningún QR de cobro (Más → QRs de cobro)", "warn");
   // LAS MESAS SE PAGAN SIEMPRE AL QR DEL BOLICHE (el del admin), nunca al del team.
   // Solo el admin puede elegir entre sus QRs; el resto ve el principal, sin opción.
   const puedeElegir = me.rol === "admin" && lista.length > 1;
   if (!puedeElegir || !qrCobroSel || !lista.find(q => q.id === qrCobroSel)) qrCobroSel = lista[0].id;
   const sel = lista.find(q => q.id === qrCobroSel);
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="qmBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="qmBack">${ico("atras")}Volver</button>
     <div class="sh-h">Cobrar ${esc(m.etiqueta)}${nMesas > 1 ? ` +${nMesas - 1}` : ""}<span class="r-sub">${fmtBs(prim.precio)} Bs</span></div>
     ${puedeElegir ? `<div class="seg" style="margin-bottom:12px">${lista.map(q =>
       `<button class="segbtn ${q.id === qrCobroSel ? "on" : ""}" data-qsel="${q.id}">${esc(q.nombre)}</button>`).join("")}</div>` : ""}
@@ -6969,7 +6840,7 @@ function sheetEditarMesa(m, prim, nMesas) {
   const vale = c => !c.categorias || !c.categorias.length || cats.every(k => c.categorias.includes(k));
   const ok = activos.filter(c => vale(c) || c.id === prim.combo_id);
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="emBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="emBack">${ico("atras")}Volver</button>
     <div class="sh-h">Editar ${esc(m.etiqueta)}${nMesas > 1 ? ` +${nMesas - 1}` : ""}<span class="r-sub">${fmtBs(prim.precio || 0)} Bs</span></div>
     <div class="field"><label>Cliente</label><input id="emCli" value="${esc(prim.cliente || "")}"></div>
     <div class="field"><label>Combo</label><select id="emCombo">
@@ -6992,7 +6863,7 @@ function sheetEditarMesa(m, prim, nMesas) {
 function sheetPagarMesa(m, prim, nMesas) {
   const esAdmin = me.rol === "admin";
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="pmBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="pmBack">${ico("atras")}Volver</button>
     <div class="sh-h">Marcar pagada · ${esc(m.etiqueta)}${nMesas > 1 ? ` +${nMesas - 1}` : ""}<span class="r-sub">${fmtBs(prim.precio)} Bs</span></div>
     <div class="field"><label>¿Cómo pagó?</label>
       <div class="seg"><button type="button" class="segbtn on" data-pmp="transferencia">Transferencia</button><button type="button" class="segbtn" data-pmp="efectivo">Efectivo</button></div></div>
@@ -7001,7 +6872,7 @@ function sheetPagarMesa(m, prim, nMesas) {
       : "Subí la foto del comprobante. Sin foto la mesa no se puede marcar pagada."}</div>
     <div id="pmPrev"></div>
     <div id="pmCompBox">
-      <button class="btn ghost2" id="pmFoto">📷 ${esAdmin ? "Adjuntar comprobante (opcional)" : "Subir foto del comprobante"}</button>
+      <button class="btn ghost2" id="pmFoto">${esAdmin ? "Adjuntar comprobante (opcional)" : "Subir foto del comprobante"}</button>
       <div style="height:9px"></div>
     </div>
     <button class="btn primary" id="pmGo"${esAdmin ? "" : " disabled"}>Confirmar pago</button>
@@ -7033,10 +6904,10 @@ function sheetPagarMesa(m, prim, nMesas) {
     try {
       urlComp = await subirComprobanteMesa(f, m.id);
       $("#pmPrev").innerHTML = `<img src="${esc(urlComp)}" alt="comprobante" style="width:100%;max-width:260px;display:block;margin:0 auto 10px;border-radius:12px;border:1px solid var(--line-2)">`;
-      bf.textContent = "📷 Cambiar foto";
+      bf.textContent = "Cambiar foto";
       const go = $("#pmGo"); if (go) go.disabled = false;
       toast("Comprobante cargado");
-    } catch (e) { fail(e); bf.textContent = "📷 Reintentar"; }
+    } catch (e) { fail(e); bf.textContent = "Reintentar"; }
     bf.disabled = false;
   };
   $("#pmFoto").onclick = () => inpComp.click();
@@ -7048,38 +6919,6 @@ function sheetPagarMesa(m, prim, nMesas) {
     toast(esAdmin ? `${m.etiqueta} pagada en ${metodoPm} · verificada` : `${m.etiqueta} pagada en ${metodoPm} — queda por verificar`, esAdmin ? "" : "warn");
     closeSheet(); screenMesas();
   };
-}
-
-/* QR que ve el CLIENTE para pagar su manilla: SIEMPRE el del jefe del team
-   (la plata de manillas va a cada jefe); admin: los QR del boliche */
-async function sheetQrManillas() {
-  if (me.rol === "admin") {
-    const { data: qrs } = await sb.from("qr_cobro").select("*").eq("club_id", club).eq("activo", true).order("orden");
-    const lista = qrs || [];
-    if (!lista.length) return toast("Cargá un QR de cobro en Pagos → QRs de cobro", "warn");
-    if (!qrCobroSel || !lista.find(q => q.id === qrCobroSel)) qrCobroSel = lista[0].id;
-    const sel = lista.find(q => q.id === qrCobroSel);
-    sheet(`
-      <div class="sh-h">Cobrar manilla<span class="r-sub">${fmtBs(ev.precio_manilla)} Bs</span></div>
-      ${lista.length > 1 ? `<div class="seg" style="margin-bottom:12px">${lista.map(q =>
-        `<button class="segbtn ${q.id === qrCobroSel ? "on" : ""}" data-qsm="${q.id}">${esc(q.nombre)}</button>`).join("")}</div>` : ""}
-      <img src="${esc(sel.url)}" alt="QR de cobro ${esc(sel.nombre)}" style="width:100%;max-width:320px;display:block;margin:0 auto 10px;border-radius:14px;background:#fff;padding:10px">
-      <div class="hint" style="text-align:center">El cliente paga su manilla a este QR. La plata entra a <b>${esc(sel.nombre)}</b>.</div>`);
-    document.querySelectorAll("#sheetBody [data-qsm]").forEach(b => b.onclick = () => {
-      qrCobroSel = b.dataset.qsm; sheetQrManillas();
-    });
-    return;
-  }
-  // rrpp / jefe: el QR del jefe del team, sin caer al del boliche
-  if (!me.team_id) return toast("No tenés team asignado en este boliche", "warn");
-  const { data: t } = await sb.from("teams").select("nombre,qr_cobro_url").eq("id", me.team_id).single();
-  if (!t?.qr_cobro_url) return toast(me.rol === "jefe"
-    ? "Subí tu QR en Pagos → “Subir mi QR de cobro”"
-    : "Tu jefe todavía no subió su QR de cobro — pedíselo", "warn");
-  sheet(`
-    <div class="sh-h">Cobrar manilla<span class="r-sub">${fmtBs(ev.precio_manilla)} Bs</span></div>
-    <img src="${esc(t.qr_cobro_url)}" alt="QR de cobro ${esc(t.nombre)}" style="width:100%;max-width:320px;display:block;margin:0 auto 10px;border-radius:14px;background:#fff;padding:10px">
-    <div class="hint" style="text-align:center">El cliente paga su manilla a este QR. La plata entra al jefe de <b>${esc(t.nombre)}</b>.</div>`);
 }
 
 /* editor admin: propiedades de la mesa */
@@ -7268,13 +7107,13 @@ async function sheetFases(evId, evNombre, volverA) {
   const fs = fases || [], on = !!evRow?.venta_por_fases;
   fs.forEach(f => { if (f.ticket_url) fasesArte[f.id] = f.ticket_url; else delete fasesArte[f.id]; });
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="fsBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="fsBack">${ico("atras")}Volver</button>
     <div class="sh-h">Fases de preventa<span class="r-sub">${esc(evNombre || "")}</span></div>
     ${volverA === "crear" ? `<div class="hint" style="margin:0 0 10px;color:var(--ok)">✓ Evento creado. Cargá las tandas acá abajo y después prendé la venta por fases.</div>` : ""}
     <div class="hint" style="margin:0 0 12px">Apagado, el evento vende todo a ${fmtBs(evRow?.precio_manilla || 0)} Bs como siempre. Prendido, el precio y el stock los pone la fase que esté abierta.</div>
     <button class="btn ${on ? "danger" : "primary"}" id="fsToggle">${on ? "Apagar — volver al precio único" : "Prender venta por fases"}</button>
     <div class="sh-h" style="margin-top:18px;font-size:14px">Fases (${fs.length})</div>
-    <p class="hint" style="margin:0 0 8px">Con 🖼 le podés poner a cada fase su propio diseño de entrada. La que no tenga usa el diseño del evento, y le sale el sello con el nombre de la tanda.</p>
+    <p class="hint" style="margin:0 0 8px">Con el botón de imagen le podés poner a cada fase su propio diseño de entrada. La que no tenga usa el diseño del evento, y le sale el sello con el nombre de la tanda.</p>
     <div>${fs.map(f => `
       <div class="list-row rc" style="${f.activo ? "" : "opacity:.5"}${f.vigente ? ";border-color:rgba(61,220,151,.45)" : ""}">
         <div class="r-l" style="flex:1;min-width:0"><span class="rc-body">
@@ -7282,7 +7121,7 @@ async function sheetFases(evId, evNombre, volverA) {
           <span class="rc-sub"><span>${fmtBs(f.precio)} Bs · ${f.vendidas}/${f.cupo ?? "sin tope"}${f.desde || f.hasta ? ` · ${fmtTS(f.desde)} a ${fmtTS(f.hasta)}` : ""}</span></span>
         </span></div>
         <div style="display:flex;gap:5px;flex-shrink:0">
-          <button class="checkin" data-farte="${f.id}" data-fnom="${esc(f.nombre)}" title="Arte de la entrada de esta fase" style="background:var(--surface-3);color:${f.ticket_url ? "var(--ok)" : "var(--text-2)"};border-color:var(--line-2)">🖼${f.ticket_url ? " ✓" : ""}</button>
+          <button class="checkin" data-farte="${f.id}" data-fnom="${esc(f.nombre)}" title="Arte de la entrada de esta fase" style="background:var(--surface-3);color:${f.ticket_url ? "var(--ok)" : "var(--text-2)"};border-color:var(--line-2)" aria-label="Diseño de la entrada de esta fase">${ico("imagen")}${f.ticket_url ? " ✓" : ""}</button>
           <button class="checkin" data-fcup="${f.id}" data-fnom="${esc(f.nombre)}" style="background:var(--accent-soft);color:var(--accent-2);border-color:rgba(139,92,246,.4)">Cupos</button>
           <button class="checkin" data-fed="${f.id}" style="background:var(--surface-3);color:var(--text-2);border-color:var(--line-2)">Editar</button>
           ${f.vendidas ? "" : `<button class="checkin" data-fdel="${f.id}" style="background:var(--danger-bg);color:var(--danger);border-color:rgba(251,113,133,.35)">✕</button>`}
@@ -7382,7 +7221,7 @@ async function sheetCuposFase(faseId, faseNom, evId, evNombre, volverA) {
   const cs = cupos || [];
   const conCupo = cs.filter(c => c.cupo != null);
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="cpBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="cpBack">${ico("atras")}Volver</button>
     <div class="sh-h">Cupos por team<span class="r-sub">${esc(faseNom)}</span></div>
     <div class="hint" style="margin:0 0 14px">Dejá el campo vacío para que ese team venda sin límite propio. ${conCupo.length ? `Hoy ${conCupo.length} team(s) tienen cupo asignado.` : "Hoy ninguno tiene cupo: se lo lleva el que venda más rápido."}</div>
     <div>${cs.map(c => `
@@ -7445,25 +7284,12 @@ function abrirCuenta() {
     <div class="acct"><div class="avatar">${esc(me.nombre[0])}</div>
     <div class="an">${esc(me.nombre)}</div>
     <div class="as">@${esc(me.usuario)} · ${ROL_LABEL[me.rol]}</div></div>
-    ${me.rol === "admin" ? `<button class="btn ghost2" id="acUsers" style="margin-top:14px">⚙️ Administración de usuarios y equipos</button><div style="height:10px"></div>` : ""}
-    ${["admin", "jefe"].includes(me.rol) ? `<button class="btn ghost2" id="acFiltro" style="${me.rol === "admin" ? "" : "margin-top:14px"}">⚑ Rechazados en puerta</button><div style="height:10px"></div>` : ""}
-    ${me.admin_principal ? `<button class="btn ghost2" id="acCaja">👥 Lista de la caja</button><div style="height:10px"></div>` : ""}
     <div class="sh-h" style="margin-top:16px">Cambiar mi contraseña</div>
     <div class="field"><input id="pwN" type="password" placeholder="Nueva contraseña (mín. 6)" autocomplete="new-password"></div>
     <button class="btn ghost2" id="pwGo">Cambiar contraseña</button>
     <div style="height:10px"></div>
     <button class="btn danger" onclick="logout()">Cerrar sesión</button>`;
   $("#sheet").classList.add("open"); $("#scrim").classList.add("show");
-  const au = $("#acUsers");
-  // entrar desde el perfil siempre aterriza en la raíz (los filtros y el
-  // historial interno de niveles siguen vivos para navegar de nuevo)
-  if (au) au.onclick = () => {
-    gnNav = null;
-    try { history.pushState({ tab: "gente", nav: null }, "", "#gente/usuarios"); } catch { /* file:// */ }
-    sheetUsuarios();
-  };
-  const af = $("#acFiltro"); if (af) af.onclick = sheetFiltro;
-  const ac = $("#acCaja"); if (ac) ac.onclick = sheetCajaFiltro;
   $("#pwGo").onclick = async () => {
     const p = $("#pwN").value;
     if (p.length < 6) return toast("Mínimo 6 caracteres", "warn");
@@ -7616,7 +7442,7 @@ async function renderCajaFiltro() {
           ${haySinTeam ? `<option value="__sin__">Sin team</option>` : ""}
         </select></div>
       <div class="field"><label>Buscar</label>
-        <input id="cfBuscar" placeholder="🔍 Buscar relacionador…" autocomplete="off"></div>
+        <input id="cfBuscar" placeholder="Buscar relacionador…" autocomplete="off"></div>
       <div class="field"><label>Relacionador</label><select id="cfWho"></select></div>
       <button class="btn primary" id="cfSave">Agregar a la lista de caja</button>`;
 
@@ -7764,15 +7590,15 @@ async function screenInventario() {
       <div class="stat ${bajos.length ? "st-warn" : "st-ok"}"><span class="st-ic ${bajos.length ? "warn" : "ok"}">${IC.shield}</span><span class="k">Por reponer</span><span class="v ${bajos.length ? "warn" : "ok"}">${bajos.length}</span></div>
     </div>
     <div class="ph-actions" style="margin-bottom:12px">
-      <button class="ghost" id="btnRecibir">📥 Cargar compra</button>
+      <button class="ghost" id="btnRecibir">Cargar compra</button>
       <button class="ghost" id="btnNuevaBebida">+ Bebida</button>
-      <button class="ghost" id="btnTragos">🥃 Carta</button>
-      <button class="ghost" id="btnBarras">🍸 Barras (${barrasCache.length})</button>
-      <button class="ghost" id="btnTurno">👥 Turno</button>
-      <button class="ghost" id="btnConteo">📋 Contar</button>
-      <button class="ghost" id="btnCortCfg">🎗️ Cortesías</button>
+      <button class="ghost" id="btnTragos">Carta</button>
+      <button class="ghost" id="btnBarras">Barras (${barrasCache.length})</button>
+      <button class="ghost" id="btnTurno">Turno</button>
+      <button class="ghost" id="btnConteo">Contar</button>
+      <button class="ghost" id="btnCortCfg">Cortesías</button>
     </div>
-    ${bajos.length ? `<div class="hint" style="color:var(--warn);margin:0 0 10px">⚠️ Hay que reponer: ${bajos.map(b => esc(b.nombre)).join(" · ")}</div>` : ""}
+    ${bajos.length ? `<div class="hint" style="color:var(--warn);margin:0 0 10px">Hay que reponer: ${bajos.map(b => esc(b.nombre)).join(" · ")}</div>` : ""}
     ${!filas.length ? `<div class="empty">Todavía no cargaste bebidas. Empezá con "+ Bebida" y después registrá la compra.</div>` : ""}
     ${Object.entries(porCat).map(([cat, items]) => `
       <div class="sh-h" style="margin-top:16px;font-size:14px">${esc(cat)}<span class="r-sub">${items.length}</span></div>
@@ -7910,7 +7736,7 @@ async function sheetBebida(id) {
         </div>
       </div>`).join("") || `<div class="empty">Sin stock. Cargá una compra.</div>`}
     <div style="height:12px"></div>
-    <button class="btn ghost2" id="fbRecibir">📥 Cargar compra de ${esc(b.nombre)}</button>`);
+    <button class="btn ghost2" id="fbRecibir">Cargar compra de ${esc(b.nombre)}</button>`);
   $("#fbRecibir").onclick = () => sheetRecibirLote(id);
   document.querySelectorAll("#sheetBody [data-conteo]").forEach(x => x.onclick = () =>
     sheetConteo(ls.find(l => l.id === x.dataset.conteo), b));
@@ -8013,7 +7839,7 @@ async function screenBarMovimientos() {
     .eq("club_id", club).order("created_at", { ascending: false }).limit(200);
   if (error) throw error;   // lo muestra conPantalla con Reintentar
   const movs = data || [];
-  const ICO = { entrada: "📥", salida: "🍸", ajuste: "⚖️", baja: "🗑️", anulacion: "↩️", devolucion: "↩️" };
+  const ICO = { entrada: ico("recibir"), salida: ico("salida"), ajuste: ico("ajuste"), baja: ico("baja"), anulacion: ico("deshacer"), devolucion: ico("deshacer") };
   $("#main").innerHTML = `
     <div class="sh-h">Movimientos<span class="r-sub">últimos ${movs.length}</span></div>
     <div class="hint" style="margin:0 0 12px">Todo lo que entró y salió, con quién y cuándo. Nada se borra: una corrección queda como un movimiento más.</div>
@@ -8171,7 +7997,7 @@ async function screenRecepcion() {
   $("#main").innerHTML = `
     <div class="sh-h">Registrar lo que llega</div>
     <div class="hint" style="margin:0 0 14px">Anotá lo que entra al depósito. No manejás costos ni ves el stock total — de eso se ocupa el propietario.</div>
-    <button class="btn primary" id="rcGo">📥 Registrar ingreso</button>`;
+    <button class="btn primary" id="rcGo">Registrar ingreso</button>`;
   $("#rcGo").onclick = () => sheetRecibirLote();
 }
 async function screenRecepcionMias() {
@@ -8182,7 +8008,7 @@ async function screenRecepcionMias() {
     <div class="sh-h">Lo que registraste<span class="r-sub">${ls.length}</span></div>
     <div>${ls.map(l => `
       <div class="list-row rc">
-        <div class="r-l" style="flex:1;min-width:0"><span class="relmark" style="background:var(--surface-3)">📥</span>
+        <div class="r-l" style="flex:1;min-width:0"><span class="relmark" style="background:var(--surface-3)">${ico("recibir")}</span>
           <span class="rc-body"><span class="rc-nm">${esc(l.b?.nombre || "—")}</span>
             <span class="rc-sub"><span>${esc(l.codigo)} · ${new Date(l.recibido_at).toLocaleString("es-BO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })}</span></span></span></div>
         <div style="text-align:right;flex-shrink:0">
@@ -8429,9 +8255,9 @@ function posPintar() {
       <button class="segbtn ${posCat ? "" : "on"}" data-pc="">Todo</button>
       ${cats.map(c => `<button class="segbtn ${posCat === c ? "on" : ""}" data-pc="${esc(c)}">${esc(c)}</button>`).join("")}</div>` : ""}
     ${posDisp.length > 8 ? `<div class="field" style="margin-bottom:10px">
-      <input id="posQ" placeholder="🔍 Buscar trago…" autocomplete="off" value="${esc(posBusca)}"></div>` : ""}
+      <input id="posQ" placeholder="Buscar trago…" autocomplete="off" value="${esc(posBusca)}"></div>` : ""}
     ${posCortSel ? `<div class="hint" id="posCortBox" style="background:rgba(246,180,74,.12);border:1px solid rgba(246,180,74,.35);border-radius:12px;padding:10px 13px;margin-bottom:10px;color:var(--warn)">
-      🎗️ Cortesía de <b>${esc(posCortSel.nombre)}</b> · le quedan ${posCortSel.cupo - posCortSel.usados} de ${posCortSel.cupo}
+      Cortesía de <b>${esc(posCortSel.nombre)}</b> · le quedan ${posCortSel.cupo - posCortSel.usados} de ${posCortSel.cupo}
       <button class="checkin" id="posCortX" style="float:right;background:var(--surface-3);color:var(--text-3);border-color:var(--line-2);padding:4px 9px">✕</button></div>` : ""}
     ${!vis.length ? `<div class="empty">${posDisp.length ? "Ningún trago coincide." : "No hay tragos cargados para esta barra."}</div>` : ""}
     <div id="posGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
@@ -8578,9 +8404,9 @@ function posPie() {
   const pie = $("#posPie"); if (!pie) return;
   if (!nCar) {
     pie.innerHTML = `<div class="ph-actions" style="margin-top:14px">
-      <button class="ghost" id="posCort">🎗️ Cortesía de relacionador</button>
+      <button class="ghost" id="posCort">Cortesía de relacionador</button>
       ${posUltima && Date.now() - posUltima.at < POS_VENTANA_ANUL
-        ? `<button class="ghost" id="posAnul" style="color:var(--danger)">↩︎ Anular ${fmtBs(posUltima.total)} Bs</button>` : ""}
+        ? `<button class="ghost" id="posAnul" style="color:var(--danger)">Anular ${fmtBs(posUltima.total)} Bs</button>` : ""}
     </div>`;
   } else {
     pie.innerHTML = `<div style="position:sticky;bottom:calc(var(--nav-h) + 8px);margin-top:14px;
@@ -8593,7 +8419,7 @@ function posPie() {
       <div style="height:8px"></div>
       <div class="ph-actions" style="justify-content:space-between">
         <button class="ghost" id="posClear">Vaciar</button>
-        ${!posCortSel ? `<button class="ghost" id="posCort">🎗️ Es cortesía</button>` : ""}
+        ${!posCortSel ? `<button class="ghost" id="posCort">Es cortesía</button>` : ""}
       </div>
     </div>`;
   }
@@ -8624,7 +8450,7 @@ async function posCobrar(forma) {
 
   if (error) {
     if (!esFallaDeRed(error)) {
-      const msg = error.message.replace(/^.*CUPO AGOTADO/, "🚫 CUPO AGOTADO");
+      const msg = error.message.replace(/^.*CUPO AGOTADO/, "CUPO AGOTADO");
       toast(msg, "warn");
       // Si rebotó por stock, lo que muestran las tarjetas ya no es cierto:
       // se vuelve a pedir el catálogo para que los números se corrijan solos.
@@ -8675,7 +8501,7 @@ async function posAnularUltima() {
     setTimeout(() => {
       if (posAnulArm !== armada) return;      // ya se usó, o se armó otra
       posAnulArm = null;
-      if ($("#posAnul") && posUltima) $("#posAnul").textContent = `↩︎ Anular ${fmtBs(posUltima.total)} Bs`;
+      if ($("#posAnul") && posUltima) $("#posAnul").textContent = `Anular ${fmtBs(posUltima.total)} Bs`;
     }, 4000);
     return;
   }
@@ -8696,7 +8522,7 @@ async function sheetCortesia() {
   sheet(`
     <div class="sh-h">Cortesía de relacionador</div>
     <div class="hint" style="margin:0 0 12px">Mostrá la manilla, elegí el nombre y cargá el trago. Si ya usó su cupo, el sistema no te deja registrarlo.</div>
-    <div class="field"><input id="coBuscar" placeholder="🔍 Buscar…" autocomplete="off"></div>
+    <div class="field"><input id="coBuscar" placeholder="Buscar…" autocomplete="off"></div>
     <div id="coLista">${posCortesias.map(c => {
       const queda = c.cupo - c.usados, lleno = queda <= 0;
       return `<div class="list-row rc" data-co="${c.user_id}" data-q="${esc((c.nombre || "").toLowerCase())}" style="cursor:${lleno ? "not-allowed" : "pointer"};opacity:${lleno ? ".5" : "1"}">
@@ -8708,7 +8534,7 @@ async function sheetCortesia() {
     }).join("")}</div>`);
   const bind = () => document.querySelectorAll("#coLista [data-co]").forEach(r => r.onclick = () => {
     const c = posCortesias.find(x => x.user_id === r.dataset.co);
-    if (!c || c.cupo - c.usados <= 0) return toast(`🚫 ${c.nombre} ya usó sus ${c.cupo} vaso(s)`, "warn");
+    if (!c || c.cupo - c.usados <= 0) return toast(`${c.nombre} ya usó sus ${c.cupo} vaso(s)`, "warn");
     posCortSel = c; closeSheet(); posPintar();
   });
   bind();
@@ -8998,7 +8824,7 @@ async function sheetAvisos() {
   sheet(`
     <div class="sh-h">Avisos<span class="r-sub">${avisos.length}</span></div>
     <p class="hint" style="margin:0 0 12px">Le aparece a cada uno cuando entra a la app y lo tiene que cerrar para seguir. Se muestra una sola vez por persona.</p>
-    <button class="btn primary" id="avNuevo">＋ Nuevo aviso</button>
+    <button class="btn primary" id="avNuevo">Nuevo aviso</button>
     <div id="avLista" style="margin-top:14px">${avisos.map(a => {
       const pct = +a.alcance ? Math.round(+a.leidos / +a.alcance * 100) : 0;
       const vencido = a.hasta_ts && new Date(a.hasta_ts) < new Date();
@@ -9040,7 +8866,7 @@ async function sheetAvisos() {
 
 function sheetNuevoAviso() {
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="naBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="naBack">${ico("atras")}Volver</button>
     <div class="sh-h">Nuevo aviso</div>
     <div class="field"><label>Título</label><input id="naT" placeholder="Este sábado abrimos 22:00" autocomplete="off"></div>
     <div class="field"><label>Mensaje</label><textarea id="naM" rows="4" placeholder="Escribí acá lo que querés que lean."></textarea></div>
@@ -9081,7 +8907,7 @@ async function sheetQuienLeyo(id) {
   const { data } = await sb.rpc("aviso_lectores", { p_aviso: id });
   const l = data || [];
   sheet(`
-    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="qlBack">← Volver</button>
+    <button class="btn ghost2" style="width:auto;padding:8px 14px;margin-bottom:12px" id="qlBack">${ico("atras")}Volver</button>
     <div class="sh-h">Quién lo leyó<span class="r-sub">${l.length}</span></div>
     <div>${l.map(x => `
       <div class="list-row rc">
