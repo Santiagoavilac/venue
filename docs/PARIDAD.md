@@ -36,7 +36,11 @@ fue probada todavía a mano en un teléfono.
 | 3 | Combos (`sheetCombos`) | `mesa_hojas.dart` | hecho · probado contra el demo |
 | 3 | Confirmar pagos de mesas (`sheetContabilidad`) | ídem | hecho · probado contra el demo |
 | 3 | Registro de combos en texto y guardar el plano como imagen (`copyRegistroMesas`, `guardarPlano`) | `mesas_screen.dart` | hecho |
-| 4 | Pagos | — | pendiente |
+| 4 | Pagos: totales, rendición propia, movimientos (`screenPagos`) | `payments/ui/pagos_screen.dart` | hecho · probado contra el demo |
+| 4 | Rendir con QR del jefe o del boliche, monto, n.º de operación y foto obligatoria (`sheetCobrar`) | ídem | hecho · probado contra el demo; además no se duplica si se reenvía |
+| 4 | Detalle del pago con captura; adjuntar o cambiar (`sheetVoucher`) | ídem | hecho · probado contra el demo |
+| 4 | Admin: avanzar estado pendiente → pagado → verificado | ídem | hecho · probado contra el demo |
+| 4 | Admin: QRs de cobro del boliche (`sheetQrsCobro`) · Jefe: QR de su team (`set_team_qr`) | ídem | hecho · probado contra el demo (subir la imagen: sin probar) |
 | 5 | Reporte, stats, liquidación, contabilidad Excel | — | pendiente |
 | 6 | Mi team, Gente, boliches | — | pendiente |
 | 7 | Eventos (admin), listas, fases, avisos | — | pendiente |
@@ -48,8 +52,8 @@ fue probada todavía a mano en un teléfono.
 | Rol | Secciones |
 | --- | --- |
 | Seguridad | Escáner · Puerta · RRPPs · Mesas · Eventos · Cuenta |
-| Administrador | Accesos (Listas, Entradas, Resumen, Historial) · Escáner · Mesas · Eventos · Cuenta |
-| Jefe, Relacionador | Accesos (Listas, Entradas, Resumen) · Mesas · Eventos · Cuenta |
+| Administrador | Accesos (Listas, Entradas, Resumen, Historial) · Escáner · Pagos · Mesas · Eventos · Cuenta |
+| Jefe, Relacionador | Accesos (Listas, Entradas, Resumen) · Pagos · Mesas · Eventos · Cuenta |
 | Caja, Propietario, Barra, Recepción | Cuenta |
 
 Con esto, **el rol Seguridad ya tiene en la app todo lo que tiene en la web

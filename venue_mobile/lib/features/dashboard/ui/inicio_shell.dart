@@ -13,6 +13,7 @@ import '../../access_control/ui/lista_puerta_screen.dart';
 import '../../access_control/ui/rrpps_screen.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/ui/eventos_screen.dart';
+import '../../payments/ui/pagos_screen.dart';
 import '../../vip_tables/ui/mesas_screen.dart';
 import '../../access_control/ui/accesos_screen.dart';
 import 'cuenta_screen.dart';
@@ -40,6 +41,9 @@ List<_Seccion> _seccionesPara(Rol rol) => [
       if (rol == Rol.portero)
         const _Seccion('RRPPs', Icons.groups_outlined, Icons.groups_rounded,
             RrppsScreen()),
+      if (rol.vende)
+        const _Seccion('Pagos', Icons.payments_outlined, Icons.payments_rounded,
+            PagosScreen()),
       if (rol.veEventos)
         const _Seccion('Mesas', Icons.table_bar_outlined,
             Icons.table_bar_rounded, MesasScreen()),
