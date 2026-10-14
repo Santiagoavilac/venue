@@ -11,6 +11,8 @@ import '../../avisos/bienvenida.dart';
 import '../../access_control/ui/escaner_screen.dart';
 import '../../access_control/ui/lista_puerta_screen.dart';
 import '../../access_control/ui/rrpps_screen.dart';
+import '../../bar/ui/barra_screens.dart';
+import '../../bar/ui/pos_screen.dart';
 import '../../caja/caja.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/ui/eventos_screen.dart';
@@ -33,6 +35,27 @@ class _Seccion {
 /// Secciones disponibles para un rol. La primera es su pantalla de trabajo:
 /// el portero abre directo en el escáner, que es lo que hace toda la noche.
 List<_Seccion> _seccionesPara(Rol rol) => [
+      // módulo barra: pestañas propias, no ven nada de puerta
+      if (rol == Rol.propietario) ...const [
+        _Seccion('Inventario', Icons.inventory_2_outlined, Icons.inventory_2_rounded,
+            InventarioScreen()),
+        _Seccion('Vender', Icons.local_bar_outlined, Icons.local_bar_rounded, PosScreen()),
+        _Seccion('Cierre', Icons.receipt_long_outlined, Icons.receipt_long_rounded,
+            CierreBarraScreen()),
+        _Seccion('Analítica', Icons.insights_outlined, Icons.insights_rounded,
+            AnaliticaBarraScreen()),
+        _Seccion('Movimientos', Icons.swap_vert_rounded, Icons.swap_vert_rounded,
+            MovimientosScreen()),
+      ],
+      if (rol == Rol.deposito) ...const [
+        _Seccion('Registrar', Icons.download_outlined, Icons.download_rounded,
+            RecepcionScreen()),
+        _Seccion('Lo mío', Icons.history_rounded, Icons.history_rounded,
+            MisRecepcionesScreen()),
+      ],
+      if (rol == Rol.barra)
+        const _Seccion('Vender', Icons.local_bar_outlined, Icons.local_bar_rounded,
+            PosScreen()),
       if (rol == Rol.caja)
         const _Seccion('Relacionadores', Icons.fact_check_outlined,
             Icons.fact_check_rounded, CajaScreen()),
