@@ -1,7 +1,13 @@
 # Venue · estado de implementación
 
-Última actualización: 2026-10-14 · Backend de trabajo: proyecto demo
-`cxksjarupexptfksnptg` (sin datos reales).
+Última actualización: 2026-10-14 · Backend: proyecto Supabase
+`cxksjarupexptfksnptg`. **Desde el 2026-10-14 es la base principal** (antes
+era solo el demo): la web publicada y la app apuntan ahí.
+
+> Ojo: `tools/seed_demo.py`, `tests/test_seguridad.py` y las pruebas de
+> integración de la app **escriben en esta base** (reinician el evento demo,
+> crean y borran filas de prueba). Con datos reales no se corren sin antes
+> separar un proyecto de pruebas.
 
 Solo figura como probado lo que se ejecutó de verdad.
 
@@ -105,7 +111,7 @@ de sección; con movimiento reducido no queda ninguno. Flujos: clave
 incorrecta, código inexistente en el escáner, pago con comprobante (doble
 toque), Auditoría con filtro, RLS de la auditoría.
 
-Publicada en Vercel (proyecto `venue-web`, contra el Supabase **demo**):
+Publicada en Vercel (proyecto `venue-web`, contra la base principal):
 https://venue-web-amber.vercel.app — se vuelve a publicar con
 `sh tools/web/publicar.sh`. Recorrida ahí con los 9 roles: cero errores.
 
