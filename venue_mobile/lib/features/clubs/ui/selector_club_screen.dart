@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/estado_vista.dart';
 import '../../authentication/data/sesion.dart';
+import '../../teams/data/gente.dart';
+import '../../teams/ui/gente_screen.dart';
 import '../data/clubs.dart';
 
 class MarcaClub extends StatelessWidget {
@@ -50,6 +52,11 @@ class SelectorClubScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final clubs = ref.watch(clubsProvider);
     final perfil = ref.watch(perfilProvider).value;
+    final plataforma = ref.watch(plataformaProvider).value ?? false;
+    // el superadmin da de alta boliches desde acá, como en la web
+    Future<void> nuevo() async {
+      if (await abrirNuevoBoliche(context) == true) ref.invalidate(clubsProvider);
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -57,6 +64,15 @@ class SelectorClubScreen extends ConsumerWidget {
           valor: clubs,
           reintentar: () => ref.invalidate(clubsProvider),
           datos: (lista) {
+            if (lista.isEmpty && plataforma) {
+              return MensajeVista(
+                icono: Icons.add_business_outlined,
+                titulo: 'Todavía no hay ningún boliche',
+                detalle: 'Creá el primero para empezar a cargar eventos.',
+                accion: 'Nuevo boliche',
+                alTocar: nuevo,
+              );
+            }
             if (lista.isEmpty) {
               return MensajeVista(
                 icono: Icons.storefront_outlined,
@@ -121,6 +137,12 @@ class SelectorClubScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
+                  ),
+                if (plataforma)
+                  OutlinedButton.icon(
+                    onPressed: nuevo,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Nuevo boliche'),
                   ),
                 const SizedBox(height: 12),
                 TextButton(

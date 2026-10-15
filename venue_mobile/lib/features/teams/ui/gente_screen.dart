@@ -1099,6 +1099,11 @@ class _Boliches extends ConsumerWidget {
   }
 }
 
+/// Alta de boliche desde fuera de esta pantalla (el selector de boliche).
+/// Devuelve true si se creó.
+Future<bool?> abrirNuevoBoliche(BuildContext context) =>
+    _hoja<bool>(context, const _BolicheForm());
+
 String _hex(Color? c, String defecto) => c == null
     ? defecto
     : '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
@@ -1119,6 +1124,30 @@ class _BolicheFormState extends ConsumerState<_BolicheForm> {
   late final _s = TextEditingController(text: _hex(c?.secundario, '#A855F7'));
   final _a = TextEditingController(text: '#22D3EE');
   bool _ocupado = false;
+  bool _idTocado = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // igual que la web: el identificador se arma solo desde el nombre hasta
+    // que la persona lo edita a mano
+    if (c == null) {
+      _nombre.addListener(() {
+        if (!_idTocado) _id.text = _slug(_nombre.text);
+      });
+    }
+  }
+
+  static String _slug(String t) {
+    const de = 'áàäâãéèëêíìïîóòöôõúùüûñç', a = 'aaaaaeeeeiiiiooooouuuunc';
+    final b = StringBuffer();
+    for (final ch in t.trim().toLowerCase().split('')) {
+      final i = de.indexOf(ch);
+      b.write(i >= 0 ? a[i] : ch);
+    }
+    final r = b.toString().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
+    return r.length > 30 ? r.substring(0, 30) : r;
+  }
 
   @override
   void dispose() {
@@ -1179,6 +1208,7 @@ class _BolicheFormState extends ConsumerState<_BolicheForm> {
         TextField(
           controller: _id,
           enabled: c == null,
+          onChanged: (_) => _idTocado = true,
           autocorrect: false,
           decoration: const InputDecoration(
               labelText: 'Identificador',
