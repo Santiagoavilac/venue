@@ -739,8 +739,72 @@ const ICO_PATHS = {
   mas: '<path d="M12 5v14M5 12h14"/>',
   menos: '<path d="M5 12h14"/>',
   ojo: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  base: '<ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6"/><path d="M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/>',
+  ticket: '<path d="M3 9V6.5A1.5 1.5 0 0 1 4.5 5h15A1.5 1.5 0 0 1 21 6.5V9a3 3 0 0 0 0 6v2.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5V15a3 3 0 0 0 0-6z"/><path d="M14.5 7v1.5M14.5 11.25v1.5M14.5 15.5V17"/>',
+  sofa: '<path d="M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="M3 13a2 2 0 0 1 4 0v1h10v-1a2 2 0 0 1 4 0v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M6 18v2M18 18v2"/>',
+  manilla: '<rect x="3" y="8" width="18" height="8" rx="4"/><path d="M8.5 8v8M15.5 8v8"/>',
+  ajustes: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3.6 15H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9.7 4.4V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z"/>',
+  copiar: '<rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>',
+  archivo: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+  calendario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  escudo: '<path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/>',
+  usuario: '<circle cx="12" cy="8" r="3.6"/><path d="M5 20.5c.6-3.7 3.3-5.8 7-5.8s6.4 2.1 7 5.8"/>',
+  grupo: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.5 3-5 6-5s5.2 1.5 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 15.2c2.6.3 4.6 1.7 5.3 4.8"/>',
+  barras: '<path d="M6 20v-5M12 20V9M18 20V4"/>',
+  buscar: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  chevron: '<path d="M6 9l6 6 6-6"/>',
+  puntos: '<circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/>',
+  check: '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.3 2.3 4.7-4.8"/>',
+  reloj: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  qr: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2M20 14v6h-6"/>',
+  bolsa: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  copa: '<path d="M7 3h10l-1 8a4 4 0 0 1-8 0L7 3z"/><path d="M12 15v5M8 21h8"/>',
+  caja: '<path d="M4 8h16v12H4zM4 8l1.5-4h13L20 8"/><path d="M10 12h4"/>',
+  mapa: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>',
+  lista_: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
 };
 const ico = (k, cls = "") => `<svg viewBox="0 0 24 24" class="ic ${cls}" aria-hidden="true">${ICO_PATHS[k]}</svg>`;
+
+/* ---------- piezas del patrón de pantalla ----------
+   Todas las secciones se arman con las mismas tres piezas, en web de
+   escritorio, web de celular y la app:
+     · pgHead: etiqueta de sección en mayúsculas, título y una línea de
+       contexto; las acciones a la derecha (abajo en el celular).
+     · kpi: el dato con su ícono en un recuadro a la izquierda.
+     · pillEst: estado con punto de color (Activo, Pendiente…). */
+function pgHead({ ey = "", t, s = "", acc = "" }) {
+  return `
+  <header class="pg-h">
+    <div class="pg-h-tx">
+      ${ey ? `<span class="pg-ey">${ey}</span>` : ""}
+      <h1 class="pg-t">${t}</h1>
+      ${s ? `<p class="pg-s">${s}</p>` : ""}
+    </div>
+    ${acc ? `<div class="pg-acc">${acc}</div>` : ""}
+  </header>`;
+}
+/* tono: "" neutro · "marca" · "ok" · "warn" · "bad" */
+function kpi({ ic, k, v, de, s = "", tono = "", cola = "", attrs = "", tag = "div" }) {
+  return `
+  <${tag} class="kp${tono ? " kp-" + tono : ""}" ${attrs}>
+    ${ic ? `<span class="kp-ic">${ico(ic)}</span>` : ""}
+    <div class="kp-tx">
+      <span class="kp-k">${k}</span>
+      <span class="kp-v">${v}${de != null ? `<small> / ${de}</small>` : ""}</span>
+      ${s ? `<span class="kp-s">${s}</span>` : ""}
+    </div>
+    ${cola ? `<span class="kp-cola">${ico(cola)}</span>` : ""}
+  </${tag}>`;
+}
+const pillEst = (txt, tono = "ok") => `<span class="pill-est ${tono}">${txt}</span>`;
+const ROL_ICO = { admin: "escudo", jefe: "grupo", rrpp: "usuario", portero: "escudo", caja: "base",
+  propietario: "copa", barra: "copa", deposito: "caja" };
+const rolBadge = r => `<span class="us-rol" data-r="${r}">${ico(ROL_ICO[r] || "usuario")}${ROL_LABEL[r] || r}</span>`;
+/* Tono estable por persona para la inicial: el mismo nombre siempre cae en
+   el mismo color, y ninguno compite con el de la marca. */
+const TINTES = ["#7A3B2E", "#2F3F6B", "#4B2F6B", "#2E5A4B", "#6B5A2F", "#5A2F4B", "#2F5A6B"];
+const tinte = nm => { let h = 0; for (const c of String(nm || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0; return TINTES[h % TINTES.length]; };
+const inicial = nm => `<span class="ini" style="--ini:${tinte(nm)}">${esc((String(nm || "·").trim()[0] || "·").toUpperCase())}</span>`;
 
 const TAB_ICONS = {
   accesos: '<path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h7"/><path d="M10 12h11M17.5 8.5L21 12l-3.5 3.5"/>',
@@ -875,7 +939,7 @@ function sheetMasTabs() {
 
 function setTab() {
   document.querySelectorAll("#tabbar button, #botnav button").forEach(b =>
-    b.classList.toggle("on", b.dataset.t === tab));
+    b.classList.toggle("on", b.dataset.t === tab || (b.dataset.x === "usuarios" && tab === "gente")));
   // "Más" queda marcado cuando la sección activa vive dentro de él.
   const mas = document.querySelector("#botnav [data-mas]");
   if (mas) mas.classList.toggle("on", !tabsFor().slice(0, MAS_TABS).some(([t]) => t === tab));
@@ -1951,12 +2015,7 @@ function accSubs() {
 
 function accHeader() {
   return `
-  <header class="ac-h">
-    <div class="ac-h-tx">
-      <h1 class="ac-t">Accesos</h1>
-      <p class="ac-s">Quién puede entrar y quién ya entró.</p>
-    </div>
-  </header>
+  ${pgHead({ ey: "Puerta", t: "Accesos", s: ev ? `${esc(ev.nombre)} · ${fmtF(ev.fecha)}` : "Quién puede entrar y quién ya entró." })}
   <nav class="ac-subs" role="tablist">
     ${accSubs().map(([k, l]) =>
       `<button role="tab" aria-selected="${accSub === k}" class="ac-sub${accSub === k ? " on" : ""}" data-sub="${k}">${l}</button>`).join("")}
@@ -2089,26 +2148,21 @@ async function accResumen() {
   const cont = $("#acCuerpo");
   if (!cont) return;
   cont.innerHTML = `
-    <div class="ac-tot">
+    <section class="ac-tot">
+      <span class="ac-tot-ic">${ico("check")}</span>
       <div class="ac-tot-l">
         <div class="ac-tot-k">Ingresaron</div>
-        <div class="ac-tot-v">${totalEntro}<span>de ${totalPuede}</span></div>
+        <div class="ac-tot-v">${totalEntro}<span> / ${totalPuede}</span></div>
       </div>
       <div class="ac-tot-bar"><i style="width:${pct}%"></i></div>
       <div class="ac-tot-pct">${pct}%</div>
-    </div>
+    </section>
 
-    <div class="ac-vias">
-      <button class="ac-via" data-sub="invitados">
-        <span class="ac-via-k">${IC.people} Listas</span>
-        <span class="ac-via-v">${ing}<small>de ${anot}</small></span>
-        <span class="ac-via-s">${Math.max(anot - ing, 0)} sin llegar</span>
-      </button>
-      <button class="ac-via" data-sub="entradas">
-        <span class="ac-via-k">${IC.qr} Entradas</span>
-        <span class="ac-via-v">${qrUso}<small>de ${qrTot}</small></span>
-        <span class="ac-via-s">${Math.max(qrTot - qrUso, 0)} sin usar</span>
-      </button>
+    <div class="kps">
+      ${kpi({ tag: "button", attrs: 'data-sub="invitados"', ic: "grupo", k: "Listas", v: ing, de: anot,
+        s: `${Math.max(anot - ing, 0)} sin llegar`, cola: "chevron" })}
+      ${kpi({ tag: "button", attrs: 'data-sub="entradas"', ic: "ticket", k: "Entradas", v: qrUso, de: qrTot,
+        s: `${Math.max(qrTot - qrUso, 0)} sin usar`, cola: "chevron" })}
     </div>
 
     ${listas.length ? `
@@ -2235,7 +2289,7 @@ async function screenListas(soloPintar) {
     // Se ofrece reintentar en los dos casos: distinguirlos acá obligaría a
     // arrastrar el error, y el botón no molesta cuando de verdad no hay.
     $("#main").innerHTML = `
-      <div class="sh-h">Listas · ${esc(ev.nombre)}</div>
+      ${pgHead({ ey: "Puerta", t: "Listas", s: esc(ev.nombre) })}
       <div class="empty">Todavía no hay listas para este evento.<br>
         <span style="color:var(--text-muted);font-size:12.5px">${me.rol === "admin" ? "Creálas en Eventos → botón Listas." : "Pedile al admin que las cree."}</span><br>
         <button class="btn ghost2" style="width:auto;margin-top:12px;padding:10px 18px" id="lsRetry">Reintentar</button>
@@ -2645,7 +2699,7 @@ async function screenListas(soloPintar) {
    ============================================================ */
 async function screenListaPuerta() {
   $("#main").innerHTML = `
-    <div class="sh-h">Lista en puerta · ${esc(ev.nombre)}</div>
+    ${pgHead({ ey: "Puerta", t: "Lista en puerta", s: esc(ev.nombre) })}
     <div style="display:flex;gap:8px;align-items:flex-start">
       <div class="field" style="flex:1"><input id="pq" placeholder="Buscar nombre…" autocomplete="off"></div>
       <button class="ghost" id="pqRefresh" title="Traer lo último" style="padding:13px 15px;flex-shrink:0" aria-label="Traer lo último">${ico("recargar")}</button>
@@ -2899,7 +2953,7 @@ async function screenCaja() {
       ${evActivo ? `<button class="cebox ${cajaChecks.has(g.id) ? "on" : ""}" data-cchk="${g.id}" data-nom="${esc(g.nombre)}" title="Marcar que entró / recibió su manilla"></button>` : ""}
     </div>`;
   $("#main").innerHTML = `
-    <div class="sh-h">Relacionadores · ${clubNombre(club)}<span class="r-sub" id="cjCount">${cajaChecks.size}/${gente.length} atendidos</span></div>
+    ${pgHead({ ey: "Caja", t: "Relacionadores", s: `${esc(clubNombre(club))} · <span id="cjCount">${cajaChecks.size}/${gente.length} atendidos</span>` })}
     <div class="hint" style="margin:0 0 12px">Buscá al relacionador, entregale su manilla y tocá el ✓ para marcar que ya pasó.${evActivo
       ? ` Evento: <b style="color:var(--text-2)">${esc(evActivo.nombre)}</b>${evActivo.estado === "cerrado" ? " (ya cerrado — se sigue pudiendo marcar)" : ""}.`
       : ` <span style="color:var(--warn)">Este boliche todavía no tiene ningún evento creado — pedile al admin que lo cree para poder marcar.</span>`}</div>
@@ -2998,7 +3052,7 @@ async function screenRrppsPuerta() {
     </div>`;
 
   $("#main").innerHTML = `
-    <div class="sh-h">Relacionadores · ${clubNombre(club)}<span class="r-sub">${gente.length} en la lista</span></div>
+    ${pgHead({ ey: "Puerta", t: "Relacionadores", s: `${esc(clubNombre(club))} · ${gente.length} en la lista` })}
     <div class="hint" style="margin:0 0 12px">Buscá al relacionador para ver a qué team pertenece.${
       evA ? ` Evento: <b style="color:var(--text-2)">${esc(evA.nombre)}</b>.` : ""}</div>
     ${filtroOn ? `<div class="hint" style="margin:-6px 0 12px;color:var(--accent-2)">
@@ -3378,41 +3432,52 @@ async function pintarLiquidacion(prepagadas) {
 
   const total = preBoliche + mesaNeto - pueDesc;
 
+  const cerrado = ev.estado === "cerrado";
+  const sub = (ic, k, v, d, neg) => `
+        <div class="rp-sub${neg ? " neg" : ""}">
+          <span class="rp-sub-ic">${ico(ic)}</span>
+          <div class="rp-sub-tx"><span class="rp-sub-k">${k}</span><span class="rp-sub-v">${v}</span><span class="rp-sub-s">${d}</span></div>
+        </div>`;
   box.innerHTML = `
-    <div class="rp-cierre">
-      <span class="rp-cierre-k">Lo que se debería pagar al boliche</span>
-      <div class="rp-liq">
-        <div class="rp-lq">
-          <span class="rp-lq-k">Prepagadas — ${pct}%</span>
-          <span class="rp-lq-v">${fmtBs(preBoliche)} <small>Bs</small></span>
-          <span class="rp-lq-s">${preCant} ingresaron${preUnit ? ` × ${fmtBs(preUnit)} Bs` : ""} × ${pct}%</span>
+      <div class="rp-hero-h">
+        <span class="rp-hero-ic">${ico("base")}</span>
+        <div class="rp-hero-tx">
+          <span class="rp-hero-k">Total a pagar al boliche</span>
+          <span class="rp-hero-v">Bs ${fmtBs(total)}</span>
         </div>
-        <div class="rp-lq">
-          <span class="rp-lq-k">Mesas netas</span>
-          <span class="rp-lq-v">${fmtBs(mesaNeto)} <small>Bs</small></span>
-          <span class="rp-lq-s">${fmtBs(L.bruto_mesas)} − ${fmtBs(L.comision_mesas)} comisiones</span>
-        </div>
-        ${pueDesc > 0 ? `
-        <div class="rp-lq rp-lq-neg">
-          <span class="rp-lq-k">Menos Compra en Puerta — ${pct}%</span>
-          <span class="rp-lq-v">−${fmtBs(pueDesc)} <small>Bs</small></span>
-          <span class="rp-lq-s">${pueCant} ingresaron × ${fmtBs(puePrecio)} Bs × ${pct}%</span>
-        </div>` : ""}
+        ${pillEst(cerrado ? "Cerrado" : "Pendiente de cierre", cerrado ? "ok" : "warn")}
       </div>
-      <div class="rp-cierre-tot">
-        <span class="rp-cierre-tk">Total</span>
-        <span class="rp-cierre-v">${fmtBs(total)} <small>Bs</small></span>
+      <div class="rp-hero-grid">
+        ${sub("ticket", `Prepagadas — ${pct}%`, `Bs ${fmtBs(preBoliche)}`,
+          `${preCant} ingresaron${preUnit ? ` × ${fmtBs(preUnit)} Bs` : ""} × ${pct}%`)}
+        ${sub("sofa", "Mesas netas", `Bs ${fmtBs(mesaNeto)}`,
+          `${fmtBs(L.bruto_mesas)} − ${fmtBs(L.comision_mesas)} comisiones`)}
+        ${pueDesc > 0 ? sub("bolsa", `Menos Compra en Puerta — ${pct}%`, `−Bs ${fmtBs(pueDesc)}`,
+          `${pueCant} ingresaron × ${fmtBs(puePrecio)} Bs × ${pct}%`, true) : ""}
+        ${sub("manilla", "Manillas externas", `${+L.manillas_externas || 0}`, "No se reparten")}
       </div>
       ${lp && pueCant > 0 && !pue.hayPrecio ? `<p class="rp-cierre-av">${pueCant} persona${pueCant === 1 ? "" : "s"} de
         <b>${esc(lp.nombre)}</b> ingres${pueCant === 1 ? "ó" : "aron"}, pero esa lista todavía no tiene precio
-        cargado, así que no se descuenta nada. Se pone al editar la lista.</p>` : ""}
-    </div>
-    <div class="rp-ext">
+        cargado, así que no se descuenta nada. Se pone al editar la lista.</p>` : ""}`;
+  const aj = $("#liqAj");
+  if (aj) {
+    aj.innerHTML = `
+      <div class="rp-aj-h"><span class="rp-aj-ic">${ico("ajustes")}</span><h2 class="rp-aj-t">Ajustes del cierre</h2></div>
       <div class="field"><label for="liqExt">Manillas de externos (no se reparten)</label>
-        <input id="liqExt" type="number" min="0" value="${L.manillas_externas}"></div>
-      <button class="btn ghost2" id="liqGo">Aplicar</button>
-    </div>
-    <div class="hint" style="margin:-2px 0 0">De las ${L.manillas_usadas} que ingresaron se descuentan ${L.manillas_externas}. Es otra cosa que Compra en Puerta: acá se sacan manillas del reparto. Queda guardado en el evento.</div>`;
+        <div class="num-step">
+          <input id="liqExt" type="number" min="0" inputmode="numeric" value="${L.manillas_externas}">
+          <span class="num-step-b">
+            <button type="button" data-paso="1" aria-label="Sumar una">${ico("chevron", "rot180")}</button>
+            <button type="button" data-paso="-1" aria-label="Restar una">${ico("chevron")}</button>
+          </span>
+        </div>
+      </div>
+      <p class="rp-aj-n">De las ${L.manillas_usadas} que ingresaron se descuentan ${L.manillas_externas}. Es otra cosa que Compra en Puerta: acá se sacan manillas del reparto. Queda guardado en el evento.</p>
+      <div class="rp-aj-acc"><button class="btn ghost2" id="liqGo">Aplicar</button></div>`;
+    qsa("#liqAj [data-paso]").forEach(b => b.onclick = () => {
+      const i = $("#liqExt"); i.value = Math.max(0, (+i.value || 0) + +b.dataset.paso);
+    });
+  }
   $("#liqGo").onclick = async () => {
     const b = $("#liqGo"); b.disabled = true;
     const { error: e2 } = await sb.rpc("set_manillas_externas", {
@@ -3511,52 +3576,39 @@ async function screenStats() {
   const comTotal = tot.cr + tot.cj + mesasTot.comR + mesasTot.comJ + tot.bono;
   const neto = bolicheEnt + mesasTot.bs - mesasTot.comR - mesasTot.comJ - tot.bono;
   const title = me.rol === "admin" ? "Cierre del evento" : me.rol === "jefe" ? "Stats de mi team" : "Mis stats";
+  const esAdm = me.rol === "admin";
+  const excel = puedeVerExcelContable() ? `<button class="btn ghost2" id="btnExcel">${ico("archivo")}${me.rol === "jefe" && me.contabilidad_total !== true
+        ? "Exportar contabilidad de mi team" : "Exportar contabilidad Excel"}</button>` : "";
   $("#main").innerHTML = `
-    <div class="rp-h">
-      <div class="rp-h-tx">
-        <h2 class="rp-t">${title}</h2>
-        <p class="rp-s">${esc(ev.nombre)} · ${fmtF(ev.fecha)}</p>
-      </div>
+    ${pgHead({ ey: esAdm ? "Reporte" : "Stats", t: title, s: `${esc(ev.nombre)} · ${fmtF(ev.fecha)}` })}
+    ${esAdm ? `<div class="rp-top">
+      <section class="rp-hero" id="liqBox"><div class="sk sk-l1"></div></section>
+      <aside class="rp-aj" id="liqAj"></aside>
+    </div>` : ""}
+    <div class="kps">
+      ${kpi({ ic: "grupo", k: "Ingresaron de lista", v: regTot.in, de: regTot.an })}
+      ${kpi({ ic: "ticket", k: "Entradas ingresadas", v: entTot.usad, de: entTot.vend })}
+      ${esAdm ? kpi({ ic: "sofa", k: "Mesas vendidas", v: mesasTot.n }) : ""}
+      ${me.rol === "rrpp" ? kpi({ ic: "sofa", k: "Mis mesas", v: tot.mv, s: `Bs ${fmtBs(tot.bm)}` })
+        + kpi({ ic: "base", k: "Mi comisión total", v: `Bs ${fmtBs(tot.cr + tot.cmr + tot.bono)}`, s: "Entradas + mesas + bonos", tono: "ok" }) : ""}
+      ${me.rol === "jefe" ? kpi({ ic: "grupo", k: "Comisión RRPPs", v: `Bs ${fmtBs(tot.cr + tot.cmr)}` })
+        + kpi({ ic: "base", k: "Mi comisión (jefe)", v: `Bs ${fmtBs(tot.cj + tot.cmj)}`, tono: "ok" }) : ""}
     </div>
-    ${me.rol === "admin" ? `<div id="liqBox"></div>` : ""}
-    <div class="rp-kpis">
-      <div class="rp-k">
-        <span class="rp-k-k">Ingresaron de lista</span>
-        <span class="rp-k-v">${regTot.in}<small>/${regTot.an}</small></span>
-      </div>
-      <div class="rp-k">
-        <span class="rp-k-k">Entradas ingresadas</span>
-        <span class="rp-k-v">${entTot.usad}<small>/${entTot.vend}</small></span>
-      </div>
-      ${me.rol === "admin" ? `
-      <div class="rp-k">
-        <span class="rp-k-k">Mesas vendidas</span>
-        <span class="rp-k-v">${mesasTot.n}</span>
-      </div>` : ""}
-    </div>
-    ${me.rol === "admin" && porLista.length ? `<div class="rp-bloque">
+    ${esAdm && porLista.length ? `<div class="rp-bloque">
       <div class="rp-bloque-h"><span class="rp-bloque-t">Por lista</span>
         <span class="rp-bloque-s">entraron / anotados</span></div>
       <div class="rp-listas">${porLista.map(l => `
         <span class="rp-lp"><span class="rp-lp-n">${esc(l.nombre)}</span>
           <span class="rp-lp-v"><b>${l.ce}</b>/${l.ca}</span></span>`).join("")}</div>
     </div>` : ""}
-    ${me.rol === "admin" ? `<div id="fasesBox"></div>` : ""}
-    <div class="stats">
-      ${me.rol === "rrpp" ? `
-      <div class="stat"><span class="k">Mis mesas</span><span class="v">${tot.mv} · ${fmtBs(tot.bm)} Bs</span></div>
-      <div class="stat" style="grid-column:1/-1"><span class="k">Mi comisión total (entradas + mesas + bonos)</span><span class="v ok">${fmtBs(tot.cr + tot.cmr + tot.bono)} Bs</span></div>` : ""}
-      ${me.rol === "jefe" ? `
-      <div class="stat"><span class="k">Comisión RRPPs</span><span class="v">${fmtBs(tot.cr + tot.cmr)} Bs</span></div>
-      <div class="stat"><span class="k">Mi comisión (jefe)</span><span class="v ok">${fmtBs(tot.cj + tot.cmj)} Bs</span></div>` : ""}
-    </div>
-    ${["rrpp", "jefe"].includes(me.rol) ? `<div class="ph-actions" style="margin-bottom:14px;justify-content:flex-start">
-      ${me.rol === "rrpp" ? `<button class="btn ghost2" style="width:auto" id="btnMisNombres">Ver mis nombres</button>` : ""}
-      <button class="btn ghost2" style="width:auto" id="btnHistStats">Eventos pasados</button>
+    ${esAdm ? `<div id="fasesBox"></div>` : ""}
+    ${["rrpp", "jefe"].includes(me.rol) ? `<div class="pg-fila-acc">
+      ${me.rol === "rrpp" ? `<button class="btn ghost2" id="btnMisNombres">${ico("usuario")}Ver mis nombres</button>` : ""}
+      <button class="btn ghost2" id="btnHistStats">${ico("reloj")}Eventos pasados</button>
     </div>` : ""}
-    ${me.rol === "admin" ? `
+    ${esAdm ? `
     <details class="rp-det">
-      <summary class="rp-det-s">Ver desglose por comisiones</summary>
+      <summary class="rp-det-s">${ico("chevron", "rp-det-ch")}<span>Ver desglose por comisiones</span>${ico("chevron", "rp-det-ch2")}</summary>
       <div class="rp-det-b">
         <p class="rp-det-n">Otra forma de leer la misma noche: el bruto menos lo que se lleva
           cada relacionador. Es un control interno — la cifra que se paga es la de arriba.</p>
@@ -3569,13 +3621,10 @@ async function screenStats() {
       </div>
     </details>
     <div class="rp-acc">
-      <button class="btn primary" id="btnCopiar">Copiar cierre</button>
-      <button class="ghost rp-mas" id="rpMas" aria-label="Más acciones">⋯</button>
-    </div>` : ""}
-    ${puedeVerExcelContable() ? `<div class="rp-acc">
-      <button class="btn ghost2" id="btnExcel">${me.rol === "jefe" && me.contabilidad_total !== true
-        ? "Exportar contabilidad de mi team" : "Exportar contabilidad Excel"}</button>
-    </div>` : ""}`;
+      <button class="btn primary" id="btnCopiar">${ico("copiar")}Copiar cierre</button>
+      ${excel}
+      <button class="ghost rp-mas" id="rpMas" aria-label="Más acciones">${ico("puntos")}</button>
+    </div>` : excel ? `<div class="rp-acc">${excel}</div>` : ""}`;
   /* La lista "Por relacionador" salió de esta pantalla (pedido del dueño):
      con ella se fueron su filtro por team, su buscador y el click que abría
      el detalle. El desglose nombre por nombre sigue disponible desde
@@ -4040,13 +4089,19 @@ async function screenGente() {
   if (gnNav?.tipo === "user") { gnVistaUsuario(gente.find(g => g.id === gnNav.id)); return; }
 
   const clubNom = clubNombre(club);
+  const nAdm = gente.filter(g => g._effRol === "admin").length;
+  const nAct = gente.filter(g => g.activo).length;
   $("#main").innerHTML = `
-    <div class="iv-h">
-      <div class="iv-h-tx">
-        <h2 class="iv-t">Administración de usuarios y equipos</h2>
-        <p class="iv-s">${clubNom} · <b>${gente.length}</b> personas · <b>${teamsDelClub().length}</b> teams</p>
-      </div>
-      <button class="btn primary iv-add" id="gnNuevo">${genteTab === "usuarios" ? "Nuevo usuario" : "Nuevo team"}</button>
+    ${pgHead({
+      ey: "Gestión", t: "Administración de usuarios y equipos",
+      s: `${esc(clubNom)} · ${gente.length} usuario${gente.length === 1 ? "" : "s"} · ${teamsDelClub().length} team${teamsDelClub().length === 1 ? "" : "s"}`,
+      acc: `${genteTab === "usuarios" ? `<button class="btn ghost2" id="gnTels">${ico("telefono")}WhatsApp</button>` : ""}
+        <button class="btn primary" id="gnNuevo">${ico("mas")}${genteTab === "usuarios" ? "Nuevo usuario" : "Nuevo team"}</button>` })}
+    <div class="kps kps-4">
+      ${kpi({ ic: "usuario", k: "Usuarios totales", v: gente.length, cola: "grupo" })}
+      ${kpi({ ic: "grupo", k: "Teams", v: teamsDelClub().length, cola: "grupo" })}
+      ${kpi({ ic: "escudo", k: "Administradores", v: nAdm, tono: "marca" })}
+      ${kpi({ ic: "check", k: "Activos", v: nAct, tono: "ok", cola: "barras" })}
     </div>
     <nav class="ac-subs gn-tabs" role="tablist">
       <button role="tab" class="ac-sub${genteTab === "usuarios" ? " on" : ""}" data-gt="usuarios">Usuarios</button>
@@ -4068,39 +4123,38 @@ function gnListaUsuarios(gente, telPorId) {
     const busca = `${g.nombre} @${g.usuario} ${ROL_LABEL[g._effRol]} ${g._effTeamNom} ${telPorId[g.id] || ""}`.toLowerCase();
     return `
     <div class="gn-fila" data-gu="${g.id}" data-row="${esc(busca)}" data-team="${g._effTeam || ""}" data-rol="${g._effRol}" data-act="${g.activo ? 1 : 0}" role="button" tabindex="0">
-      <span class="relmark">${esc(g.nombre[0])}</span>
+      ${inicial(g.nombre)}
       <span class="gn-nm">${esc(g.nombre)}${g.id === me.id ? ` <span class="us-yo">Vos</span>` : ""}</span>
       <span class="gn-user">@${esc(g.usuario)}</span>
-      <span class="gn-rol"><span class="us-rol" data-r="${g._effRol}">${ROL_LABEL[g._effRol]}</span></span>
-      <span class="gn-team">${g._effTeamNom ? esc(g._effTeamNom) : `<span class="vacio">Sin team</span>`}</span>
-      <span class="gn-est">${g.activo ? `<span class="gn-on">Activo</span>` : `<span class="us-off">Pausado</span>`}</span>
-      <button class="tk-mas" data-mas-gu="${g.id}" title="Ficha" aria-label="Ficha de ${esc(g.nombre)}">⋯</button>
+      <span class="gn-rol">${rolBadge(g._effRol)}</span>
+      <span class="gn-team">${ico("grupo")}${g._effTeamNom ? esc(g._effTeamNom) : `<span class="vacio">Sin team</span>`}</span>
+      <span class="gn-est">${g.activo ? pillEst("Activo") : pillEst("Pausado", "off")}</span>
+      <button class="tk-mas" data-mas-gu="${g.id}" title="Ficha" aria-label="Ficha de ${esc(g.nombre)}">${ico("puntos")}</button>
     </div>`;
   };
   return `
     <div class="iv-tools">
-      <div class="iv-buscar"><input id="gnBuscar" placeholder="Buscar por nombre, usuario, team o número…" autocomplete="off" value="${esc(gnQ)}"></div>
+      <label class="campo-ic iv-buscar">${ico("buscar")}<input id="gnBuscar" placeholder="Buscar por nombre, usuario, team o número…" autocomplete="off" value="${esc(gnQ)}"></label>
       <div class="iv-filtros gn-filtros">
-        <select id="gnRolF" title="Filtrar por rol">
+        <label class="sel-ic">${ico("usuario")}<select id="gnRolF" title="Filtrar por rol">
           <option value="">Todos los roles</option>
           ${["admin", "jefe", "rrpp", "portero", "caja"].map(r => `<option value="${r}"${gnFRol === r ? " selected" : ""}>${ROL_LABEL[r]}</option>`).join("")}
-        </select>
-        <select id="gnTeamF" title="Filtrar por team">
+        </select></label>
+        <label class="sel-ic">${ico("grupo")}<select id="gnTeamF" title="Filtrar por team">
           <option value="">Todos los teams</option>
           ${teamsDelClub().map(t => `<option value="${t.id}"${gnFTeam === t.id ? " selected" : ""}>${esc(t.nombre)}</option>`).join("")}
           <option value="__none__"${gnFTeam === "__none__" ? " selected" : ""}>Sin team</option>
-        </select>
-        <select id="gnEstF" title="Filtrar por estado">
-          <option value="">Todos</option>
+        </select></label>
+        <label class="sel-ic sel-dot"><span class="dot"></span><select id="gnEstF" title="Filtrar por estado">
+          <option value="">Estado: Todos</option>
           <option value="1"${gnFEstado === "1" ? " selected" : ""}>Activos</option>
           <option value="0"${gnFEstado === "0" ? " selected" : ""}>Pausados</option>
-        </select>
-        <button class="btn ghost2 gn-wa" id="gnTels">WhatsApp</button>
+        </select></label>
       </div>
     </div>
     <div class="gn-tabla">
       <div class="gn-cab" aria-hidden="true">
-        <span></span><span>Nombre</span><span>Usuario</span><span>Rol</span><span>Team</span><span>Estado</span><span></span>
+        <span></span><span>Nombre</span><span>Usuario</span><span>Rol</span><span>Team</span><span>Estado</span><span>Acciones</span>
       </div>
       ${gente.map(filaDe).join("") || `<div class="empty">No hay usuarios.</div>`}
     </div>
@@ -4115,7 +4169,7 @@ function gnConectarUsuarios(gente) {
     f.onclick = () => abrirFicha(f.dataset.gu);
     f.onkeydown = e => { if (e.key === "Enter") abrirFicha(f.dataset.gu); };
   });
-  $("#gnTels").onclick = e => { e.stopPropagation(); sheetTelefonos(); };
+  $("#gnTels") && ($("#gnTels").onclick = e => { e.stopPropagation(); sheetTelefonos(); });
   const bq = $("#gnBuscar"), fr = $("#gnRolF"), ft = $("#gnTeamF"), fe = $("#gnEstF");
   const aplicar = () => {
     gnQ = (bq?.value || "").trim().toLowerCase();
@@ -4145,19 +4199,19 @@ function gnListaTeams(gente) {
     const rrpps = miembros.filter(g => g._effRol === "rrpp");
     return `
     <div class="gn-fila gn-fila-tm" data-tm="${t.id}" role="button" tabindex="0">
-      <span class="relmark">${esc((t.nombre.replace(/^team /i, "")[0] || "T").toUpperCase())}</span>
+      ${inicial(t.nombre.replace(/^team /i, "") || "T")}
       <span class="gn-nm">${esc(t.nombre)}</span>
       <span class="gn-user">${jefes.length ? `Jefe: ${esc(jefes.map(j => j.nombre.split(" ")[0]).join(", "))}` : `<span class="vacio">Sin jefe</span>`}</span>
       <span class="gn-rol">${rrpps.length} RRPP</span>
-      <span class="gn-team">${miembros.length} miembro${miembros.length === 1 ? "" : "s"}</span>
+      <span class="gn-team">${ico("grupo")}${miembros.length} miembro${miembros.length === 1 ? "" : "s"}</span>
       <span class="gn-est"><span class="pill-club">${clubTag(t.clubs)}</span></span>
-      <button class="tk-mas" data-mas-tm="${t.id}" title="Abrir" aria-label="Abrir ${esc(t.nombre)}">⋯</button>
+      <button class="tk-mas" data-mas-tm="${t.id}" title="Abrir" aria-label="Abrir ${esc(t.nombre)}">${ico("puntos")}</button>
     </div>`;
   }).join("");
   return `
     <div class="gn-tabla">
       <div class="gn-cab" aria-hidden="true">
-        <span></span><span>Team</span><span>Jefe</span><span>RRPP</span><span>Miembros</span><span>Boliche</span><span></span>
+        <span></span><span>Team</span><span>Jefe</span><span>RRPP</span><span>Miembros</span><span>Boliche</span><span>Acciones</span>
       </div>
       ${filas || `<div class="empty">Todavía no hay teams en este boliche.</div>`}
     </div>`;
@@ -4180,17 +4234,13 @@ function gnVistaTeam(t) {
   const invite = `${location.origin}${location.pathname}?invite=${t.invite_code}`;
   $("#main").innerHTML = `
     <button class="btn ghost2 gn-volver" id="gnBack">${ico("atras")}Todos los teams</button>
-    <div class="iv-h">
-      <div class="iv-h-tx">
-        <h2 class="iv-t">${esc(t.nombre)}</h2>
-        <p class="iv-s">${jefes.length ? `Jefe: <b>${esc(jefes.map(j => j.nombre).join(", "))}</b> · ` : ""}<b>${rrpps.length}</b> RRPP · <b>${miembros.length}</b> miembro${miembros.length === 1 ? "" : "s"} · ${clubTag(t.clubs)}</p>
-      </div>
-      ${ev ? `<button class="btn primary iv-add" id="gnResumen">Copiar resumen</button>` : ""}
-    </div>
+    ${pgHead({ ey: "Team", t: esc(t.nombre),
+      s: `${jefes.length ? `Jefe: <b>${esc(jefes.map(j => j.nombre).join(", "))}</b> · ` : ""}<b>${rrpps.length}</b> RRPP · <b>${miembros.length}</b> miembro${miembros.length === 1 ? "" : "s"} · ${clubTag(t.clubs)}`,
+      acc: ev ? `<button class="btn primary" id="gnResumen">${ico("copiar")}Copiar resumen</button>` : "" })}
     <div class="dt-acc" style="flex-wrap:wrap;margin-bottom:16px">
-      <button class="btn ghost2" id="ftInv">Copiar link de registro</button>
-      <button class="btn ghost2" id="ftQr">QR de cobro</button>
-      <button class="btn ghost2" id="ftEdit">Editar team</button>
+      <button class="btn ghost2" id="ftInv">${ico("copiar")}Copiar link de registro</button>
+      <button class="btn ghost2" id="ftQr">${ico("qr")}QR de cobro</button>
+      <button class="btn ghost2" id="ftEdit">${ico("ajustes")}Editar team</button>
     </div>
     <div class="gn-tabla">
       <div class="gn-cab" aria-hidden="true">
@@ -4198,13 +4248,13 @@ function gnVistaTeam(t) {
       </div>
       ${miembros.map(g => `
       <div class="gn-fila" data-gu="${g.id}" role="button" tabindex="0">
-        <span class="relmark">${esc(g.nombre[0])}</span>
+        ${inicial(g.nombre)}
         <span class="gn-nm">${esc(g.nombre)}</span>
         <span class="gn-user">@${esc(g.usuario)}</span>
-        <span class="gn-rol"><span class="us-rol" data-r="${g._effRol}">${ROL_LABEL[g._effRol]}</span></span>
+        <span class="gn-rol">${rolBadge(g._effRol)}</span>
         <span class="gn-team"></span>
-        <span class="gn-est">${g.activo ? `<span class="gn-on">Activo</span>` : `<span class="us-off">Pausado</span>`}</span>
-        <button class="tk-mas" title="Abrir" aria-label="Abrir ${esc(g.nombre)}">⋯</button>
+        <span class="gn-est">${g.activo ? pillEst("Activo") : pillEst("Pausado", "off")}</span>
+        <button class="tk-mas" title="Abrir" aria-label="Abrir ${esc(g.nombre)}">${ico("puntos")}</button>
       </div>`).join("") || `<div class="empty">Nadie asignado a este team acá.</div>`}
     </div>
     <p class="hint" style="margin-top:10px">Tocá a alguien para ver su detalle, moverlo de team o cambiarle el rol.</p>`;
@@ -4233,17 +4283,13 @@ async function gnVistaUsuario(g) {
   $("#main").innerHTML = `
     <button class="btn ghost2 gn-volver" id="gnBack">${ico("atras")}${desdeTeam ? `Volver a ${esc(desdeTeam.nombre)}` : "Volver"}</button>
     ${desdeTeam ? `<p class="gn-miga">Teams / ${esc(desdeTeam.nombre)} / <b>${esc(g.nombre)}</b></p>` : ""}
-    <div class="iv-h">
-      <div class="iv-h-tx" style="display:flex;gap:12px;align-items:center">
-        <div class="avatar" style="width:44px;height:44px;font-size:19px">${esc(g.nombre[0])}</div>
-        <div>
-          <h2 class="iv-t">${esc(g.nombre)}${g.id === me.id ? ` <span class="us-yo">Vos</span>` : ""}</h2>
-          <p class="iv-s">@${esc(g.usuario)} · ${ROL_LABEL[g._effRol]}${g._effTeamNom ? ` · ${esc(g._effTeamNom)}` : ""}</p>
-        </div>
-      </div>
+    <div class="pg-persona">
+      ${inicial(g.nombre).replace('class="ini"', 'class="ini ini-lg"')}
+      ${pgHead({ ey: "Usuario", t: `${esc(g.nombre)}${g.id === me.id ? ` <span class="us-yo">Vos</span>` : ""}`,
+        s: `@${esc(g.usuario)} · ${ROL_LABEL[g._effRol]}${g._effTeamNom ? ` · ${esc(g._effTeamNom)}` : ""}` })}
     </div>
     <div class="dt-datos" style="max-width:560px">
-      <div class="dt-f"><span class="dt-k">Estado</span><span class="dt-v">${g.activo ? "Activo" : "Pausado"}</span></div>
+      <div class="dt-f"><span class="dt-k">Estado</span><span class="dt-v">${g.activo ? pillEst("Activo") : pillEst("Pausado", "off")}</span></div>
       ${g.rol === "admin" ? "" : `<div class="dt-f"><span class="dt-k">Opera en</span><span class="dt-v">${clubTag(g.clubs)}</span></div>`}
       ${g._effRol !== g.rol || (g._effTeam ?? null) !== (g.team_id ?? null)
         ? `<div class="dt-f"><span class="dt-k">Base</span><span class="dt-v">${ROL_LABEL[g.rol]}${g.t?.nombre ? ` · ${esc(g.t.nombre)}` : ""}</span></div>` : ""}
@@ -4679,7 +4725,7 @@ async function screenTeam() {
   const gente = rosterRaw || [];
   const inviteUrl = myTeam?.invite_code ? `${location.origin}${location.pathname}?invite=${myTeam.invite_code}` : null;
   $("#main").innerHTML = `
-    <div class="sh-h">Mi team<span class="r-sub">${gente.length} relacionadores</span></div>
+    ${pgHead({ ey: "Team", t: "Mi team", s: `${gente.length} relacionadores` })}
     ${inviteUrl ? `<div class="assigned" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
       <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Link de registro: ${inviteUrl}</span>
       <button class="checkin" id="btnInv" style="flex-shrink:0">Copiar</button></div>` : ""}
@@ -4762,12 +4808,7 @@ async function screenTeamAdmin() {
   });
   const inv = t => `${location.origin}${location.pathname}?invite=${t.invite_code}`;
   $("#main").innerHTML = `
-    <div class="tm-h">
-      <div class="tm-h-tx">
-        <h2 class="tm-t">Teams</h2>
-        <p class="tm-s"><b>${teams.length}</b> ${teams.length === 1 ? "team" : "teams"} en ${clubNombre(club)}</p>
-      </div>
-    </div>
+    ${pgHead({ ey: "Gestión", t: "Teams", s: `<b>${teams.length}</b> ${teams.length === 1 ? "team" : "teams"} en ${esc(clubNombre(club))}` })}
     <div class="cta-zona" id="tmZona">
       <button class="btn primary cta-abrir" id="btnNTOpen">Crear team</button>
     </div>
@@ -4941,13 +4982,8 @@ async function screenEventos() {
   // listar — el admin crea el primero desde acá mismo
   if (!club) {
     $("#main").innerHTML = `
-      <header class="in-h">
-        <div class="in-h-tx">
-          <h1 class="in-t">Inicio</h1>
-          <p class="in-s">Todavía no hay ningún boliche creado.</p>
-        </div>
-        ${me.rol === "admin" ? `<button class="btn primary in-nuevo" id="irBoliches">Crear boliche</button>` : ""}
-      </header>
+      ${pgHead({ ey: "Inicio", t: "Bienvenido", s: "Todavía no hay ningún boliche creado.",
+        acc: me.rol === "admin" ? `<button class="btn primary" id="irBoliches">${ico("mas")}Crear boliche</button>` : "" })}
       <div class="empty">${me.rol === "admin"
         ? "Creá el primer boliche para empezar a cargar eventos."
         : "Pedile a un administrador que cree el primer boliche."}</div>`;
@@ -4988,18 +5024,18 @@ async function screenEventos() {
         ${ev.precio_manilla ? `<span class="ev-pt"></span><span>Manilla ${fmtBs(ev.precio_manilla)} Bs</span>` : ""}
       </p>
 
-      <div class="ev-mets">
-        <button class="ev-met" data-go="listas"><span class="ev-met-ic">${IC.people}</span><span class="ev-met-k">Listas</span><b>${ca}</b></button>
-        <button class="ev-met" data-go="entradas"><span class="ev-met-ic">${IC.qr}</span><span class="ev-met-k">Entradas</span><b>${qr}</b></button>
-        <button class="ev-met" data-go="mesas"><span class="ev-met-ic">${IC.mesa}</span><span class="ev-met-k">Mesas</span><b>${mv}</b></button>
-        <button class="ev-met ok" data-go="listas"><span class="ev-met-ic">${IC.pincheck}</span><span class="ev-met-k">Ingresaron</span><b>${ce}</b></button>
+      <div class="kps kps-4 ev-kps">
+        ${kpi({ tag: "button", attrs: 'data-go="listas"', ic: "grupo", k: "Anotados en listas", v: ca })}
+        ${kpi({ tag: "button", attrs: 'data-go="entradas"', ic: "ticket", k: "Entradas", v: qr })}
+        ${kpi({ tag: "button", attrs: 'data-go="mesas"', ic: "sofa", k: "Mesas", v: mv })}
+        ${kpi({ tag: "button", attrs: 'data-go="listas"', ic: "check", k: "Ingresaron", v: ce, tono: "ok" })}
       </div>
 
       <div class="ev-acc">
-        <button class="ghost" data-listas="${ev.id}">Listas</button>
-        <button class="ghost" data-edit="${ev.id}">Editar</button>
-        <button class="ghost" data-dis="${ev.id}">${ev.ticket_url ? "Diseño ✓" : "Diseño"}</button>
-        <button class="ghost ev-mas" id="evMas" title="Más acciones" aria-label="Más acciones">⋯</button>
+        <button class="ghost" data-listas="${ev.id}">${ico("lista_")}Listas</button>
+        <button class="ghost" data-edit="${ev.id}">${ico("ajustes")}Editar</button>
+        <button class="ghost" data-dis="${ev.id}">${ico("imagen")}Diseño${ev.ticket_url ? " ✓" : ""}</button>
+        <button class="ghost ev-mas" id="evMas" title="Más acciones" aria-label="Más acciones">${ico("puntos")}</button>
       </div>
     </section>`;
   }
@@ -5013,16 +5049,9 @@ async function screenEventos() {
     e.id !== (ev && ev.id) && !(e.estado === "cerrado" || e.fecha < hoyStr));
 
   $("#main").innerHTML = `
-    <header class="in-h">
-      <div class="in-h-tx">
-        <h1 class="in-t">Inicio</h1>
-        <p class="in-s">Gestioná tu próximo evento y accedé al historial.</p>
-      </div>
-      <div style="display:flex;gap:8px">
-        ${me.plataforma ? `<button class="btn ghost2" id="irBoliches" title="Administrar boliches">Boliches</button>` : ""}
-        <button class="btn primary in-nuevo" id="evNuevoBtn">Crear nuevo evento</button>
-      </div>
-    </header>
+    ${pgHead({ ey: esc(clubNombre(club)), t: "Inicio", s: "Tu próximo evento y los anteriores.",
+      acc: `${me.plataforma ? `<button class="btn ghost2" id="irBoliches" title="Administrar boliches">${ico("mapa")}Boliches</button>` : ""}
+        <button class="btn primary" id="evNuevoBtn">${ico("mas")}Crear nuevo evento</button>` })}
 
     ${hero || `<div class="empty">Todavía no hay ningún evento en este boliche.<br>
       <span style="color:var(--text-muted);font-size:12.5px">Creá el primero con el botón de arriba.</span></div>`}
@@ -5808,14 +5837,10 @@ async function screenMesas() {
   // cambiar la ventana no le mueve el plazo a nadie que ya reservó.
   const vence = m => hora(new Date(m.reserva_vence_at || new Date(m.reservada_at).getTime() + horasReserva() * 36e5));
   $("#main").innerHTML = `
-    <div class="ms-h">
-      <div class="ms-h-tx">
-        <h2 class="ms-t">Mesas</h2>
-        <p class="ms-s"><b>${oc.length}</b> de <b>${mesas.length}</b> ${esPortero ? "ocupadas" : "vendidas"}${
-          !esPortero && oc.length ? ` · <b>${fmtBs(oc.reduce((a, m) => a + (+m.precio || 0), 0))}</b> Bs` : ""}${pisos.length < 2 ? ` · ${esc(FLOOR_LABEL[planta] || planta)}` : ""}</p>
-      </div>
-      <div class="ms-h-acc" id="msAcc"></div>
-    </div>
+    ${pgHead({ ey: "Salón", t: "Mesas",
+      s: `<b>${oc.length}</b> de <b>${mesas.length}</b> ${esPortero ? "ocupadas" : "vendidas"}${
+          !esPortero && oc.length ? ` · <b>Bs ${fmtBs(oc.reduce((a, m) => a + (+m.precio || 0), 0))}</b>` : ""}${pisos.length < 2 ? ` · ${esc(FLOOR_LABEL[planta] || planta)}` : ""}`,
+      acc: `<div class="ms-h-acc" id="msAcc"></div>` })}
     ${misRes.length ? `<div class="hint" style="color:var(--warn);margin:0 0 10px">Reservas sin pago: ${misRes.map(x => `${esc(x.etiqueta)} vence ${vence(x)}`).join(" · ")} — confirmá el pago o se liberan solas.</div>` : ""}
     <div class="floors${pisos.length < 2 ? " solo" : ""}" style="margin:0 0 12px"><span class="ind" style="width:calc(${(100 / pisos.length).toFixed(2)}% - 5px);transform:translateX(${pisos.indexOf(planta) * 100}%)"></span>
       ${pisos.map(f => `<button data-f="${f}" class="${planta === f ? "on" : ""}">${FLOOR_LABEL[f] || f}</button>`).join("")}</div>
@@ -7290,12 +7315,15 @@ async function sheetCopiar() {
 
 /* ---------- buscar ---------- */
 $("#btnBuscar") && ($("#btnBuscar").onclick = () => abrirBuscar());
-/* En escritorio "/" abre la búsqueda, como en cualquier lista larga.
-   Se ignora si el foco ya está escribiendo en un campo. */
+/* En escritorio ⌘K (Ctrl+K fuera de la Mac) abre la búsqueda desde
+   cualquier lado; "/" también, salvo que el foco ya esté en un campo. */
+const esMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+{ const k = $("#btnBuscar kbd"); if (k) k.textContent = esMac ? "⌘ K" : "Ctrl K"; }
 document.addEventListener("keydown", e => {
-  if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+  const atajoK = e.key.toLowerCase() === "k" && (esMac ? e.metaKey : e.ctrlKey) && !e.altKey;
+  if (!atajoK && (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey)) return;
   const t = e.target;
-  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+  if (!atajoK && t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
   if (!me || $("#app").classList.contains("hidden")) return;
   e.preventDefault();
   abrirBuscar();
@@ -7607,10 +7635,10 @@ async function screenInventario() {
   const porCat = {};
   filas.forEach(s => (porCat[s.categoria] = porCat[s.categoria] || []).push(s));
   $("#main").innerHTML = `
-    <div class="sh-h">Inventario · ${clubNombre(club)}<span class="r-sub">${filas.length} bebidas</span></div>
-    <div class="stats" style="margin-bottom:12px">
-      <div class="stat st-vio"><span class="st-ic vio">${IC.tag}</span><span class="k">Stock valorizado</span><span class="v">${fmtBs(Math.round(valor))} Bs</span></div>
-      <div class="stat ${bajos.length ? "st-warn" : "st-ok"}"><span class="st-ic ${bajos.length ? "warn" : "ok"}">${IC.shield}</span><span class="k">Por reponer</span><span class="v ${bajos.length ? "warn" : "ok"}">${bajos.length}</span></div>
+    ${pgHead({ ey: "Barra", t: "Inventario", s: `${esc(clubNombre(club))} · ${filas.length} bebidas` })}
+    <div class="kps">
+      ${kpi({ ic: "base", k: "Stock valorizado", v: `Bs ${fmtBs(Math.round(valor))}`, tono: "marca" })}
+      ${kpi({ ic: "caja", k: "Por reponer", v: `${bajos.length}`, tono: bajos.length ? "warn" : "ok" })}
     </div>
     <div class="ph-actions" style="margin-bottom:12px">
       <button class="ghost" id="btnRecibir">Cargar compra</button>
@@ -7864,7 +7892,7 @@ async function screenBarMovimientos() {
   const movs = data || [];
   const ICO = { entrada: ico("recibir"), salida: ico("salida"), ajuste: ico("ajuste"), baja: ico("baja"), anulacion: ico("deshacer"), devolucion: ico("deshacer") };
   $("#main").innerHTML = `
-    <div class="sh-h">Movimientos<span class="r-sub">últimos ${movs.length}</span></div>
+    ${pgHead({ ey: "Barra", t: "Movimientos", s: `Últimos ${movs.length}` })}
     <div class="hint" style="margin:0 0 12px">Todo lo que entró y salió, con quién y cuándo. Nada se borra: una corrección queda como un movimiento más.</div>
     <div>${movs.map(m => `
       <div class="list-row rc">
@@ -7919,7 +7947,7 @@ async function screenBarConteo() {
   filas.forEach(f => (porCat[f.categoria || "Sin categoría"] ||= []).push(f));
 
   $("#main").innerHTML = `
-    <div class="sh-h">Conteo · ${esc(ev.nombre)}<span class="r-sub">${filas.length} lote(s)</span></div>
+    ${pgHead({ ey: "Barra", t: "Conteo", s: `${esc(ev.nombre)} · ${filas.length} lote(s)` })}
     <div class="seg" style="margin-bottom:10px">
       <button class="segbtn ${conteoMomento === "apertura" ? "on" : ""}" data-cm="apertura">Apertura</button>
       <button class="segbtn ${conteoMomento === "cierre" ? "on" : ""}" data-cm="cierre">Cierre</button>
@@ -8018,7 +8046,7 @@ async function screenBarConteo() {
 async function screenRecepcion() {
   await loadBebidas();
   $("#main").innerHTML = `
-    <div class="sh-h">Registrar lo que llega</div>
+    ${pgHead({ ey: "Depósito", t: "Registrar lo que llega" })}
     <div class="hint" style="margin:0 0 14px">Anotá lo que entra al depósito. No manejás costos ni ves el stock total — de eso se ocupa el propietario.</div>
     <button class="btn primary" id="rcGo">Registrar ingreso</button>`;
   $("#rcGo").onclick = () => sheetRecibirLote();
@@ -8028,7 +8056,7 @@ async function screenRecepcionMias() {
     .eq("recibido_por", me.id).order("recibido_at", { ascending: false }).limit(80);
   const ls = data || [];
   $("#main").innerHTML = `
-    <div class="sh-h">Lo que registraste<span class="r-sub">${ls.length}</span></div>
+    ${pgHead({ ey: "Depósito", t: "Lo que registraste", s: `${ls.length} registro${ls.length === 1 ? "" : "s"}` })}
     <div>${ls.map(l => `
       <div class="list-row rc">
         <div class="r-l" style="flex:1;min-width:0"><span class="relmark" style="background:var(--surface-3)">${ico("recibir")}</span>
@@ -8266,7 +8294,7 @@ function posPintar() {
   const cats = [...new Set(posDisp.map(t => t.categoria).filter(Boolean))];
   const vis = posVisibles();
   $("#main").innerHTML = `
-    <div class="sh-h">Vender · ${esc(ev.nombre)}<span class="r-sub">${posDisp.length} tragos</span></div>
+    ${pgHead({ ey: "Barra", t: "Vender", s: `${esc(ev.nombre)} · ${posDisp.length} tragos` })}
     ${colaBarra.pendientes() ? `<div class="hint" style="background:rgba(246,180,74,.12);
       border:1px solid rgba(246,180,74,.35);border-radius:12px;padding:10px 13px;margin-bottom:10px;color:var(--warn)">
       ${colaBarra.pendientes()} venta(s) esperando señal
@@ -8734,7 +8762,7 @@ async function screenBarAnalitica() {
   const faltanConteos = mm.length === 0;
   const mermaTot = +(m.merma_bs || 0);
   $("#main").innerHTML = `
-    <div class="sh-h">Analítica · ${esc(ev.nombre)}<span class="r-sub">${res.vasos} vasos · ${res.pedidos} pedidos</span></div>
+    ${pgHead({ ey: "Barra", t: "Analítica", s: `${esc(ev.nombre)} · ${res.vasos} vasos · ${res.pedidos} pedidos` })}
 
     <div class="stats" style="margin-bottom:12px">
       <div class="stat st-ok" style="grid-column:1/-1"><span class="k">Lo que quedó de verdad</span>
@@ -8814,7 +8842,7 @@ async function screenBarCierre() {
   const tot = cs.reduce((a, c) => ({ bs: a.bs + +c.bs, tragos: a.tragos + +c.tragos, cort: a.cort + +c.cortesias }), { bs: 0, tragos: 0, cort: 0 });
   const usaron = (cort || []).filter(c => +c.usados > 0).sort((a, b) => b.usados - a.usados);
   $("#main").innerHTML = `
-    <div class="sh-h">Cierre de barra · ${esc(ev.nombre)}</div>
+    ${pgHead({ ey: "Barra", t: "Cierre de barra", s: esc(ev.nombre) })}
     <div class="stats" style="margin-bottom:12px">
       <div class="stat st-ok"><span class="k">Vendido</span><span class="v ok">${fmtBs(tot.bs)} Bs</span><small>${tot.tragos} tragos</small></div>
       <div class="stat st-vio"><span class="k">Cortesías</span><span class="v vio">${tot.cort}</span><small>vasos</small></div>

@@ -18,7 +18,7 @@
 <meta name="twitter:card" content="summary">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Chakra+Petch:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Chakra+Petch:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <style>
 /* Ajustes propios de esta pantalla. El resto vive en styles.css:
@@ -87,17 +87,20 @@
         </button>
         <span class="tb-sep" aria-hidden="true"></span>
         <button class="tb-ev" id="tbEv">
+          <svg class="ic tb-ev-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+          <span class="tb-ev-tx">
           <span class="tb-ev-nm" id="tbEvNm">Sin evento</span>
           <span class="tb-ev-meta" id="tbEvMeta"></span>
+          </span>
           <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
         </button>
       </div>
 
       <div class="tb-acc">
-        <button class="tb-search" id="btnBuscar" title="Buscar persona, entrada o mesa (/)">
+        <button class="tb-search" id="btnBuscar" title="Buscar persona, entrada o mesa">
           <svg viewBox="0 0 24 24" class="ic"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
           <span>Buscar…</span>
-          <kbd>/</kbd>
+          <kbd>⌘ K</kbd>
         </button>
         <button class="iconbtn" id="btnAlertas" title="Alertas" aria-label="Alertas">
           <svg viewBox="0 0 24 24" class="ic"><path d="M12 3a6 6 0 0 0-6 6c0 4-1.5 5.5-1.5 5.5h15S18 13 18 9a6 6 0 0 0-6-6ZM10 18.5a2 2 0 0 0 4 0"/></svg>

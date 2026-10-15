@@ -8,6 +8,7 @@ import '../../../core/networking/supabase.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
+import '../../../core/widgets/patron.dart';
 import '../../analytics/ui/reporte_hojas.dart';
 import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
@@ -199,19 +200,147 @@ class GenteScreen extends ConsumerWidget {
     final plataforma = ref.watch(plataformaProvider).value ?? false;
     return DefaultTabController(
       length: plataforma ? 3 : 2,
-      child: Column(children: [
-        TabBar(tabs: [
-          const Tab(text: 'Usuarios'),
-          const Tab(text: 'Teams'),
-          if (plataforma) const Tab(text: 'Boliches'),
+      child: NestedScrollView(
+        headerSliverBuilder: (c, _) => [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+            sliver: SliverToBoxAdapter(child: _CabeceraGente(plataforma: plataforma)),
+          ),
+        ],
+        body: TabBarView(children: [
+          const _Usuarios(),
+          const _Teams(),
+          if (plataforma) const _Boliches(),
         ]),
-        Expanded(
-          child: TabBarView(children: [
-            const _Usuarios(),
-            const _Teams(),
-            if (plataforma) const _Boliches(),
-          ]),
+      ),
+    );
+  }
+}
+
+/// Encabezado, indicadores y pestañas de "Usuarios y equipos": lo mismo que
+/// la pantalla de la web.
+class _CabeceraGente extends ConsumerWidget {
+  const _CabeceraGente({required this.plataforma});
+  final bool plataforma;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final club = ref.watch(clubActivoProvider);
+    final usuarios = ref.watch(usuariosProvider).value ?? const <Usuario>[];
+    final teams = ref.watch(teamsInfoProvider).value ?? const <TeamInfo>[];
+    final equipo = ref.watch(equipoProvider).value ?? const <String, Miembro>{};
+    String rolDe(Usuario u) => equipo[u.id]?.rol ?? u.rol;
+    final admins = usuarios.where((u) => rolDe(u) == 'admin').length;
+    final activos = usuarios.where((u) => u.activo).length;
+    final marca = Theme.of(context).colorScheme.primary;
+    String pl(int n, String s) => '$n $s${n == 1 ? '' : 's'}';
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Encabezado(
+        etiqueta: 'Gestión',
+        titulo: 'Administración de usuarios y equipos',
+        contexto: '${club?.nombre ?? ''} · ${pl(usuarios.length, 'usuario')} · ${pl(teams.length, 'team')}',
+        acciones: [
+          FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 50)),
+            onPressed: () async {
+              if (await _hoja<bool>(context, const _AltaUsuario()) == true) {
+                ref.invalidate(usuariosProvider);
+                ref.invalidate(equipoProvider);
+              }
+            },
+            icon: const Icon(Icons.add_rounded, size: 20),
+            label: const Text('Nuevo usuario'),
+          ),
+        ],
+      ),
+      GrillaIndicadores(children: [
+        Indicador(
+            icono: Icons.person_outline_rounded,
+            etiqueta: 'Usuarios totales',
+            valor: '${usuarios.length}'),
+        Indicador(icono: Icons.groups_outlined, etiqueta: 'Teams', valor: '${teams.length}'),
+        Indicador(
+            icono: Icons.shield_outlined,
+            etiqueta: 'Administradores',
+            valor: '$admins',
+            tono: Tono.marca),
+        Indicador(
+            icono: Icons.check_circle_outline,
+            etiqueta: 'Activos',
+            valor: '$activos',
+            tono: Tono.ok),
+      ]),
+      const SizedBox(height: 16),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: VenueColors.superficie,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: VenueColors.linea),
+          ),
+          child: TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            dividerHeight: 0,
+            indicatorSize: TabBarIndicatorSize.tab,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 22),
+            indicator: BoxDecoration(
+              color: marca.withValues(alpha: .22),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            tabs: [
+              const Tab(text: 'Usuarios', height: 42),
+              const Tab(text: 'Teams', height: 42),
+              if (plataforma) const Tab(text: 'Boliches', height: 42),
+            ],
+          ),
         ),
+      ),
+    ]);
+  }
+}
+
+/// Rol con su ícono: el admin con el color del boliche, el jefe en azul.
+class _RolBadge extends StatelessWidget {
+  const _RolBadge(this.rol);
+  final String rol;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = Rol.desde(rol);
+    final esq = Theme.of(context).colorScheme;
+    final (color, fondo, borde) = switch (r) {
+      Rol.admin => (
+          Color.lerp(esq.secondary, Colors.white, .3)!,
+          esq.primary.withValues(alpha: .12),
+          esq.primary.withValues(alpha: .7)
+        ),
+      Rol.jefe => (VenueColors.info, VenueColors.info.withValues(alpha: .12), VenueColors.info.withValues(alpha: .35)),
+      _ => (VenueColors.textoSuave, VenueColors.superficie2, VenueColors.linea),
+    };
+    final icono = switch (r) {
+      Rol.admin || Rol.portero => Icons.shield_outlined,
+      Rol.jefe => Icons.groups_outlined,
+      Rol.caja => Icons.point_of_sale_outlined,
+      Rol.barra || Rol.propietario => Icons.local_bar_outlined,
+      Rol.deposito => Icons.inventory_2_outlined,
+      _ => Icons.person_outline_rounded,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: fondo,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: borde),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icono, size: 15, color: color),
+        const SizedBox(width: 6),
+        Text(r?.etiqueta ?? rol,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: color)),
       ]),
     );
   }
@@ -230,6 +359,8 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
   Widget build(BuildContext context) {
     final usuarios = ref.watch(usuariosProvider);
     final equipo = ref.watch(equipoProvider).value ?? const <String, Miembro>{};
+    final yo = ref.watch(usuarioIdProvider);
+    final tabla = MediaQuery.sizeOf(context).width >= 900;
     void recargar() {
       ref.invalidate(usuariosProvider);
       ref.invalidate(equipoProvider);
@@ -245,59 +376,167 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
             : todos.where((u) => normalizar(
                     '${u.nombre} @${u.usuario} ${u.rolEtiqueta} ${equipo[u.id]?.team ?? ''}')
                 .contains(q)).toList();
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-          children: [
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  onChanged: (v) => setState(() => _q = v),
-                  autocorrect: false,
-                  decoration: InputDecoration(
-                    hintText: 'Buscar por nombre, usuario, rol o team…',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixText: '${lista.length}',
-                    isDense: true,
-                  ),
-                ),
-              ),
+
+        Future<void> abrir(Usuario u) async {
+          if (await _hoja<bool>(context, _EditarUsuario(usuario: u)) == true) recargar();
+        }
+
+        Widget fila(Usuario u) {
+          final rol = equipo[u.id]?.rol ?? u.rol;
+          final team = equipo[u.id]?.teamId != null ? equipo[u.id]!.team : null;
+          final nombre = Row(children: [
+            Flexible(
+              child: Text(u.nombre,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w600,
+                      color: u.activo ? null : VenueColors.textoSuave)),
+            ),
+            if (u.id == yo) ...[
               const SizedBox(width: 8),
-              IconButton.filled(
-                tooltip: 'Nuevo usuario',
-                onPressed: () async {
-                  if (await _hoja<bool>(context, const _AltaUsuario()) == true) recargar();
-                },
-                icon: const Icon(Icons.person_add_alt_1_rounded),
-              ),
-            ]),
-            for (final u in lista)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  backgroundColor: VenueColors.superficieAlta,
-                  child: Text(u.nombre.isEmpty ? '?' : u.nombre[0].toUpperCase()),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: VenueColors.superficie2,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: VenueColors.linea),
                 ),
-                title: Text(u.nombre,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: u.activo ? null : VenueColors.textoSuave)),
-                subtitle: Text([
-                  '@${u.usuario}',
-                  Rol.desde(equipo[u.id]?.rol ?? u.rol)?.etiqueta ?? u.rol,
-                  if (equipo[u.id]?.teamId != null) equipo[u.id]!.team,
-                  if (!u.activo) 'en pausa',
-                  if (u.adminPrincipal) 'cuenta principal',
-                ].join(' · ')),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () async {
-                  if (await _hoja<bool>(context, _EditarUsuario(usuario: u)) == true) recargar();
-                },
+                child: const Text('Vos',
+                    style: TextStyle(fontSize: 11.5, color: VenueColors.textoSuave)),
               ),
+            ],
+          ]);
+          final teamW = Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.groups_outlined, size: 16, color: VenueColors.textoTenue),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(team ?? 'Sin team',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13.5, color: VenueColors.textoSuave)),
+            ),
+          ]);
+          final estado = u.activo
+              ? const PillEstado('Activo')
+              : const PillEstado('Pausado', tono: Tono.neutro);
+          if (tabla) {
+            return InkWell(
+              onTap: () => abrir(u),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: VenueColors.lineaSuave))),
+                child: Row(children: [
+                  Inicial(u.nombre, lado: 42),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 15, child: nombre),
+                  Expanded(
+                      flex: 11,
+                      child: Text('@${u.usuario}',
+                          style: const TextStyle(color: VenueColors.textoSuave, fontSize: 14))),
+                  Expanded(flex: 11, child: Align(alignment: Alignment.centerLeft, child: _RolBadge(rol))),
+                  Expanded(flex: 10, child: teamW),
+                  Expanded(flex: 8, child: Align(alignment: Alignment.centerLeft, child: estado)),
+                  const Icon(Icons.more_horiz_rounded, color: VenueColors.textoSuave),
+                ]),
+              ),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Material(
+              color: VenueColors.superficie,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: VenueColors.linea),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => abrir(u),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Inicial(u.nombre),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Expanded(child: nombre),
+                          const SizedBox(width: 8),
+                          estado,
+                        ]),
+                        const SizedBox(height: 3),
+                        Text('@${u.usuario}',
+                            style: const TextStyle(fontSize: 13, color: VenueColors.textoTenue)),
+                        const SizedBox(height: 9),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [_RolBadge(rol), teamW],
+                        ),
+                      ]),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+          children: [
+            TextField(
+              onChanged: (v) => setState(() => _q = v),
+              autocorrect: false,
+              decoration: InputDecoration(
+                hintText: 'Buscar por nombre, usuario, rol o team…',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixText: '${lista.length}',
+              ),
+            ),
+            const SizedBox(height: 14),
+            if (tabla)
+              Container(
+                decoration: BoxDecoration(
+                  color: VenueColors.superficie,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: VenueColors.linea),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(78, 16, 20, 12),
+                    child: Row(children: [
+                      Expanded(flex: 15, child: _Cab('Nombre')),
+                      Expanded(flex: 11, child: _Cab('Usuario')),
+                      Expanded(flex: 11, child: _Cab('Rol')),
+                      Expanded(flex: 10, child: _Cab('Team')),
+                      Expanded(flex: 8, child: _Cab('Estado')),
+                      SizedBox(width: 24),
+                    ]),
+                  ),
+                  const Divider(height: 1, color: VenueColors.linea),
+                  for (final u in lista) fila(u),
+                ]),
+              )
+            else
+              for (final u in lista) fila(u),
           ],
         );
       },
     );
   }
+}
+
+class _Cab extends StatelessWidget {
+  const _Cab(this.t);
+  final String t;
+  @override
+  Widget build(BuildContext context) => Text(t.toUpperCase(),
+      style: const TextStyle(
+          fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1, color: VenueColors.textoTenue));
 }
 
 /// Alta de una cuenta. Para el jefe: siempre relacionador de su team.
