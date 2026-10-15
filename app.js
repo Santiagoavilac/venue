@@ -579,9 +579,21 @@ function showClubPicker(cls) {
           <svg class="cp-arrow" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
         </button>`; }).join("")}
       </div>
+      ${me.plataforma ? `<button class="cp-nuevo" id="cpNuevo">${ico("mas")}Nuevo boliche</button>
+      <div class="cp-form hidden" id="cpForm"></div>` : ""}
       <button class="cp-out" onclick="logout()">Cerrar sesión</button>
     </div>`;
   ov.classList.remove("hidden");
+  // el superadmin puede dar de alta un boliche sin entrar a otro: el
+  // formulario se abre acá mismo (la hoja vive dentro de #app, oculto)
+  $("#cpNuevo") && ($("#cpNuevo").onclick = () => {
+    const f = $("#cpForm");
+    if (!f.classList.toggle("hidden")) {
+      f.innerHTML = formClubHTML();
+      bindFormClub((id, nombre) => { toast(`${nombre} creado`); showClubPicker(myClubs()); });
+      $("#clN").focus();
+    }
+  });
   window.Motion?.selector(ov);
   ov.querySelectorAll("[data-cp]").forEach(b => b.onclick = async () => {
     club = b.dataset.cp;
@@ -4588,9 +4600,10 @@ async function recargarClubs() {
   clubsDisponibles = data || [];
 }
 
-function sheetNuevoClub() {
-  sheet(`
-    <div class="sh-h">Nuevo boliche</div>
+/* Formulario de alta de boliche: lo usan la hoja "Boliches" y el selector
+   de boliche del inicio (que está fuera de #app, donde vive la hoja). */
+function formClubHTML() {
+  return `
     <div class="field"><label>Nombre</label><input id="clN" placeholder="Mi Boliche" autocomplete="off"></div>
     <div class="field"><label>Slug (identificador único, sin espacios)</label><input id="clId" placeholder="se autogenera" autocomplete="off"></div>
     <div class="field"><label>Subtítulo (opcional)</label><input id="clSub" placeholder="Ej: Rojo · pista principal" autocomplete="off"></div>
@@ -4599,11 +4612,13 @@ function sheetNuevoClub() {
       <div class="field"><label>Color secundario</label><input type="color" id="clS" value="#A855F7"></div>
     </div>
     <div class="field"><label>Color de acento</label><input type="color" id="clA" value="#22D3EE"></div>
-    <button class="btn primary" id="clGo">Crear boliche</button>`);
+    <button class="btn primary" id="clGo">Crear boliche</button>`;
+}
+function bindFormClub(alCrear) {
   $("#clN").addEventListener("input", () => {
     if (!$("#clId").dataset.tocado) {
       $("#clId").value = $("#clN").value.trim().toLowerCase()
-        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
     }
   });
@@ -4621,11 +4636,18 @@ function sheetNuevoClub() {
     $("#clGo").disabled = false;
     if (error) return toast(error.code === "23505" ? `Ya existe un boliche con el slug "${id}"` : error.message, "warn");
     await recargarClubs();
+    alCrear(id, nombre);
+  };
+}
+
+function sheetNuevoClub() {
+  sheet(`<div class="sh-h">Nuevo boliche</div>${formClubHTML()}`);
+  bindFormClub(async (id, nombre) => {
     // primer boliche creado: ahora hay que elegirlo para poder operar
     if (!club) { club = id; renderClubMenu(myClubs()); await applyClubRole(); return enterApp(); }
     toast(`${nombre} creado`);
     sheetBoliches();
-  };
+  });
 }
 
 function sheetEditarClub(c) {
