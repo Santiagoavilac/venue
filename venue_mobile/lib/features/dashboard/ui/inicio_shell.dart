@@ -558,7 +558,7 @@ class _BarraSuperior extends ConsumerWidget {
 }
 
 /// Barra lateral de pantallas anchas (tablet, escritorio): boliche arriba,
-/// secciones con la activa teñida y una barra a la izquierda, cuenta abajo.
+/// secciones con la activa teñida, cuenta abajo.
 class _Lateral extends ConsumerWidget {
   const _Lateral({
     required this.secciones,
@@ -593,9 +593,6 @@ class _Lateral extends ConsumerWidget {
             child: Container(
               height: 46,
               padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: on
-                  ? BoxDecoration(border: Border(left: BorderSide(color: esq.primary, width: 3)))
-                  : null,
               child: Row(children: [
                 Icon(on ? s.iconoOn : s.icono,
                     size: 21, color: on ? esq.secondary : VenueColors.textoSuave),

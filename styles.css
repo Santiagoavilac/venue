@@ -3562,16 +3562,16 @@ body,.app{font-family:var(--ui);font-feature-settings:"cv11","ss01";-webkit-font
 .nav-items button{min-height:46px;padding:10px 14px;gap:14px;border-radius:11px;font-size:15px;font-weight:500;color:var(--text-secondary)}
 .nav-items button .ic{width:20px;height:20px}
 .nav-items button:hover{background:var(--surface);color:var(--text-primary)}
-/* activa: tinte de marca y una barra en el borde izquierdo */
+/* activa: tinte de marca, ícono en color y texto en negrita (sin barra lateral) */
 .nav-items button.on,.gsap-on .nav-items button.on{
   background:color-mix(in srgb,var(--brand-primary) 17%,transparent);color:var(--text-primary);font-weight:600;
-  box-shadow:inset 3px 0 0 var(--brand-primary);
+  box-shadow:none;
 }
 .nav-items button.on .ic{color:var(--brand-secondary)}
 .gsap-on .nav-items button.on{background:none;box-shadow:none}
 .nav-ind{left:10px;right:10px;border-radius:11px;
   background:color-mix(in srgb,var(--brand-primary) 17%,transparent)!important;
-  box-shadow:inset 3px 0 0 var(--brand-primary)!important}
+  box-shadow:none!important}
 .nav-sep{padding:18px 14px 8px;font-size:13px;font-weight:500;color:var(--text-muted)}
 .nav-bottom{padding:12px 14px 14px}
 .nav-user{padding:8px;gap:12px;border-radius:12px}
