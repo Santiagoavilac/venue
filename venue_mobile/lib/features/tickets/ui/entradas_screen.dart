@@ -308,8 +308,13 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 22),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(minWidth: 118),
+                    constraints: const BoxConstraints(minWidth: 118, maxWidth: 190),
                     child: FilledButton(
+                      // el tema estira los botones a todo el ancho: en una
+                      // fila eso es ancho infinito y la fila no se dibuja
+                      style: FilledButton.styleFrom(
+                          minimumSize: const Size(118, 52),
+                          padding: const EdgeInsets.symmetric(horizontal: 14)),
                       onPressed: _generando || cerrada != null
                           ? null
                           : () => _generar(ev, fases, casa),

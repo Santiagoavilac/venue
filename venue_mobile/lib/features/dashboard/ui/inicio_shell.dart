@@ -275,7 +275,7 @@ class _InicioShellState extends ConsumerState<InicioShell>
                             child: Column(mainAxisSize: MainAxisSize.min, children: [
                               const Text('Más',
                                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
-                              const Text('Girá el tambor y tocá la que quieras',
+                              const Text('Deslizá hacia los costados y tocá la que quieras',
                                   style: TextStyle(color: VenueColors.textoSuave, fontSize: 13)),
                               Revolver(
                                 opciones: [

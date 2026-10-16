@@ -650,7 +650,6 @@ class _ListaFormState extends ConsumerState<_ListaForm> {
       text: l?['ingreso_hasta'] == null ? '' : '${l!['ingreso_hasta']}'.substring(0, 5));
   late final _precio = TextEditingController(text: _t('precio'));
   late DateTime? _d = _dt(l?['registro_desde']), _h = _dt(l?['registro_hasta']);
-  int _v = 0;
 
   @override
   void dispose() {
@@ -758,84 +757,211 @@ class _ListaFormState extends ConsumerState<_ListaForm> {
           const Text(
               'El cupo de acá manda sobre el general. Ejemplo: la lista da 1 invitado a cada relacionador, pero a una persona puntual le das 3.',
               style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5, height: 1.35)),
-          FutureBuilder(
-            key: ValueKey(_v),
-            future: Future.wait([
-              repo.cuposDeLista(l!['id'] as String),
-              repo.personasConCupo(club),
-            ]),
-            builder: (context, s) {
-              if (!s.hasData) {
-                return const Padding(
-                    padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()));
-              }
-              final cupos = s.data![0], gente = s.data![1];
-              final nombre = {for (final g in gente) g['id'] as String: '${g['nombre']} · ${g['team'] ?? ''}'};
-              String? quien;
-              final cant = TextEditingController();
-              return StatefulBuilder(
-                builder: (context, set) => Column(children: [
-                  for (final c in cupos)
-                    ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(nombre[c['user_id']] ?? '?'),
-                      subtitle: Text('cupo ${c['cupo']}'),
-                      trailing: IconButton(
-                          tooltip: 'Quitar cupo especial',
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () async {
-                            await repo.quitarCupo(l!['id'] as String, c['user_id'] as String);
-                            setState(() => _v++);
-                          }),
-                    ),
-                  Row(children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String?>(
-                        initialValue: quien,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Persona', isDense: true),
-                        items: [
-                          for (final g in gente)
-                            DropdownMenuItem<String?>(
-                                value: g['id'] as String,
-                                child: Text(nombre[g['id']]!, overflow: TextOverflow.ellipsis)),
-                        ],
-                        onChanged: (v) => set(() => quien = v),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 80,
-                      child: TextField(
-                          controller: cant,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Cupo', isDense: true)),
-                    ),
-                    IconButton.filledTonal(
-                      tooltip: 'Guardar cupo especial',
-                      onPressed: () async {
-                        final n = int.tryParse(cant.text);
-                        if (quien == null || n == null || n < 0) {
-                          avisar(context, 'Elegí persona y cantidad', tipo: TipoAviso.aviso);
-                          return;
-                        }
-                        try {
-                          await repo.fijarCupo(l!['id'] as String, quien!, n);
-                          setState(() => _v++);
-                        } catch (e) {
-                          if (context.mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
-                        }
-                      },
-                      icon: const Icon(Icons.check_rounded),
-                    ),
-                  ]),
-                ]),
-              );
-            },
-          ),
+          _CuposEspeciales(listaId: l!['id'] as String, club: club),
         ],
       ],
+    );
+  }
+}
+
+/// Cupos especiales de una lista con filtros: buscar por nombre, por team y
+/// por rol, ver quién ya tiene uno, y darle el mismo cupo a todos los que
+/// quedaron filtrados (por ejemplo, 3 a todo un team).
+class _CuposEspeciales extends ConsumerStatefulWidget {
+  const _CuposEspeciales({required this.listaId, required this.club});
+  final String listaId;
+  final String club;
+  @override
+  ConsumerState<_CuposEspeciales> createState() => _CuposEspecialesState();
+}
+
+class _CuposEspecialesState extends ConsumerState<_CuposEspeciales> {
+  late Future<List<List<Fila>>> _f = _cargar();
+  String _q = '';
+  String? _team;
+  String? _rol;
+  final _todos = TextEditingController();
+
+  Future<List<List<Fila>>> _cargar() {
+    final repo = ref.read(gestionRepositoryProvider);
+    return Future.wait([repo.cuposDeLista(widget.listaId), repo.personasConCupo(widget.club)]);
+  }
+
+  void _recargar() => setState(() => _f = _cargar());
+
+  @override
+  void dispose() {
+    _todos.dispose();
+    super.dispose();
+  }
+
+  Future<void> _hacer(Future<void> Function() f, String ok) async {
+    try {
+      await f();
+      _recargar();
+      if (mounted) avisar(context, ok);
+    } catch (e) {
+      if (mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+    }
+  }
+
+  Future<void> _editar(Fila g, int? actual) async {
+    final c = TextEditingController(text: actual?.toString() ?? '');
+    final r = await showDialog<String>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text('Cupo de ${g['nombre']}'),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Invitados en esta lista'),
+        ),
+        actions: [
+          if (actual != null)
+            TextButton(
+                onPressed: () => Navigator.pop(d, 'quitar'),
+                style: TextButton.styleFrom(foregroundColor: VenueColors.mal),
+                child: const Text('Quitar')),
+          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancelar')),
+          FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 42)),
+              onPressed: () => Navigator.pop(d, c.text),
+              child: const Text('Guardar')),
+        ],
+      ),
+    );
+    if (r == null) return;
+    final repo = ref.read(gestionRepositoryProvider);
+    final id = g['id'] as String;
+    if (r == 'quitar') {
+      return _hacer(() => repo.quitarCupo(widget.listaId, id), 'Cupo especial quitado');
+    }
+    final n = int.tryParse(r.trim());
+    if (n == null || n < 0) return;
+    await _hacer(() => repo.fijarCupo(widget.listaId, id, n), 'Cupo de ${g['nombre']}: $n');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: _f,
+      builder: (context, s) {
+        if (!s.hasData) {
+          return const Padding(
+              padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()));
+        }
+        final cupos = {for (final c in s.data![0]) c['user_id'] as String: (c['cupo'] as num).toInt()};
+        final gente = s.data![1];
+        final teams = {for (final g in gente) '${g['team'] ?? 'Sin team'}'}.toList()..sort();
+        final q = normalizar(_q.trim());
+        final filtrados = gente.where((g) {
+          if (_team != null && '${g['team'] ?? 'Sin team'}' != _team) return false;
+          if (_rol != null && g['rol'] != _rol) return false;
+          return q.isEmpty || normalizar('${g['nombre']} ${g['usuario'] ?? ''}').contains(q);
+        }).toList()
+          ..sort((a, b) {
+            // primero los que ya tienen cupo especial
+            final ca = cupos.containsKey(a['id']) ? 0 : 1, cb = cupos.containsKey(b['id']) ? 0 : 1;
+            return ca != cb ? ca - cb : '${a['nombre']}'.compareTo('${b['nombre']}');
+          });
+
+        Widget chip(String t, bool on, VoidCallback f) => Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: ChoiceChip(label: Text(t), selected: on, onSelected: (_) => f()),
+            );
+
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const SizedBox(height: 8),
+          TextField(
+            onChanged: (v) => setState(() => _q = v),
+            decoration: const InputDecoration(
+                hintText: 'Buscar persona…', prefixIcon: Icon(Icons.search_rounded), isDense: true),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              chip('Todos los teams', _team == null, () => setState(() => _team = null)),
+              for (final t in teams) chip(t, _team == t, () => setState(() => _team = t)),
+            ]),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              chip('Todos', _rol == null, () => setState(() => _rol = null)),
+              chip('Relacionadores', _rol == 'rrpp', () => setState(() => _rol = 'rrpp')),
+              chip('Jefes', _rol == 'jefe', () => setState(() => _rol = 'jefe')),
+              chip('Admins', _rol == 'admin', () => setState(() => _rol = 'admin')),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          // el mismo cupo a todos los filtrados (un team entero, por ejemplo)
+          Row(children: [
+            Expanded(
+              child: Text('Dar a los ${filtrados.length} filtrados',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+            ),
+            SizedBox(
+              width: 72,
+              child: TextField(
+                  controller: _todos,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Cupo', isDense: true)),
+            ),
+            const SizedBox(width: 6),
+            IconButton.filledTonal(
+              tooltip: 'Aplicar a todos los filtrados',
+              onPressed: filtrados.isEmpty
+                  ? null
+                  : () {
+                      final n = int.tryParse(_todos.text.trim());
+                      if (n == null || n < 0) {
+                        avisar(context, 'Poné la cantidad', tipo: TipoAviso.aviso);
+                        return;
+                      }
+                      final repo = ref.read(gestionRepositoryProvider);
+                      _hacer(() async {
+                        for (final g in filtrados) {
+                          await repo.fijarCupo(widget.listaId, g['id'] as String, n);
+                        }
+                      }, '${filtrados.length} personas con cupo $n');
+                    },
+              icon: const Icon(Icons.done_all_rounded),
+            ),
+          ]),
+          const SizedBox(height: 4),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 340),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                if (filtrados.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Nadie coincide con el filtro.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: VenueColors.textoSuave)),
+                  ),
+                for (final g in filtrados)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${g['nombre']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text('${g['team'] ?? 'Sin team'} · ${g['rol'] ?? ''}'),
+                    trailing: cupos.containsKey(g['id'])
+                        ? Chip(
+                            label: Text('cupo ${cupos[g['id']]}'),
+                            visualDensity: VisualDensity.compact,
+                            side: BorderSide(color: Theme.of(context).colorScheme.primary))
+                        : const Text('general', style: TextStyle(color: VenueColors.textoSuave)),
+                    onTap: () => _editar(g, cupos[g['id']]),
+                  ),
+              ],
+            ),
+          ),
+        ]);
+      },
     );
   }
 }
