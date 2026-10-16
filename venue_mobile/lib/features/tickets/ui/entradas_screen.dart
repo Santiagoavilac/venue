@@ -8,8 +8,10 @@ import '../../../core/widgets/estado_vista.dart';
 import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/data/eventos.dart';
+import '../../events/ui/gestion_screen.dart';
 import '../../teams/data/equipo.dart';
 import '../data/entradas.dart';
+import 'reporte_teams.dart';
 import 'ticket_sheet.dart';
 
 enum _Alcance { mias, team, todas }
@@ -27,6 +29,16 @@ String? motivoVentaCerrada(({DateTime? desde, DateTime? hasta}) v, DateTime ahor
   return null;
 }
 
+/// Un nombre por línea (o separados por coma), como en la web. Si alguien
+/// escribe "Luis +2" queda solo "Luis": cada entrada va con su nombre.
+List<String> expandirNombres(String crudo) => crudo
+    .split(RegExp(r'[\n,]'))
+    .map((s) => s.trim().replaceAll(RegExp(r'\s*\+\s*\d+$'), '').trim())
+    .where((s) => s.length >= 2)
+    .toList();
+
+const _maxTanda = 40;
+
 /// Entradas prepagadas: generar, ver el QR, compartir (una o en tanda),
 /// anular y eliminar. El relacionador ve las suyas; el jefe, además las de
 /// su team; el admin, todas, con filtro por relacionador.
@@ -40,6 +52,8 @@ class EntradasScreen extends ConsumerStatefulWidget {
 class _EntradasScreenState extends ConsumerState<EntradasScreen> {
   final _cliente = TextEditingController();
   bool _generando = false;
+  int? _progreso;
+  int _escritos = 0;
   _Alcance _alcance = _Alcance.mias;
   String _q = '';
   String? _vendedor;
@@ -78,21 +92,72 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
   }
 
   Future<void> _generar(Evento ev, Map<String, Fase> fases, Set<String> casa) async {
-    final nombre = _cliente.text.trim();
-    if (nombre.length < 2 || _generando) return;
-    setState(() => _generando = true);
-    try {
-      final e = await ref.read(entradasRepositoryProvider).generar(ev.id, nombre);
+    final nombres = expandirNombres(_cliente.text);
+    if (nombres.isEmpty || _generando) return;
+    if (nombres.length > _maxTanda) {
+      avisar(context, 'Máximo $_maxTanda por tanda', tipo: TipoAviso.aviso);
+      return;
+    }
+    setState(() {
+      _generando = true;
+      _progreso = nombres.length > 1 ? 0 : null;
+    });
+    final repo = ref.read(entradasRepositoryProvider);
+    final creadas = <Entrada>[];
+    String? corte;
+    for (final nombre in nombres) {
+      try {
+        creadas.add(await repo.generar(ev.id, nombre));
+        if (mounted && _progreso != null) setState(() => _progreso = creadas.length);
+      } catch (e) {
+        corte = mensajeDeError(e);
+        break;
+      }
+    }
+    if (creadas.isNotEmpty) {
       _cliente.clear();
       _recargar();
-      if (mounted) {
-        FocusScope.of(context).unfocus();
-        await mostrarTicket(context, _ticket(e, ev, fases, casa));
-      }
-    } catch (e) {
-      if (mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
     }
-    if (mounted) setState(() => _generando = false);
+    if (mounted) {
+      setState(() {
+        _generando = false;
+        _progreso = null;
+        _escritos = expandirNombres(_cliente.text).length;
+        // la tanda queda marcada para mandarla de una con "Enviar"
+        if (creadas.length > 1) {
+          _alcance = _Alcance.mias;
+          _vendedor = null;
+          _marcadas
+            ..clear()
+            ..addAll(creadas.map((e) => e.id));
+        }
+      });
+      FocusScope.of(context).unfocus();
+      if (corte != null) {
+        // si se cortó a mitad hay que decir cuántas faltaron: si no, el
+        // relacionador cree que salieron todas
+        avisar(
+            context,
+            creadas.isEmpty
+                ? corte
+                : '$corte · se generaron ${creadas.length} de ${nombres.length}, '
+                    'faltaron ${nombres.length - creadas.length}',
+            tipo: TipoAviso.aviso);
+      } else if (creadas.length > 1) {
+        avisar(context, '${creadas.length} entradas generadas — ya están marcadas, tocá Enviar');
+      }
+      if (creadas.length == 1 && corte == null) {
+        await mostrarTicket(context, _ticket(creadas.first, ev, fases, casa));
+      }
+    }
+  }
+
+  Future<void> _abrirFases(Evento ev) async {
+    await abrirFases(context, ev);
+    // el interruptor de fases vive en el evento: se relee para el cartel
+    ref.invalidate(eventosProvider);
+    ref.invalidate(fasesProvider);
+    ref.invalidate(faseVigenteProvider);
   }
 
   Future<void> _accion(Entrada e, {required bool eliminar}) async {
@@ -173,31 +238,71 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                           '${vigente.quedan == null ? '' : ' · quedan ${vigente.quedan}'}',
                   vigente == null ? VenueColors.aviso : VenueColors.ok,
                 ),
-              Row(children: [
+              if (rol == Rol.admin || veOtras)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(children: [
+                    if (rol == Rol.admin)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _abrirFases(ev),
+                          icon: const Icon(Icons.tune_rounded, size: 18),
+                          label: Text(ev.ventaPorFases ? 'Fases y precios' : 'Vender por fases'),
+                        ),
+                      ),
+                    if (rol == Rol.admin && veOtras) const SizedBox(width: 8),
+                    if (veOtras)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => mostrarReporteTeams(context, ref,
+                              soloTeam: rol == Rol.admin ? null : miTeam),
+                          icon: const Icon(Icons.groups_rounded, size: 18),
+                          label: const Text('Reporte por team'),
+                        ),
+                      ),
+                  ]),
+                ),
+              Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 Expanded(
                   child: TextField(
                     controller: _cliente,
-                    enabled: cerrada == null,
+                    enabled: cerrada == null && !_generando,
                     textCapitalization: TextCapitalization.words,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _generar(ev, fases, casa),
-                    decoration:
-                        const InputDecoration(labelText: 'Nombre del cliente'),
+                    keyboardType: TextInputType.multiline,
+                    minLines: 1,
+                    maxLines: 5,
+                    onChanged: (v) {
+                      final n = expandirNombres(v).length;
+                      if (n != _escritos) setState(() => _escritos = n);
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Clientes',
+                      hintText: 'Un nombre completo por línea',
+                      helperText: _escritos > 1
+                          ? 'Se generan $_escritos entradas'
+                              '${vigente != null ? ' · ${vigente.precio * _escritos} Bs' : ''}'
+                          : 'Pegá varios nombres, uno por línea (máx. $_maxTanda)',
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                SizedBox(
-                  width: 118,
-                  child: FilledButton(
-                    onPressed: _generando || cerrada != null
-                        ? null
-                        : () => _generar(ev, fases, casa),
-                    child: _generando
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2.2))
-                        : const Text('Generar'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 22),
+                  child: SizedBox(
+                    width: 118,
+                    child: FilledButton(
+                      onPressed: _generando || cerrada != null
+                          ? null
+                          : () => _generar(ev, fases, casa),
+                      child: _generando
+                          ? (_progreso != null
+                              ? Text('$_progreso/$_escritos')
+                              : const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2.2)))
+                          : const Text('Generar'),
+                    ),
                   ),
                 ),
               ]),

@@ -23,6 +23,21 @@ Future<T?> _hoja<T>(BuildContext context, Widget child) => showModalBottomSheet<
       ),
     );
 
+/// Fases de preventa del evento (precio, stock, cupos por team), para
+/// abrirlas desde Entradas sin pasar por Más → Eventos.
+Future<void> abrirFases(BuildContext context, Evento ev) => _hoja(
+    context,
+    _Fases(evento: {'id': ev.id, 'nombre': ev.nombre, 'venta_por_fases': ev.ventaPorFases}));
+
+/// Límites y horarios de una lista, para abrirlos desde su tarjeta en Listas.
+Future<void> abrirEditarLista(
+    BuildContext context, WidgetRef ref, String eventoId, String listaId) async {
+  final ls = await ref.read(gestionRepositoryProvider).listas(eventoId);
+  final i = ls.indexWhere((l) => l['id'] == listaId);
+  if (i < 0 || !context.mounted) return;
+  await _hoja(context, _ListaForm(eventoId: eventoId, lista: ls[i], orden: i));
+}
+
 String _fh(dynamic ts) {
   final t = DateTime.tryParse(ts as String? ?? '')?.toLocal();
   if (t == null) return 'sin límite';

@@ -11,6 +11,7 @@ import '../../../core/widgets/estado_vista.dart';
 import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/data/eventos.dart';
+import '../../events/ui/gestion_screen.dart';
 import '../../teams/data/equipo.dart';
 import '../../tickets/data/entradas.dart';
 import '../../tickets/ui/ticket_sheet.dart';
@@ -397,45 +398,81 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
             ),
             if (on) ...[
               const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-                child: Row(children: [
-                  if (p.anota)
-                    FilledButton.icon(
-                      onPressed:
-                          abiertaParaAnotar && !lleno ? () => _anotar(l) : null,
-                      style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 44),
-                          padding: const EdgeInsets.symmetric(horizontal: 14)),
-                      icon: const Icon(Icons.add_rounded, size: 20),
-                      label: Text(lleno
-                          ? 'Cupo lleno'
-                          : abiertaParaAnotar
-                              ? 'Agregar invitados'
-                              : 'Cerrada'),
-                    ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      cupo != null
-                          ? '$propios/$cupo tuyos'
-                          : '$propios tuyos${p.rol == Rol.admin ? ' · sin límite' : ''}',
-                      style: const TextStyle(color: VenueColors.textoSuave),
-                    ),
-                  ),
-                  if (rs.length > 1)
-                    IconButton(
-                      tooltip: _ingresaronArriba
-                          ? 'Orden normal'
-                          : 'Los que ingresaron arriba',
-                      onPressed: () =>
-                          setState(() => _ingresaronArriba = !_ingresaronArriba),
-                      icon: Icon(Icons.vertical_align_top_rounded,
-                          color: _ingresaronArriba
-                              ? Theme.of(context).colorScheme.primary
-                              : VenueColors.textoSuave),
-                    ),
-                ]),
+              Container(
+                margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+                decoration: BoxDecoration(
+                  color: VenueColors.superficie2,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: VenueColors.linea),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cupo != null ? '$propios / $cupo' : '$propios',
+                              style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: lleno ? VenueColors.aviso : VenueColors.texto),
+                            ),
+                            Text(
+                              cupo != null
+                                  ? (lleno ? 'tuyos · cupo lleno' : 'tuyos · quedan ${cupo - propios}')
+                                  : 'tuyos${p.rol == Rol.admin ? ' · sin límite' : ''}',
+                              style: const TextStyle(
+                                  color: VenueColors.textoSuave, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (p.rol == Rol.admin)
+                        IconButton(
+                          tooltip: 'Límites y horarios de la lista',
+                          onPressed: () async {
+                            await abrirEditarLista(context, ref, ev.id, l.id);
+                            _recargar();
+                          },
+                          icon: const Icon(Icons.tune_rounded,
+                              color: VenueColors.textoSuave),
+                        ),
+                      if (rs.length > 1)
+                        IconButton(
+                          tooltip: _ingresaronArriba
+                              ? 'Orden normal'
+                              : 'Los que ingresaron arriba',
+                          onPressed: () =>
+                              setState(() => _ingresaronArriba = !_ingresaronArriba),
+                          icon: Icon(Icons.vertical_align_top_rounded,
+                              color: _ingresaronArriba
+                                  ? Theme.of(context).colorScheme.primary
+                                  : VenueColors.textoSuave),
+                        ),
+                    ]),
+                    if (p.anota) ...[
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: FilledButton.icon(
+                          onPressed:
+                              abiertaParaAnotar && !lleno ? () => _anotar(l) : null,
+                          style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
+                          icon: const Icon(Icons.add_rounded, size: 20),
+                          label: Text(lleno
+                              ? 'Cupo lleno'
+                              : abiertaParaAnotar
+                                  ? 'Agregar invitados'
+                                  : 'Cerrada'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
               if (rs.isEmpty)
                 const Padding(
