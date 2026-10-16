@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,6 +21,44 @@ List<String> pisosDe(Iterable<Mesa> mesas) {
   final hay = mesas.map((m) => m.planta).toSet();
   final p = ordenPisos.where(hay.contains).toList();
   return p.isEmpty ? ['alta', 'baja'] : p;
+}
+
+/// Radio para juntar mesas, en unidades del plano (el ancho mide 1000).
+/// 70 deja sumar las que están una al lado de la otra (4, 3 y 2 de SitRoom,
+/// separadas por un pasillo angosto) y no las que quedan del otro lado de la
+/// pista. Es el mismo valor que usa la web (RADIO_JUNTAR en app.js).
+const radioJuntarMesas = 70.0;
+
+/// Distancia entre los BORDES de dos mesas, en unidades del plano: dos
+/// lounges grandes pegados dan 0 aunque sus centros estén lejos.
+double distanciaMesas(Mesa a, Mesa b) {
+  const ancho = 1000.0, alto = 420.0;
+  double dx(Mesa m) => m.x * ancho / 100;
+  double dw(Mesa m) => m.w * ancho / 100;
+  double dy(Mesa m) => m.y * alto / 100;
+  double dh(Mesa m) => (m.h ?? 21) * alto / 100;
+  final gx = math.max(0.0, math.max(dx(a), dx(b)) - math.min(dx(a) + dw(a), dx(b) + dw(b)));
+  final gy = math.max(0.0, math.max(dy(a), dy(b)) - math.min(dy(a) + dh(a), dy(b) + dh(b)));
+  return math.sqrt(gx * gx + gy * gy);
+}
+
+/// Mesas que quedan unidas a [base] encadenando vecinas dentro del radio:
+/// se puede armar una fila de mesas, pero no saltar a una lejana.
+Set<String> mesasEncadenadas(Mesa base, Iterable<Mesa> candidatas,
+    {double radio = radioJuntarMesas}) {
+  final pendientes = [base];
+  final unidas = <String>{};
+  final resto = candidatas.where((m) => m.id != base.id).toList();
+  while (pendientes.isNotEmpty) {
+    final actual = pendientes.removeLast();
+    for (final m in resto) {
+      if (!unidas.contains(m.id) && distanciaMesas(actual, m) <= radio) {
+        unidas.add(m.id);
+        pendientes.add(m);
+      }
+    }
+  }
+  return unidas;
 }
 
 class Mesa {

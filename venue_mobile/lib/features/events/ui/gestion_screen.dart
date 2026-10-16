@@ -6,7 +6,9 @@ import '../../../core/networking/supabase.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
+import '../../../core/widgets/patron.dart';
 import '../../clubs/data/clubs.dart';
+import '../../guestlists/ui/listas_screen.dart';
 import '../../teams/data/gente.dart';
 import '../data/eventos.dart';
 import '../data/gestion.dart';
@@ -183,6 +185,11 @@ class GestionEventosScreen extends ConsumerWidget {
                 alAccion: (k) async {
                   final id = e['id'] as String, nombre = e['nombre'] as String;
                   switch (k) {
+                    case 'cliente':
+                      // "Nuevo cliente" anota en el evento de la tarjeta
+                      ref.read(eventoElegidoProvider.notifier).elegir(id);
+                      await nuevoCliente(context, ref);
+                      ref.invalidate(numerosEventoProvider(id));
                     case 'publicar':
                       try {
                         final r = await repo.publicar(id);
@@ -198,6 +205,7 @@ class GestionEventosScreen extends ConsumerWidget {
                       if (await _hoja<bool>(context, _EditarEvento(evento: e)) == true) recargar();
                     case 'listas':
                       await _hoja(context, _Listas(eventoId: id, nombre: nombre));
+                      ref.invalidate(numerosEventoProvider(id));
                     case 'fases':
                       await _hoja(context, _Fases(evento: e));
                       recargar();
@@ -248,6 +256,9 @@ class _TarjetaEvento extends StatelessWidget {
     final a = accionesDeEvento(e);
     final cerrado = e['estado'] == 'cerrado';
     final marca = Theme.of(context).colorScheme.primary;
+    // el evento elegido se abre con sus números y sus acciones a la vista;
+    // los demás quedan en una fila con el menú
+    final abierto = seleccionado && !cerrado;
     return Card(
       margin: const EdgeInsets.only(top: 10),
       shape: RoundedRectangleBorder(
@@ -258,48 +269,107 @@ class _TarjetaEvento extends StatelessWidget {
       child: InkWell(
         onTap: alElegir,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
-          child: Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${e['nombre']}',
+          padding: EdgeInsets.fromLTRB(14, 12, abierto ? 14 : 4, 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${e['nombre']}',
+                      style: TextStyle(
+                          fontSize: abierto ? 22 : 17, fontWeight: FontWeight.w800,
+                          color: cerrado ? VenueColors.textoSuave : null)),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      '${e['fecha']}',
+                      if (abierto && e['hora_inicio'] != null)
+                        '${'${e['hora_inicio']}'.padRight(5).substring(0, 5)}–${'${e['hora_fin']}'.padRight(5).substring(0, 5)}',
+                      '${e['precio_manilla']} Bs',
+                      if (e['publicado'] == false) 'BORRADOR · solo lo ves vos',
+                      if (cerrado) 'cerrado',
+                      if (e['venta_por_fases'] == true) 'por fases',
+                    ].join(' · '),
                     style: TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.w800,
-                        color: cerrado ? VenueColors.textoSuave : null)),
-                const SizedBox(height: 2),
-                Text(
-                  [
-                    '${e['fecha']}',
-                    '${e['precio_manilla']} Bs',
-                    if (e['publicado'] == false) 'BORRADOR · solo lo ves vos',
-                    if (cerrado) 'cerrado',
-                    if (e['venta_por_fases'] == true) 'por fases',
-                  ].join(' · '),
-                  style: TextStyle(
-                      color: e['publicado'] == false ? VenueColors.aviso : VenueColors.textoSuave,
-                      fontSize: 13),
-                ),
+                        color: e['publicado'] == false ? VenueColors.aviso : VenueColors.textoSuave,
+                        fontSize: 13),
+                  ),
+                ]),
+              ),
+              if (a.publicar)
+                TextButton(onPressed: () => alAccion('publicar'), child: const Text('Publicar')),
+              PopupMenuButton<String>(
+                tooltip: 'Acciones del evento',
+                onSelected: alAccion,
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'editar', child: Text('Editar')),
+                  const PopupMenuItem(value: 'listas', child: Text('Listas y cupos')),
+                  const PopupMenuItem(value: 'fases', child: Text('Fases de preventa')),
+                  const PopupMenuItem(value: 'horarios', child: Text('Horario de venta')),
+                  const PopupMenuItem(value: 'arte', child: Text('Arte del ticket')),
+                  if (a.cerrar) const PopupMenuItem(value: 'cerrar', child: Text('Cerrar evento')),
+                  const PopupMenuItem(value: 'eliminar', child: Text('Eliminar')),
+                ],
+              ),
+            ]),
+            if (abierto) ...[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => alAccion('cliente'),
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('Nuevo cliente'),
+              ),
+              const SizedBox(height: 12),
+              _NumerosEvento(eventoId: e['id'] as String),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final (k, t, i) in const [
+                  ('editar', 'Editar', Icons.edit_outlined),
+                  ('listas', 'Listas', Icons.list_alt_rounded),
+                  ('fases', 'Fases', Icons.local_activity_outlined),
+                  ('horarios', 'Horario', Icons.schedule_rounded),
+                  ('arte', 'Diseño', Icons.image_outlined),
+                ])
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 12)),
+                    onPressed: () => alAccion(k),
+                    icon: Icon(i, size: 18),
+                    label: Text(t),
+                  ),
+                if (a.cerrar)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        foregroundColor: VenueColors.mal),
+                    onPressed: () => alAccion('cerrar'),
+                    icon: const Icon(Icons.lock_outline_rounded, size: 18),
+                    label: const Text('Cerrar'),
+                  ),
               ]),
-            ),
-            if (a.publicar)
-              TextButton(onPressed: () => alAccion('publicar'), child: const Text('Publicar')),
-            PopupMenuButton<String>(
-              tooltip: 'Acciones del evento',
-              onSelected: alAccion,
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'editar', child: Text('Editar')),
-                const PopupMenuItem(value: 'listas', child: Text('Listas y cupos')),
-                const PopupMenuItem(value: 'fases', child: Text('Fases de preventa')),
-                const PopupMenuItem(value: 'horarios', child: Text('Horario de venta')),
-                const PopupMenuItem(value: 'arte', child: Text('Arte del ticket')),
-                if (a.cerrar) const PopupMenuItem(value: 'cerrar', child: Text('Cerrar evento')),
-                const PopupMenuItem(value: 'eliminar', child: Text('Eliminar')),
-              ],
-            ),
+            ],
           ]),
         ),
       ),
     );
+  }
+}
+
+class _NumerosEvento extends ConsumerWidget {
+  const _NumerosEvento({required this.eventoId});
+  final String eventoId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final n = ref.watch(numerosEventoProvider(eventoId)).value;
+    String v(int? x) => x == null ? '…' : '$x';
+    return GrillaIndicadores(children: [
+      Indicador(icono: Icons.groups_rounded, etiqueta: 'Listas', valor: v(n?.listas), tono: Tono.aviso),
+      Indicador(icono: Icons.qr_code_2_rounded, etiqueta: 'QR emitidos', valor: v(n?.qr), tono: Tono.marca),
+      Indicador(icono: Icons.table_bar_rounded, etiqueta: 'Mesas vendidas', valor: v(n?.mesas)),
+      Indicador(icono: Icons.how_to_reg_rounded, etiqueta: 'Ingresaron (lista)', valor: v(n?.ingresaron), tono: Tono.ok),
+    ]);
   }
 }
 

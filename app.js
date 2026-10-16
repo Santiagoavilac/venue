@@ -305,6 +305,31 @@ function expandNombres(raw) {
     .filter(Boolean);
 }
 
+/* Juntar mesas solo si están cerca. Distancia entre los BORDES, en
+   unidades del plano (ancho 1000, alto 420): dos lounges pegados dan 0.
+   Se encadena (fila de mesas) pero no se salta a una del otro lado de la
+   pista. Mismo valor que la app (radioJuntarMesas en mesas.dart). */
+const RADIO_JUNTAR = 70;
+function distanciaMesas(a, b) {
+  const r = m => ({ x: +m.x * 10, y: +m.y * 4.2, w: +m.w * 10, h: (+m.h || 21) * 4.2 });
+  const A = r(a), B = r(b);
+  const gx = Math.max(0, Math.max(A.x, B.x) - Math.min(A.x + A.w, B.x + B.w));
+  const gy = Math.max(0, Math.max(A.y, B.y) - Math.min(A.y + A.h, B.y + B.h));
+  return Math.hypot(gx, gy);
+}
+function mesasEncadenadas(base, candidatas) {
+  const unidas = new Set(), pend = [base];
+  while (pend.length) {
+    const act = pend.pop();
+    for (const m of candidatas) {
+      if (m.id !== base.id && !unidas.has(m.id) && distanciaMesas(act, m) <= RADIO_JUNTAR) {
+        unidas.add(m.id); pend.push(m);
+      }
+    }
+  }
+  return unidas;
+}
+
 /* ---------- comprobantes privados ----------
    El bucket `comprobantes` dejó de ser público (db/23-comprobantes-privados.sql):
    la URL guardada ya no abre sola. Cada <img>/<a> que apunte a un
@@ -6425,7 +6450,7 @@ async function sheetMesa(m) {
       <div class="field"><label>Cantidad de combos</label>
         <div class="qty"><button type="button" class="qbtn" id="vmQMinus">−</button><span class="qval" id="vmQty">1</span><button type="button" class="qbtn" id="vmQPlus">+</button>
           <span class="qtot" id="vmTotal"></span></div></div>
-      ${libresPiso.length && ev.permite_agrupar !== false ? `<div class="field"><label>Sumar más mesas al mismo combo (opcional)</label>
+      ${libresPiso.length && ev.permite_agrupar !== false ? `<div class="field" id="vmJuntar"><label>Sumar mesas cercanas al mismo combo (opcional)</label>
         <div class="chip-pick">${libresPiso.map(x => `<button type="button" class="mchip" data-mplus="${x.id}">${esc(x.etiqueta)}</button>`).join("")}</div>
         <small style="color:var(--text-3)">${ev.combo_por_mesa
           ? "Cada mesa paga su propio combo."
@@ -6537,12 +6562,30 @@ async function sheetMesa(m) {
     $("#vmQPlus").onclick = () => { qty = Math.min(20, qty + 1); updCount(); };
     updCount();
     const extraMesas = new Set();
+    // solo se ven las libres cerca de la mesa o de alguna ya sumada
+    const mostrarCercanas = () => {
+      const sumadas = [m, ...mesas.filter(x => extraMesas.has(x.id))];
+      document.querySelectorAll("#sheetBody [data-mplus]").forEach(b => {
+        const x = mesas.find(y => y.id === b.dataset.mplus);
+        const sel = extraMesas.has(b.dataset.mplus);
+        b.classList.toggle("on", sel);
+        b.classList.toggle("hidden", !sel && !sumadas.some(s => distanciaMesas(s, x) <= RADIO_JUNTAR));
+      });
+      const box = $("#vmJuntar");
+      if (box) box.classList.toggle("hidden", !document.querySelector("#sheetBody [data-mplus]:not(.hidden)"));
+    };
+    mostrarCercanas();
     const catsDelGrupo = () => [...new Set([m.categoria || "mesa",
       ...[...extraMesas].map(id => mesas.find(x => x.id === id)?.categoria || "mesa")])];
     document.querySelectorAll("#sheetBody [data-mplus]").forEach(b => b.onclick = () => {
       const id = b.dataset.mplus;
-      if (extraMesas.has(id)) { extraMesas.delete(id); b.classList.remove("on"); }
-      else { extraMesas.add(id); b.classList.add("on"); }
+      if (extraMesas.has(id)) {
+        extraMesas.delete(id);
+        // al sacar una del medio, las que colgaban de ella también salen
+        const unidas = mesasEncadenadas(m, mesas.filter(x => extraMesas.has(x.id)));
+        [...extraMesas].forEach(x => { if (!unidas.has(x)) extraMesas.delete(x); });
+      } else extraMesas.add(id);
+      mostrarCercanas();
       // al sumar una mesa de otro tipo, se recalculan los combos que sirven para el grupo
       const sel = $("#vmCombo"), antes = sel.value;
       sel.innerHTML = comboOptsHTML(catsDelGrupo());

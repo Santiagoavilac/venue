@@ -186,3 +186,20 @@ final eventosGestionProvider = FutureProvider.autoDispose<List<Fila>>((ref) asyn
   if (club == null) return const [];
   return ref.watch(gestionRepositoryProvider).eventos(club);
 });
+
+/// Números del evento para su tarjeta: listas, QR emitidos, mesas vendidas
+/// e ingresos por lista. Cuatro conteos sin traer filas.
+final numerosEventoProvider = FutureProvider.autoDispose
+    .family<({int listas, int qr, int mesas, int ingresaron}), String>((ref, eventoId) async {
+  final sb = ref.watch(supabaseProvider);
+  final r = await Future.wait([
+    sb.from('lista_tipos').select('id').eq('evento_id', eventoId).count(CountOption.exact),
+    sb.from('entradas').select('id').eq('evento_id', eventoId)
+        .isFilter('mesa_id', null).neq('estado', 'anulada').count(CountOption.exact),
+    sb.from('mesas').select('id').eq('evento_id', eventoId)
+        .neq('estado', 'disponible').count(CountOption.exact),
+    sb.from('registros').select('id').eq('evento_id', eventoId)
+        .not('ingreso_at', 'is', null).count(CountOption.exact),
+  ]);
+  return (listas: r[0].count, qr: r[1].count, mesas: r[2].count, ingresaron: r[3].count);
+});

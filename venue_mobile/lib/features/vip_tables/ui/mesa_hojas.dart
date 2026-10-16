@@ -172,8 +172,16 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
     if (_combo != null && !validos.any((c) => c.id == _combo)) _combo = null;
     _combo ??= ev.comboObligatorio && validos.isNotEmpty ? validos.first.id : _combo;
     final combo = validos.where((c) => c.id == _combo).firstOrNull;
+    // solo se ofrecen las libres que están cerca de la mesa o de alguna ya
+    // sumada: así se arma una fila de mesas, pero no se junta con una lejana
+    final sumadas = [m, for (final x in todas) if (_extra.contains(x.id)) x];
     final libresPiso = todas
-        .where((x) => x.planta == m.planta && x.libre && x.id != m.id)
+        .where((x) =>
+            x.planta == m.planta &&
+            x.libre &&
+            x.id != m.id &&
+            (_extra.contains(x.id) ||
+                sumadas.any((s) => distanciaMesas(s, x) <= radioJuntarMesas)))
         .toList();
     final pagada = _estado == 'pagada';
     final transferencia = pagada && !_cortesia && _metodo == 'transferencia';
@@ -302,15 +310,25 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
             style: const TextStyle(fontWeight: FontWeight.w700)),
         if (libresPiso.isNotEmpty && ev.permiteAgrupar) ...[
           const SizedBox(height: 14),
-          const Text('Sumar más mesas al mismo combo (opcional)'),
+          const Text('Sumar mesas cercanas al mismo combo (opcional)'),
           const SizedBox(height: 6),
           Wrap(spacing: 8, runSpacing: 4, children: [
             for (final x in libresPiso)
               FilterChip(
                 label: Text(x.etiqueta),
                 selected: _extra.contains(x.id),
-                onSelected: (v) =>
-                    setState(() => v ? _extra.add(x.id) : _extra.remove(x.id)),
+                onSelected: (v) => setState(() {
+                  if (v) {
+                    _extra.add(x.id);
+                  } else {
+                    // al sacar una del medio, las que solo estaban unidas
+                    // a través de ella también salen
+                    _extra.remove(x.id);
+                    final unidas = mesasEncadenadas(
+                        m, todas.where((t) => _extra.contains(t.id)));
+                    _extra.retainAll(unidas);
+                  }
+                }),
               ),
           ]),
           Text(

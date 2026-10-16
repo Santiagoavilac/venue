@@ -50,6 +50,88 @@ class PermisosLista {
   bool get tickea => rol == Rol.admin && puedeTickear;
 }
 
+/// Anota uno o varios nombres en [l] (con "a nombre de" si la persona puede).
+/// Devuelve true si anotó a alguien.
+Future<bool> anotarEnLista(BuildContext context, WidgetRef ref, ListaTipo l) async {
+  final permisos = ref.read(permisosEventoProvider).value;
+  final vendedores = (permisos?.aNombreDe ?? false)
+      ? (ref.read(vendedoresProvider).value ?? const <Miembro>[])
+      : const <Miembro>[];
+  final r = await showModalBottomSheet<({List<String> nombres, String? de})>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: VenueColors.superficie,
+    builder: (_) => _AnotarSheet(lista: l, vendedores: vendedores),
+  );
+  if (r == null || r.nombres.isEmpty) return false;
+  try {
+    final x = await ref.read(listasRepositoryProvider).anotar(l.id, r.nombres, aNombreDe: r.de);
+    ref.invalidate(listasProvider);
+    ref.invalidate(invitadosProvider);
+    ref.invalidate(misCuposProvider);
+    if (context.mounted) {
+      avisar(
+        context,
+        x.duplicados.isEmpty
+            ? '${x.insertados} anotado(s) en ${l.nombre}'
+            : '${x.insertados} anotado(s). Ojo, ya estaban en el evento: ${x.duplicados.join(', ')}',
+        tipo: x.duplicados.isEmpty ? TipoAviso.ok : TipoAviso.aviso,
+      );
+    }
+    return true;
+  } catch (e) {
+    if (context.mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+    return false;
+  }
+}
+
+/// "Nuevo cliente" en dos pasos: elegir la lista y después los nombres.
+Future<void> nuevoCliente(BuildContext context, WidgetRef ref) async {
+  final ahora = DateTime.now();
+  List<ListaTipo> ls;
+  try {
+    ls = (await ref.read(listasProvider.future)).where((l) => l.abierta(ahora)).toList();
+  } catch (e) {
+    if (context.mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+    return;
+  }
+  if (!context.mounted) return;
+  if (ls.isEmpty) {
+    avisar(context, 'No hay ninguna lista abierta para anotar', tipo: TipoAviso.aviso);
+    return;
+  }
+  final l = ls.length == 1
+      ? ls.first
+      : await showModalBottomSheet<ListaTipo>(
+          context: context,
+          showDragHandle: true,
+          backgroundColor: VenueColors.superficie,
+          builder: (c) => ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            children: [
+              const Text('Nuevo cliente · elegí la lista',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              for (final l in ls)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text([
+                    (l.precio ?? 0) > 0 ? '${l.precio} Bs' : 'Free',
+                    if (l.ingresoHasta != null) 'entran hasta ${l.ingresoHasta}',
+                  ].join(' · ')),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pop(c, l),
+                ),
+            ],
+          ),
+        );
+  if (l == null || !context.mounted) return;
+  await anotarEnLista(context, ref, l);
+}
+
 class ListasScreen extends ConsumerStatefulWidget {
   const ListasScreen({super.key});
 
@@ -165,33 +247,9 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
       });
 
   Future<void> _anotar(ListaTipo l) async {
-    final permisos = ref.read(permisosEventoProvider).value;
-    final vendedores = (permisos?.aNombreDe ?? false)
-        ? (ref.read(vendedoresProvider).value ?? const <Miembro>[])
-        : const <Miembro>[];
-    final r = await showModalBottomSheet<({List<String> nombres, String? de})>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: VenueColors.superficie,
-      builder: (_) => _AnotarSheet(lista: l, vendedores: vendedores),
-    );
-    if (r == null || r.nombres.isEmpty) return;
-    await _hacer(() async {
-      final x = await ref
-          .read(listasRepositoryProvider)
-          .anotar(l.id, r.nombres, aNombreDe: r.de);
-      _recargar();
-      if (!mounted) return;
+    if (await anotarEnLista(context, ref, l) && mounted) {
       setState(() => _abierta = l.id);
-      avisar(
-        context,
-        x.duplicados.isEmpty
-            ? '${x.insertados} anotado(s)'
-            : '${x.insertados} anotado(s). Ojo, ya estaban en el evento: ${x.duplicados.join(', ')}',
-        tipo: x.duplicados.isEmpty ? TipoAviso.ok : TipoAviso.aviso,
-      );
-    });
+    }
   }
 
   @override
@@ -378,16 +436,17 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                         Text(l.nombre,
                             style: const TextStyle(
                                 fontSize: 18, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 2),
-                        Text(
-                          [
-                            '${rs.length} anotados',
-                            '${rs.where((i) => i.ingreso).length} ingresaron',
-                            if (l.ingresoHasta != null) 'hasta ${l.ingresoHasta}',
-                          ].join(' · '),
-                          style: const TextStyle(
-                              color: VenueColors.textoSuave, fontSize: 13),
-                        ),
+                        const SizedBox(height: 6),
+                        // lo que la puerta necesita de un vistazo, sin abrir la lista
+                        Wrap(spacing: 6, runSpacing: 6, children: [
+                          _Chip('${rs.length} anotados'),
+                          _Chip('${rs.where((i) => i.ingreso).length} ingresaron',
+                              color: VenueColors.ok),
+                          if (l.ingresoHasta != null)
+                            _Chip('hasta ${l.ingresoHasta}', color: VenueColors.aviso),
+                          _Chip((l.precio ?? 0) > 0 ? '${l.precio} Bs' : 'Free',
+                              color: const Color(0xFFE8B530), borde: true),
+                        ]),
                       ],
                     ),
                   ),
@@ -562,6 +621,25 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
       ),
     );
   }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip(this.texto, {this.color = VenueColors.textoSuave, this.borde = false});
+  final String texto;
+  final Color color;
+  final bool borde;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        decoration: BoxDecoration(
+          color: borde ? Colors.transparent : color.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(99),
+          border: borde ? Border.all(color: color.withValues(alpha: .7)) : null,
+        ),
+        child: Text(texto,
+            style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w700)),
+      );
 }
 
 class _FilaInvitado extends StatelessWidget {

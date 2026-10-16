@@ -57,6 +57,7 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
   _Alcance _alcance = _Alcance.mias;
   String _q = '';
   String? _vendedor;
+  String? _team; // '' = sin team
   final _marcadas = <String>{};
 
   @override
@@ -219,6 +220,13 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
         ref.watch(ventanaProvider).value ?? (desde: null, hasta: null),
         DateTime.now());
     final miTeam = equipo[yo]?.teamId;
+    // lo que se cobra ahora: la fase abierta o, sin fases, el precio del evento
+    final num? precioAhora =
+        ev.ventaPorFases ? vigente?.precio : (ev.precioManilla > 0 ? ev.precioManilla : null);
+    final emitidas = veOtras
+        ? ref.watch(entradasProvider).value?.where((e) => e.estado != 'anulada').length
+        : null;
+    final mias = ref.watch(misEntradasProvider).value?.where((e) => e.estado != 'anulada').length;
 
     return Column(
       children: [
@@ -227,6 +235,17 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (mias != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    [
+                      if (emitidas != null) '$emitidas emitidas',
+                      '$mias tuyas',
+                    ].join(' · '),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
               if (cerrada != null)
                 _Cartel(Icons.lock_clock_rounded, cerrada, VenueColors.aviso)
               else if (ev.ventaPorFases)
@@ -288,8 +307,8 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                 const SizedBox(width: 10),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 22),
-                  child: SizedBox(
-                    width: 118,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 118),
                     child: FilledButton(
                       onPressed: _generando || cerrada != null
                           ? null
@@ -301,7 +320,9 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(strokeWidth: 2.2)))
-                          : const Text('Generar'),
+                          : Text(precioAhora == null
+                              ? 'Generar'
+                              : 'Generar · ${precioAhora * (_escritos > 1 ? _escritos : 1)} Bs'),
                     ),
                   ),
                 ),
@@ -321,6 +342,7 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                   onSelectionChanged: (s) => setState(() {
                     _alcance = s.first;
                     _vendedor = null;
+                    _team = null;
                     _marcadas.clear();
                   }),
                 ),
@@ -351,6 +373,24 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                 var lista = todas;
                 if (alcance == _Alcance.team) {
                   lista = lista.where((e) => equipo[e.rrppId]?.teamId == miTeam).toList();
+                }
+                // teams con cuántas entradas tiene cada uno, para el filtro
+                final teams = <String, ({String nombre, int n})>{};
+                if (alcance == _Alcance.todas) {
+                  for (final e in lista) {
+                    final m = equipo[e.rrppId];
+                    final id = m?.teamId ?? '';
+                    final t = teams[id];
+                    teams[id] = (
+                      nombre: id.isEmpty ? 'Sin team' : (m?.team ?? 'Sin team'),
+                      n: (t?.n ?? 0) + 1
+                    );
+                  }
+                  if (_team != null) {
+                    lista = lista
+                        .where((e) => (equipo[e.rrppId]?.teamId ?? '') == _team)
+                        .toList();
+                  }
                 }
                 final vendedores = {
                   for (final e in lista)
@@ -394,9 +434,32 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                       style: const TextStyle(
                           color: VenueColors.textoSuave, fontWeight: FontWeight.w600),
                     ),
+                    if (alcance == _Alcance.todas && teams.length > 1) ...[
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String?>(
+                        initialValue: _team,
+                        isExpanded: true,
+                        decoration: const InputDecoration(isDense: true),
+                        items: [
+                          DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(
+                                  'Todos los teams (${teams.values.fold<int>(0, (a, t) => a + t.n)})')),
+                          for (final t in (teams.entries.toList()
+                            ..sort((a, b) => b.value.n.compareTo(a.value.n))))
+                            DropdownMenuItem<String?>(
+                                value: t.key, child: Text('${t.value.nombre} (${t.value.n})')),
+                        ],
+                        onChanged: (v) => setState(() {
+                          _team = v;
+                          _vendedor = null;
+                        }),
+                      ),
+                    ],
                     if (alcance == _Alcance.todas && vendedores.length > 1) ...[
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String?>(
+                        key: ValueKey(_team),
                         initialValue: _vendedor,
                         isExpanded: true,
                         decoration: const InputDecoration(isDense: true),

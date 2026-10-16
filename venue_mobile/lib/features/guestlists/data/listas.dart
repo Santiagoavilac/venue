@@ -14,9 +14,13 @@ class ListaTipo {
     this.registroDesde,
     this.registroHasta,
     this.ingresoHasta,
+    this.precio,
   });
   final String id;
   final String nombre;
+
+  /// Lo que se cobra en puerta por entrar con esta lista; null o 0 = Free.
+  final num? precio;
   final DateTime? registroDesde;
   final DateTime? registroHasta;
 
@@ -37,6 +41,7 @@ class ListaTipo {
         registroHasta:
             DateTime.tryParse(j['registro_hasta'] as String? ?? '')?.toLocal(),
         ingresoHasta: (j['ingreso_hasta'] as String?)?.substring(0, 5),
+        precio: j['precio'] as num?,
       );
 }
 
@@ -107,7 +112,7 @@ class ListasRepository {
   Future<List<ListaTipo>> listas(String eventoId) async {
     final r = await _sb
         .from('lista_tipos')
-        .select('id, nombre, registro_desde, registro_hasta, ingreso_hasta')
+        .select('id, nombre, registro_desde, registro_hasta, ingreso_hasta, precio')
         .eq('evento_id', eventoId)
         .order('orden', ascending: true);
     return r.map(ListaTipo.desde).toList();
