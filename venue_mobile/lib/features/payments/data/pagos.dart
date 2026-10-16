@@ -235,3 +235,82 @@ final miRendicionProvider = FutureProvider.autoDispose<
     netoPorManilla: r.netoPorManilla, vendidas: vendidas, comision: comision, yaRendido: ya,
   );
 });
+
+/// Lo que cada relacionador tiene que pagar del evento, contado sobre las
+/// manillas prepagadas que INGRESARON (cada una a su precio de fase), y si
+/// su jefe (o el admin) ya le puso el check de pagado.
+class Rendicion {
+  const Rendicion({
+    required this.rrppId,
+    required this.nombre,
+    required this.teamId,
+    required this.team,
+    required this.vendidas,
+    required this.ingresaron,
+    required this.cobrado,
+    required this.comisionUnit,
+    required this.comision,
+    required this.aPagar,
+    required this.pagado,
+    required this.comprobantes,
+    required this.rendido,
+    this.marcadoPor,
+    this.marcadoAt,
+  });
+  final String rrppId;
+  final String nombre;
+  final String? teamId;
+  final String team;
+  final int vendidas;
+  final int ingresaron;
+  final num cobrado;
+  final num comisionUnit;
+  final num comision;
+  final num aPagar;
+  final bool pagado;
+  final List<String> comprobantes;
+
+  /// Suma de lo que declaró en sus comprobantes.
+  final num rendido;
+  final String? marcadoPor;
+  final DateTime? marcadoAt;
+
+  factory Rendicion.desde(Map<String, dynamic> j) => Rendicion(
+        rrppId: j['rrpp_id'] as String,
+        nombre: j['nombre'] as String? ?? '?',
+        teamId: j['team_id'] as String?,
+        team: j['team'] as String? ?? 'Sin team',
+        vendidas: (j['vendidas'] as num?)?.toInt() ?? 0,
+        ingresaron: (j['ingresaron'] as num?)?.toInt() ?? 0,
+        cobrado: j['cobrado'] as num? ?? 0,
+        comisionUnit: j['comision_unit'] as num? ?? 0,
+        comision: j['comision'] as num? ?? 0,
+        aPagar: j['a_pagar'] as num? ?? 0,
+        pagado: j['pagado'] == true,
+        comprobantes: [for (final c in (j['comprobantes'] as List? ?? const [])) '$c'],
+        rendido: j['rendido'] as num? ?? 0,
+        marcadoPor: j['marcado_por'] as String?,
+        marcadoAt: DateTime.tryParse(j['marcado_at'] as String? ?? '')?.toLocal(),
+      );
+}
+
+extension RendicionesRepo on PagosRepository {
+  /// admin: todos · jefe: su team y él · relacionador: él (lo filtra el servidor).
+  Future<List<Rendicion>> rendiciones(String eventoId) async =>
+      ((await _sbDe(this).rpc('rendiciones_evento', params: {'p_evento': eventoId})) as List)
+          .map((x) => Rendicion.desde(Map<String, dynamic>.from(x as Map)))
+          .toList();
+
+  /// Check de pagado a uno o a un team entero; [pagado] false lo saca.
+  Future<void> marcar(String eventoId, List<String> rrpps, bool pagado) =>
+      _sbDe(this).rpc('marcar_rendicion',
+          params: {'p_evento': eventoId, 'p_rrpps': rrpps, 'p_pagado': pagado});
+}
+
+SupabaseClient _sbDe(PagosRepository r) => r._sb;
+
+final rendicionesProvider = FutureProvider.autoDispose<List<Rendicion>>((ref) {
+  final ev = ref.watch(eventoActivoProvider);
+  if (ev == null) return const [];
+  return ref.watch(pagosRepositoryProvider).rendiciones(ev.id);
+});

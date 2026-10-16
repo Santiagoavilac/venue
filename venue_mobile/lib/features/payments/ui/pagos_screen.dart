@@ -52,8 +52,13 @@ class ImagenQr extends StatelessWidget {
   }
 }
 
-/// Pagos: el relacionador rinde a su jefe, el jefe al boliche, y el admin
-/// verifica contra el extracto.
+/// Pagos según quién mira:
+/// - relacionador: su cuenta (manillas que ingresaron, comisión, a pagar) y
+///   subir el comprobante;
+/// - jefe: lo mismo para él, y la lista de su team con capturas y un check
+///   de "pagó" por persona o para el team entero;
+/// - admin: todos los teams, con los mismos checks, y la verificación de los
+///   comprobantes contra el extracto.
 class PagosScreen extends ConsumerWidget {
   const PagosScreen({super.key});
 
@@ -68,82 +73,97 @@ class PagosScreen extends ConsumerWidget {
           icono: Icons.event_busy_rounded, titulo: 'No hay evento activo');
     }
     final pagos = ref.watch(pagosProvider);
-    final rend = ref.watch(miRendicionProvider).value;
+    final rends = ref.watch(rendicionesProvider);
     final equipo = ref.watch(equipoProvider).value ?? const <String, Miembro>{};
     final miTeam = equipo[yo]?.teamId;
     final esAdmin = rol == Rol.admin;
     final rinde = rol == Rol.rrpp || rol == Rol.jefe;
+    final controla = rol == Rol.jefe || esAdmin;
     final aQuien = rol == Rol.rrpp ? 'tu jefe' : 'el boliche';
     final repo = ref.read(pagosRepositoryProvider);
 
     void recargar() {
       ref.invalidate(pagosProvider);
+      ref.invalidate(rendicionesProvider);
       ref.invalidate(miRendicionProvider);
+    }
+
+    Future<void> marcar(List<String> ids, bool pagado, String ok) async {
+      try {
+        await repo.marcar(ev.id, ids, pagado);
+        ref.invalidate(rendicionesProvider);
+        if (context.mounted) avisar(context, ok);
+      } catch (e) {
+        if (context.mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+      }
     }
 
     return RefreshIndicator(
       onRefresh: () async {
         recargar();
-        await ref.read(pagosProvider.future);
+        await ref.read(rendicionesProvider.future);
       },
       child: VistaAsync(
-        valor: pagos,
+        valor: rends,
         reintentar: recargar,
-        datos: (lista) {
-          num suma(Iterable<Pago> l) => l.fold<num>(0, (a, p) => a + p.monto);
-          final ver = lista.where((p) => p.verificado).toList();
-          final pen = lista.where((p) => !p.verificado).toList();
+        datos: (todas) {
+          final mia = todas.where((r) => r.rrppId == yo).firstOrNull;
+          // el jefe no se marca a sí mismo: a él lo marca el admin
+          final otros = esAdmin
+              ? todas
+              : todas.where((r) => r.rrppId != yo && r.teamId == miTeam).toList();
+          final porTeam = <String, List<Rendicion>>{};
+          for (final r in otros) {
+            porTeam.putIfAbsent(r.teamId ?? '', () => []).add(r);
+          }
+          final lista = pagos.value ?? const <Pago>[];
+
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              Text('${lista.length} pagos · ${suma(lista)} Bs',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: _Caja('Verificados', '${ver.length} · ${suma(ver)} Bs', VenueColors.ok)),
-                const SizedBox(width: 10),
-                Expanded(child: _Caja('Por verificar', '${pen.length} · ${suma(pen)} Bs', VenueColors.aviso)),
-              ]),
-              if (rend != null) ...[
-                const SizedBox(height: 10),
-                _Caja('Lo que generás (${rend.comision} Bs × ${rend.vendidas} manillas)',
-                    '${rend.genero} Bs', VenueColors.ok),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(child: _Caja('Cobraste (${rend.vendidas} × ${ev.precioManilla})',
-                      '${rend.recaudado} Bs', null)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _Caja(
-                      'A rendir a $aQuien${rend.yaRendido > 0 ? ' (ya rendiste ${rend.yaRendido})' : ''}',
-                      '${rend.aRendir} Bs', VenueColors.aviso)),
-                ]),
-              ],
               if (rinde) ...[
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: () async {
+                _MiCuenta(
+                  r: mia,
+                  aQuien: aQuien,
+                  alSubir: () async {
+                    final debe = (mia?.aPagar ?? 0) - (mia?.rendido ?? 0);
                     final ok = await _hoja<bool>(
                         context,
                         _Rendir(
-                          sugerido: (rend?.aRendir ?? 0) > 0
-                              ? rend!.aRendir
-                              : (rend?.netoPorManilla ?? 0),
-                          esRendicion: (rend?.aRendir ?? 0) > 0,
+                          sugerido: debe > 0 ? debe : (mia?.aPagar ?? 0),
+                          esRendicion: true,
                           aQuien: aQuien,
                           teamId: rol == Rol.rrpp ? miTeam : null,
                         ));
                     if (ok == true) recargar();
                   },
-                  icon: const Icon(Icons.payments_outlined),
-                  label: Text(
-                      'PAGAR → ${(rend?.aRendir ?? 0) > 0 ? rend!.aRendir : (rend?.netoPorManilla ?? 0)} Bs'),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Transferí a $aQuien lo que te queda por rendir (el monto se puede editar). '
-                  '"A rendir" = cobrado − tu comisión − lo ya rendido.',
-                  style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5, height: 1.35),
-                ),
+                const SizedBox(height: 16),
+              ],
+              if (controla) ...[
+                _ResumenTeams(lista: otros, titulo: esAdmin ? 'Todos los teams' : 'Mi team'),
+                const SizedBox(height: 8),
+                if (otros.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text('Nadie de tu team vendió entradas en este evento.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: VenueColors.textoSuave)),
+                  ),
+                for (final t in porTeam.entries)
+                  _TarjetaTeam(
+                    nombre: t.value.first.team,
+                    filas: t.value,
+                    // el jefe ve un solo team: el botón de "todo el team" es el suyo
+                    alMarcarTodos: (pagado) => marcar(
+                        [for (final r in t.value) r.rrppId],
+                        pagado,
+                        pagado
+                            ? '${t.value.first.team}: todos marcados como pagados'
+                            : '${t.value.first.team}: checks quitados'),
+                    alMarcar: (r, pagado) => marcar([r.rrppId], pagado,
+                        pagado ? '${r.nombre} marcado como pagado' : 'Check de ${r.nombre} quitado'),
+                  ),
               ],
               const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 6, children: [
@@ -179,16 +199,16 @@ class PagosScreen extends ConsumerWidget {
                       }
                     },
                     icon: const Icon(Icons.upload_rounded, size: 18),
-                    label: const Text('Mi QR de cobro (para mis relacionadores)'),
+                    label: const Text('Mi QR de cobro'),
                   ),
               ]),
               const SizedBox(height: 16),
-              const Text('Movimientos',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              Text(esAdmin ? 'Comprobantes · verificación' : 'Comprobantes subidos',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
               if (lista.isEmpty)
                 const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text('Sin pagos registrados en este evento.',
+                  padding: EdgeInsets.all(20),
+                  child: Text('Todavía no se subió ningún comprobante.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: VenueColors.textoSuave)),
                 ),
@@ -233,6 +253,223 @@ class PagosScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// La cuenta propia: cuántas manillas ingresaron, comisión, lo que hay que
+/// pagar y si ya le pusieron el check.
+class _MiCuenta extends StatelessWidget {
+  const _MiCuenta({required this.r, required this.aQuien, required this.alSubir});
+  final Rendicion? r;
+  final String aQuien;
+  final VoidCallback alSubir;
+
+  @override
+  Widget build(BuildContext context) {
+    final x = r;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            const Expanded(
+                child: Text('Tu cuenta', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
+            if (x != null) _ChipPagado(x),
+          ]),
+          const SizedBox(height: 10),
+          if (x == null)
+            const Text('No vendiste entradas en este evento.',
+                style: TextStyle(color: VenueColors.textoSuave))
+          else ...[
+            _Linea('Ingresaron', '${x.ingresaron} de ${x.vendidas} vendidas'),
+            _Linea('Cobrado (las que ingresaron)', '${x.cobrado} Bs'),
+            _Linea('Tu comisión (${x.comisionUnit} × ${x.ingresaron})', '− ${x.comision} Bs'),
+            if (x.rendido > 0) _Linea('Comprobantes que subiste', '${x.rendido} Bs'),
+            const Divider(height: 18),
+            Row(children: [
+              Expanded(
+                  child: Text('A pagar a $aQuien',
+                      style: const TextStyle(fontWeight: FontWeight.w700))),
+              Text('${x.aPagar} Bs',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: x.pagado ? VenueColors.ok : VenueColors.aviso)),
+            ]),
+          ],
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: alSubir,
+            icon: const Icon(Icons.upload_file_rounded),
+            label: const Text('Subir comprobante de pago'),
+          ),
+          if (x != null && x.comprobantes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _Capturas(x.comprobantes),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+class _Linea extends StatelessWidget {
+  const _Linea(this.t, this.v);
+  final String t;
+  final String v;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(children: [
+          Expanded(child: Text(t, style: const TextStyle(color: VenueColors.textoSuave))),
+          Text(v, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ]),
+      );
+}
+
+class _ChipPagado extends StatelessWidget {
+  const _ChipPagado(this.r);
+  final Rendicion r;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = r.pagado ? VenueColors.ok : VenueColors.aviso;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+          color: c.withValues(alpha: .14), borderRadius: BorderRadius.circular(99)),
+      child: Text(r.pagado ? 'Pagado ✓' : 'Pendiente',
+          style: TextStyle(color: c, fontWeight: FontWeight.w800, fontSize: 12.5)),
+    );
+  }
+}
+
+/// Totales de lo que se controla: cuánto hay que cobrar y cuánto ya tiene check.
+class _ResumenTeams extends StatelessWidget {
+  const _ResumenTeams({required this.lista, required this.titulo});
+  final List<Rendicion> lista;
+  final String titulo;
+
+  @override
+  Widget build(BuildContext context) {
+    num suma(Iterable<Rendicion> l) => l.fold<num>(0, (a, r) => a + r.aPagar);
+    final pag = lista.where((r) => r.pagado);
+    final pen = lista.where((r) => !r.pagado);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(titulo, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(child: _Caja('Pagaron (${pag.length})', '${suma(pag)} Bs', VenueColors.ok)),
+        const SizedBox(width: 10),
+        Expanded(child: _Caja('Falta pagar (${pen.length})', '${suma(pen)} Bs', VenueColors.aviso)),
+      ]),
+    ]);
+  }
+}
+
+class _TarjetaTeam extends StatelessWidget {
+  const _TarjetaTeam({
+    required this.nombre,
+    required this.filas,
+    required this.alMarcarTodos,
+    required this.alMarcar,
+  });
+  final String nombre;
+  final List<Rendicion> filas;
+  final ValueChanged<bool> alMarcarTodos;
+  final void Function(Rendicion r, bool pagado) alMarcar;
+
+  @override
+  Widget build(BuildContext context) {
+    final todos = filas.every((r) => r.pagado);
+    final total = filas.fold<num>(0, (a, r) => a + r.aPagar);
+    return Card(
+      margin: const EdgeInsets.only(top: 10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 8, 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(nombre, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                Text(
+                    '${filas.where((r) => r.pagado).length}/${filas.length} pagaron · $total Bs en total',
+                    style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
+              ]),
+            ),
+            TextButton.icon(
+              onPressed: () => alMarcarTodos(!todos),
+              icon: Icon(todos ? Icons.remove_done_rounded : Icons.done_all_rounded, size: 18),
+              label: Text(todos ? 'Quitar todos' : 'Marcar todos'),
+            ),
+          ]),
+          const Divider(height: 14),
+          for (final r in filas)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Checkbox(value: r.pagado, onChanged: (v) => alMarcar(r, v ?? false)),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const SizedBox(height: 10),
+                    Text(r.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Text(
+                      '${r.ingresaron} de ${r.vendidas} ingresaron · paga ${r.aPagar} Bs'
+                      '${r.rendido > 0 ? ' · subió ${r.rendido} Bs' : ''}',
+                      style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
+                    ),
+                    if (r.pagado && r.marcadoPor != null)
+                      Text('check de ${r.marcadoPor}',
+                          style: const TextStyle(color: VenueColors.ok, fontSize: 12)),
+                    if (r.comprobantes.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      _Capturas(r.comprobantes),
+                    ] else
+                      const Text('sin captura',
+                          style: TextStyle(color: VenueColors.aviso, fontSize: 12)),
+                  ]),
+                ),
+              ]),
+            ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Miniaturas de los comprobantes; al tocar una se ve grande.
+class _Capturas extends StatelessWidget {
+  const _Capturas(this.refs);
+  final List<String> refs;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 74,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: refs.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (_, i) => GestureDetector(
+            onTap: () => _hoja(
+                context,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  child: Center(child: ImagenComprobante(referencia: refs[i], ancho: 320)),
+                )),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 60,
+                height: 74,
+                child: FittedBox(
+                    fit: BoxFit.cover,
+                    clipBehavior: Clip.hardEdge,
+                    child: ImagenComprobante(referencia: refs[i], ancho: 120)),
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _Caja extends StatelessWidget {
@@ -354,7 +591,7 @@ class _RendirState extends ConsumerState<_Rendir> {
           );
       if (!mounted) return;
       Navigator.pop(context, true);
-      avisar(context, 'Pago registrado — queda pendiente hasta que el admin lo verifique');
+      avisar(context, 'Comprobante subido — ${widget.aQuien == 'tu jefe' ? 'tu jefe' : 'el admin'} te marca cuando lo vea');
     } catch (e) {
       if (mounted) {
         avisar(

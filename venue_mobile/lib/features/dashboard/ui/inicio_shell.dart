@@ -8,6 +8,7 @@ import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
 import '../../../core/widgets/patron.dart';
+import '../../../core/widgets/revolver.dart';
 import '../../authentication/data/sesion.dart';
 import '../../events/data/eventos.dart';
 import '../../avisos/bienvenida.dart';
@@ -45,6 +46,11 @@ class _Seccion {
 /// Secciones disponibles para un rol. La primera es su pantalla de trabajo:
 /// el portero abre directo en el escáner, que es lo que hace toda la noche.
 List<_Seccion> _seccionesPara(Rol rol) => [
+      // los que venden arrancan en Eventos, con el resumen de la noche
+      if (rol.vende)
+        _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
+            rol == Rol.admin ? const GestionEventosScreen() : const EventosScreen(),
+            grupo: 'Inicio'),
       // módulo barra: pestañas propias, no ven nada de puerta
       if (rol == Rol.propietario) ...const [
         _Seccion('Inventario', Icons.inventory_2_outlined, Icons.inventory_2_rounded,
@@ -97,10 +103,9 @@ List<_Seccion> _seccionesPara(Rol rol) => [
       if (rol == Rol.admin)
         const _Seccion('Gente', Icons.manage_accounts_outlined,
             Icons.manage_accounts_rounded, GenteScreen(), encabezadoPropio: true),
-      if (rol.veEventos)
-        _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
-            rol == Rol.admin ? const GestionEventosScreen() : const EventosScreen(),
-            grupo: 'Inicio'),
+      if (rol.veEventos && !rol.vende)
+        const _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
+            EventosScreen(), grupo: 'Inicio'),
       const _Seccion('Cuenta', Icons.person_outline_rounded,
           Icons.person_rounded, CuentaScreen(), grupo: 'Perfil'),
     ];
@@ -260,38 +265,27 @@ class _InicioShellState extends ConsumerState<InicioShell>
                       if (!conMas || n < 4) return setState(() => _i = n);
                       final elegido = await showModalBottomSheet<int>(
                         context: context,
+                        isScrollControlled: true,
+                        // el dedo gira el tambor: arrastrar no cierra la hoja
+                        enableDrag: false,
+                        showDragHandle: true,
                         builder: (c) => SafeArea(
-                          child: ListView(
-                            shrinkWrap: true,
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                            children: [
-                              const Padding(
-                                padding: EdgeInsets.only(bottom: 10, left: 4),
-                                child: Text('Más',
-                                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                            child: Column(mainAxisSize: MainAxisSize.min, children: [
+                              const Text('Más',
+                                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+                              const Text('Girá el tambor y tocá la que quieras',
+                                  style: TextStyle(color: VenueColors.textoSuave, fontSize: 13)),
+                              Revolver(
+                                opciones: [
+                                  for (var k = 4; k < secciones.length; k++)
+                                    OpcionRevolver(secciones[k].titulo, secciones[k].iconoOn,
+                                        actual: k == i),
+                                ],
+                                alElegir: (n) => Navigator.pop(c, n + 4),
                               ),
-                              for (var k = 4; k < secciones.length; k++)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Material(
-                                    color: k == i
-                                        ? Theme.of(c).colorScheme.primary.withValues(alpha: .17)
-                                        : VenueColors.superficie2,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      side: const BorderSide(color: VenueColors.linea),
-                                    ),
-                                    clipBehavior: Clip.antiAlias,
-                                    child: ListTile(
-                                      leading: Icon(secciones[k].icono),
-                                      title: Text(secciones[k].titulo,
-                                          style: const TextStyle(fontWeight: FontWeight.w500)),
-                                      trailing: const Icon(Icons.chevron_right_rounded),
-                                      onTap: () => Navigator.pop(c, k),
-                                    ),
-                                  ),
-                                ),
-                            ],
+                            ]),
                           ),
                         ),
                       );

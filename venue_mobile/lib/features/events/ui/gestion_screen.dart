@@ -8,7 +8,6 @@ import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
 import '../../../core/widgets/patron.dart';
 import '../../clubs/data/clubs.dart';
-import '../../guestlists/ui/listas_screen.dart';
 import '../../teams/data/gente.dart';
 import '../data/eventos.dart';
 import '../data/gestion.dart';
@@ -185,11 +184,6 @@ class GestionEventosScreen extends ConsumerWidget {
                 alAccion: (k) async {
                   final id = e['id'] as String, nombre = e['nombre'] as String;
                   switch (k) {
-                    case 'cliente':
-                      // "Nuevo cliente" anota en el evento de la tarjeta
-                      ref.read(eventoElegidoProvider.notifier).elegir(id);
-                      await nuevoCliente(context, ref);
-                      ref.invalidate(numerosEventoProvider(id));
                     case 'publicar':
                       try {
                         final r = await repo.publicar(id);
@@ -313,13 +307,7 @@ class _TarjetaEvento extends StatelessWidget {
             ]),
             if (abierto) ...[
               const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: () => alAccion('cliente'),
-                icon: const Icon(Icons.person_add_alt_1_rounded),
-                label: const Text('Nuevo cliente'),
-              ),
-              const SizedBox(height: 12),
-              _NumerosEvento(eventoId: e['id'] as String),
+              NumerosEvento(eventoId: e['id'] as String),
               const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final (k, t, i) in const [
@@ -356,8 +344,9 @@ class _TarjetaEvento extends StatelessWidget {
   }
 }
 
-class _NumerosEvento extends ConsumerWidget {
-  const _NumerosEvento({required this.eventoId});
+/// Listas, QR emitidos, mesas vendidas e ingresos por lista del evento.
+class NumerosEvento extends ConsumerWidget {
+  const NumerosEvento({super.key, required this.eventoId});
   final String eventoId;
 
   @override

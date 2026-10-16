@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/estado_vista.dart';
 import '../data/eventos.dart';
+import 'gestion_screen.dart';
 
 /// Eventos abiertos del boliche. Tocar uno lo deja como evento de trabajo
 /// para el resto de la app (escáner, listas…).
@@ -36,10 +37,12 @@ class EventosScreen extends ConsumerWidget {
           }
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            itemCount: lista.length,
+            // arriba, el resumen del evento de trabajo
+            itemCount: lista.length + (activo == null ? 0 : 1),
             separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (context, i) {
-              final e = lista[i];
+              if (activo != null && i == 0) return _Resumen(activo);
+              final e = lista[activo == null ? i : i - 1];
               final sel = e.id == activo?.id;
               final vivo = e.enCurso(ahora);
               final marca = Theme.of(context).colorScheme.primary;
@@ -117,6 +120,41 @@ class _Etiqueta extends StatelessWidget {
         texto,
         style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w800),
       ),
+    );
+  }
+}
+
+/// Resumen del evento de trabajo: nombre, fecha, horario, precio y números.
+class _Resumen extends StatelessWidget {
+  const _Resumen(this.e);
+  final Evento e;
+
+  @override
+  Widget build(BuildContext context) {
+    final marca = Theme.of(context).colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: VenueColors.superficie,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: marca.withValues(alpha: .45)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [marca.withValues(alpha: .16), VenueColors.superficie],
+        ),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(e.nombre.toUpperCase(),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: .5)),
+        const SizedBox(height: 4),
+        Text(
+          '${e.fechaCorta} · ${e.horaInicio}–${e.horaFin} hs · Manilla ${e.precioManilla} Bs',
+          style: const TextStyle(color: VenueColors.textoSuave),
+        ),
+        const SizedBox(height: 14),
+        NumerosEvento(eventoId: e.id),
+      ]),
     );
   }
 }
