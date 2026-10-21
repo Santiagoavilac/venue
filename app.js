@@ -5079,6 +5079,10 @@ async function screenEventos() {
       </div>
 
       <div class="ev-acc">
+        ${ev.publicado === false && me.rol === "admin" && ev.estado !== "cerrado"
+          // el evento elegido no se repite en la lista de abajo, que era el
+          // único lugar con "Publicar": un borrador elegido quedaba sin salida
+          ? `<button class="ghost pub" data-pub="${ev.id}" data-nom="${esc(ev.nombre)}">Publicar</button>` : ""}
         <button class="ghost" data-listas="${ev.id}">${ico("lista_")}Listas</button>
         <button class="ghost" data-edit="${ev.id}">${ico("ajustes")}Editar</button>
         <button class="ghost" data-dis="${ev.id}">${ico("imagen")}Diseño${ev.ticket_url ? " ✓" : ""}</button>
