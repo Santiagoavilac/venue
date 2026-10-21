@@ -186,7 +186,14 @@
   };
 
   if (main) {
-    new MutationObserver(() => {
+    new MutationObserver(ms => {
+      // GSAP sacando y volviendo a poner un elemento oculto para medirlo no
+      // es una repintada: si se toma como tal, mata las animaciones a mitad
+      // de camino y la pantalla parpadea
+      const agregados = ms.flatMap(m => [...m.addedNodes]);
+      const sacados = ms.flatMap(m => [...m.removedNodes]);
+      if (agregados.length && sacados.every(n => agregados.includes(n)) &&
+          !agregados.some(n => n.nodeType === 1 && (n.offsetParent !== null || n.getClientRects().length > 0))) return;
       let t; try { t = tab; } catch { return; }
       if (t !== tabVisto) { tabVisto = t; tabAnimado = null; matarDeMain(); }
       const primero = main.firstElementChild;
@@ -213,9 +220,15 @@
      -------------------------------------------------------------- */
   const hoja = $1("#sheet"), cuerpo = $1("#sheetBody");
   if (hoja && cuerpo) {
+    /* Solo lo que se ve. GSAP, para medir un elemento oculto (el <input
+       type=file class=hidden> de los QR, la caja de pago de una mesa…), lo
+       saca y lo vuelve a poner en el DOM: eso disparaba el observador de
+       abajo, que relanzaba la entrada, que lo volvía a medir… y la hoja
+       parpadeaba cada medio segundo. Igual que entrarSeccion. */
+    const seVe = n => n.nodeType === 1 && (n.offsetParent !== null || n.getClientRects().length > 0);
     const entrarHoja = () => {
       if (quieto || !hoja.classList.contains("open")) return;
-      const kids = [...cuerpo.children].slice(0, 10);
+      const kids = [...cuerpo.children].filter(seVe).slice(0, 10);
       if (!kids.length) return;
       gsap.fromTo(kids, { autoAlpha: 0, y: 10 }, {
         autoAlpha: 1, y: 0, duration: rapida() ? .14 : .3,
@@ -228,7 +241,10 @@
       if (ahora && !abierta) entrarHoja();
       abierta = ahora;
     }).observe(hoja, { attributes: true, attributeFilter: ["class"] });
-    new MutationObserver(() => { if (abierta) entrarHoja(); }).observe(cuerpo, { childList: true });
+    // contenido nuevo de verdad (otra hoja, un repintado), no un oculto que va y viene
+    new MutationObserver(ms => {
+      if (abierta && ms.some(m => [...m.addedNodes].some(seVe))) entrarHoja();
+    }).observe(cuerpo, { childList: true });
   }
 
   /* --------------------------------------------------------------
