@@ -2362,7 +2362,8 @@ async function screenListas(soloPintar) {
   // filtros de admin: por team y/o relacionador (como en Entradas)
   const esAdminLs = me.rol === "admin";
   const puedeTk = me.puede_tickear !== false;   // cuentas con puede_tickear=false: solo borran, no tickean
-  if (esAdminLs) await Promise.all([loadTeams(), loadEfectivos()]);
+  // el team de quien anotó va debajo de cada invitado: hace falta para todos
+  await (esAdminLs ? Promise.all([loadTeams(), loadEfectivos()]) : loadEfectivos());
   const tSel = lsFTeam === "__none__" ? "" : lsFTeam;
   // el team que vale es el del boliche que se está mirando
   const okTeamLs = r => !lsFTeam || teamDe(r.rrpp_id) === tSel;
@@ -2463,12 +2464,12 @@ async function screenListas(soloPintar) {
               <span class="relmark" title="${esc(r.rrpp?.nombre || "")}">${esc((r.rrpp?.nombre || "?")[0])}</span>
               <span class="rc-body">
                 <span class="rc-nm">${esc(r.nombre)}</span>
-                <span class="iv-est">
-                  ${r.ingreso_at
-                    ? `<span class="iv-ok">Ingresó ${hora(r.ingreso_at)}</span>`
-                    : `<span class="iv-no">No ingresó</span>`}
+                <span class="rc-sub"><span>${esc(r.rrpp?.nombre || "—")}</span></span>
+                <span class="rc-sub"><span>${esc(teamNomDe(r.rrpp_id))}</span></span>
+                ${r.ingreso_at || r.code ? `<span class="iv-est">
+                  ${r.ingreso_at ? `<span class="iv-ok">Ingresó ${hora(r.ingreso_at)}</span>` : ""}
                   ${r.code ? `<span class="iv-qr">QR</span>` : ""}
-                </span>
+                </span>` : ""}
               </span>
             </div>
             <div style="display:flex;gap:6px;align-items:center">

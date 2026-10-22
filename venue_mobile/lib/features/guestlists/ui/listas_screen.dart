@@ -545,7 +545,10 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: _FilaInvitado(
                     invitado: i,
-                    sub: i.rrppNombre.isEmpty ? null : 'lo anotó ${i.rrppNombre}',
+                    // quién lo anotó y, debajo, su team (igual que la web)
+                    sub: i.rrppNombre.isEmpty
+                        ? null
+                        : '${i.rrppNombre}\n${ref.watch(equipoProvider).value?[i.rrppId]?.team ?? 'Sin team'}',
                     permisos: p,
                     marcado: _marcados.contains(i.id),
                     armado: _armado,
@@ -687,16 +690,20 @@ class _FilaInvitado extends StatelessWidget {
                   Text(i.nombre,
                       style: const TextStyle(
                           fontSize: 15.5, fontWeight: FontWeight.w600)),
-                  Text(
-                    [
-                      i.ingreso ? 'Ingresó ${horaCorta(i.ingresoAt!)}' : 'No ingresó',
-                      if (i.codigo != null) 'QR',
-                      ?sub,
-                    ].join(' · '),
-                    style: TextStyle(
-                        fontSize: 12.5,
-                        color: i.ingreso ? VenueColors.ok : VenueColors.textoSuave),
-                  ),
+                  if (sub != null)
+                    Text(sub!,
+                        style: const TextStyle(
+                            fontSize: 12.5, color: VenueColors.textoSuave, height: 1.3)),
+                  if (i.ingreso || i.codigo != null)
+                    Text(
+                      [
+                        if (i.ingreso) 'Ingresó ${horaCorta(i.ingresoAt!)}',
+                        if (i.codigo != null) 'QR',
+                      ].join(' · '),
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          color: i.ingreso ? VenueColors.ok : VenueColors.textoSuave),
+                    ),
                 ],
               ),
             ),
