@@ -217,7 +217,7 @@ class LeyendaPlano extends StatelessWidget {
               decoration: BoxDecoration(
                   color: c.withValues(alpha: .5), borderRadius: BorderRadius.circular(3))),
           const SizedBox(width: 5),
-          Text(t, style: const TextStyle(fontSize: 12.5, color: VenueColors.textoSuave)),
+          Text(t, style: TextStyle(fontSize: 12.5, color: VenueColors.textoSuave)),
         ]);
     return Wrap(spacing: 14, runSpacing: 4, children: [
       item('Libre', VenueColors.textoSuave),

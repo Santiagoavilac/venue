@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/networking/supabase.dart';
-import '../../../core/sync/tiempo_real.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
@@ -171,12 +170,6 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
       );
     }
 
-    ref.listen(cambiosEventoProvider(evento.id), (_, c) {
-      if (c.value?.any(const {'entradas', 'registros'}.contains) ?? false) {
-        ref.invalidate(aforoProvider(evento.id));
-      }
-    });
-    final aforo = ref.watch(aforoProvider(evento.id));
     final color = _ultimo == null ? null : colorDeVeredicto(_ultimo!.veredicto);
 
     return ListView(
@@ -189,18 +182,11 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
                 '${evento.nombre} · ${evento.fechaCorta}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w700,
                   color: VenueColors.textoSuave,
                 ),
               ),
-            ),
-            aforo.maybeWhen(
-              data: (a) => Text(
-                '${a.ingresaron} adentro · ${a.pendientes} por llegar',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              orElse: () => const SizedBox.shrink(),
             ),
           ],
         ),
@@ -328,7 +314,7 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
               ),
             ),
         ] else
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 14),
             child: Text(
               'Apuntá al QR de la entrada',
@@ -393,7 +379,7 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
                   ),
                   Text(
                     '#${h.resultado.codigo}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: VenueColors.textoSuave,
                       fontFeatures: [FontFeature.tabularFigures()],
                     ),
@@ -401,7 +387,7 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
                   const SizedBox(width: 10),
                   Text(
                     '${h.cuando.hour.toString().padLeft(2, '0')}:${h.cuando.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(color: VenueColors.textoSuave),
+                    style: TextStyle(color: VenueColors.textoSuave),
                   ),
                 ],
               ),

@@ -322,7 +322,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       // pie fijo: total, cobrar y lo que casi nunca se usa
       Container(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
             color: VenueColors.superficie,
             border: Border(top: BorderSide(color: VenueColors.linea))),
         child: Column(children: [
@@ -330,11 +330,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(children: [
-                const Icon(Icons.card_giftcard_rounded, size: 18, color: VenueColors.aviso),
+                Icon(Icons.card_giftcard_rounded, size: 18, color: VenueColors.aviso),
                 const SizedBox(width: 8),
                 Expanded(
                     child: Text('Cortesía a nombre de ${_cortesia!['nombre']}',
-                        style: const TextStyle(color: VenueColors.aviso, fontWeight: FontWeight.w700))),
+                        style: TextStyle(color: VenueColors.aviso, fontWeight: FontWeight.w700))),
                 TextButton(onPressed: () => setState(() => _cortesia = null), child: const Text('Quitar')),
               ]),
             ),
@@ -342,7 +342,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             Expanded(
               child: Text(
                 _carrito.vacio ? 'Tocá un trago' : '${_carrito.vasos} vaso(s)',
-                style: const TextStyle(color: VenueColors.textoSuave),
+                style: TextStyle(color: VenueColors.textoSuave),
               ),
             ),
             Text(_cortesia != null ? '0 Bs' : '$total Bs',

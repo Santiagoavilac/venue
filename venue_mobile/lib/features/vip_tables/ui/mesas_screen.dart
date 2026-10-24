@@ -192,7 +192,7 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     'Reservas sin pago: ${misReservas.map((m) => '${m.etiqueta} vence ${horaCorta(m.vence(ev.horasReserva)!)}').join(' · ')} — confirmá el pago o se liberan solas.',
-                    style: const TextStyle(color: VenueColors.aviso, height: 1.35),
+                    style: TextStyle(color: VenueColors.aviso, height: 1.35),
                   ),
                 ),
               const SizedBox(height: 10),
@@ -339,7 +339,7 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                 );
               }),
               if ((MediaQuery.of(context).size.width - 32) < 640)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 6),
                   child: Text('← deslizá el plano de lado →',
                       textAlign: TextAlign.center,
@@ -356,7 +356,7 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                     : esPortero
                         ? 'Tocá una mesa para ver el nombre y su combo'
                         : 'Tocá una mesa para venderla o ver su detalle · pellizcá para ampliar',
-                style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
+                style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
               ),
               if (todas.isEmpty)
                 Padding(

@@ -160,12 +160,12 @@ class Cierre {
 String textoCierre(String evento, String boliche, String fecha, Cierre c) {
   final orden = [...c.personas]
     ..sort((a, b) => (b.usadas + b.mesas).compareTo(a.usadas + a.mesas));
-  return '🍾 CIERRE ${evento.toUpperCase()} — $boliche · $fecha\n\n'
-      '💰 Para el boliche: ${c.neto} Bs\n'
-      '🎟️ Entradas: ${c.entUsadas}/${c.entVendidas} ingresaron · ${c.entBruto} Bs\n'
-      '📋 Listas: ${c.listaIngresaron}/${c.listaAnotados} ingresaron\n'
-      '🍾 Mesas: ${c.mesasN} · ${c.mesasBruto} Bs\n'
-      '🤝 Comisiones + bonos: ${c.comisionesTotal} Bs\n\n'
+  return 'CIERRE ${evento.toUpperCase()} — $boliche · $fecha\n\n'
+      'Para el boliche: ${c.neto} Bs\n'
+      'Entradas: ${c.entUsadas}/${c.entVendidas} ingresaron · ${c.entBruto} Bs\n'
+      'Listas: ${c.listaIngresaron}/${c.listaAnotados} ingresaron\n'
+      'Mesas: ${c.mesasN} · ${c.mesasBruto} Bs\n'
+      'Comisiones + bonos: ${c.comisionesTotal} Bs\n\n'
       '${orden.map((r) => '• ${r.nombre}: ${r.ingresaron}/${r.anotados} lista · ${r.usadas} QR · ${r.mesas} mesas · a pagar ${r.aPagar} Bs').join('\n')}';
 }
 
@@ -282,7 +282,30 @@ class ReporteRepository {
     ]);
     return (registros: r[0], entradas: r[1]);
   }
+
+  /// Mesas que vendió una persona en un evento (a quién y por cuánto).
+  Future<List<Map<String, dynamic>>> mesasDe(String eventoId, String usuarioId) => _sb
+      .from('mesas')
+      .select('etiqueta, cliente, precio, estado, manillas, pago_verificado')
+      .eq('evento_id', eventoId)
+      .eq('vendido_por', usuarioId)
+      .neq('estado', 'disponible')
+      .order('etiqueta', ascending: true);
 }
+
+/// Cierre de un evento cualquiera (no solo el activo): lo usan las pantallas
+/// de team y de persona, que dejan elegir otro evento.
+final cierreDeProvider =
+    FutureProvider.autoDispose.family<Cierre, String>((ref, eventoId) =>
+        ref.watch(reporteRepositoryProvider).cierre(eventoId));
+
+/// Eventos del boliche activo para elegir en team / persona (abiertos y
+/// pasados, del más nuevo al más viejo).
+final eventosDelClubProvider = FutureProvider.autoDispose<List<Evento>>((ref) async {
+  final club = ref.watch(clubActivoIdProvider);
+  if (club == null) return const [];
+  return ref.watch(reporteRepositoryProvider).eventosPasados(club);
+});
 
 final cierreProvider = FutureProvider.autoDispose<Cierre>((ref) async {
   final ev = ref.watch(eventoActivoProvider);

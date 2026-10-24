@@ -436,12 +436,16 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                   children: [
                     Text(
                       '${lista.length} entradas · $usadas ingresaron · $validas sin usar · $total Bs',
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: VenueColors.textoSuave, fontWeight: FontWeight.w600),
                     ),
                     if (alcance == _Alcance.todas && teams.length > 1) ...[
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String?>(
+                        borderRadius: BorderRadius.circular(12),
+                        dropdownColor: VenueColors.superficie,
+                        icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+                        menuMaxHeight: 420,
                         initialValue: _team,
                         isExpanded: true,
                         decoration: const InputDecoration(isDense: true),
@@ -464,6 +468,10 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                     if (alcance == _Alcance.todas && vendedores.length > 1) ...[
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String?>(
+                        borderRadius: BorderRadius.circular(12),
+                        dropdownColor: VenueColors.superficie,
+                        icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+                        menuMaxHeight: 420,
                         key: ValueKey(_team),
                         initialValue: _vendedor,
                         isExpanded: true,
@@ -628,7 +636,7 @@ class _FilaEntrada extends StatelessWidget {
                     ),
                     if (vendedor != null && vendedor!.isNotEmpty)
                       Text('la vendió $vendedor',
-                          style: const TextStyle(
+                          style: TextStyle(
                               color: VenueColors.textoSuave, fontSize: 12.5)),
                   ],
                 ),

@@ -45,7 +45,7 @@ class ImagenComprobante extends ConsumerWidget {
               width: ancho, height: 120, child: const Center(child: CircularProgressIndicator()));
         }
         if (s.data == null) {
-          return const Text('No tenés permiso para ver este comprobante.',
+          return Text('No tenés permiso para ver este comprobante.',
               style: TextStyle(color: VenueColors.textoSuave));
         }
         return ClipRRect(
@@ -71,7 +71,7 @@ Future<void> hojaMesaSeguridad(BuildContext context, Mesa m, Combo? combo) => _h
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 10),
             if (m.libre)
-              const Text('Libre', style: TextStyle(color: VenueColors.textoSuave))
+              Text('Libre', style: TextStyle(color: VenueColors.textoSuave))
             else ...[
               Text(m.cliente ?? '—',
                   style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
@@ -81,7 +81,7 @@ Future<void> hojaMesaSeguridad(BuildContext context, Mesa m, Combo? combo) => _h
                   if (combo != null) '${m.comboQty} × ${combo.nombre}',
                   etiquetaEstado[m.estado] ?? m.estado,
                 ].join(' · '),
-                style: const TextStyle(color: VenueColors.textoSuave, fontSize: 16),
+                style: TextStyle(color: VenueColors.textoSuave, fontSize: 16),
               ),
             ],
           ],
@@ -268,6 +268,10 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String?>(
+          borderRadius: BorderRadius.circular(12),
+          dropdownColor: VenueColors.superficie,
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+          menuMaxHeight: 420,
           initialValue: _combo,
           isExpanded: true,
           decoration: InputDecoration(
@@ -286,7 +290,7 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
           onChanged: (v) => setState(() => _combo = v),
         ),
         if (validos.isEmpty && ev.comboObligatorio)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text('Ningún combo habilitado para este tipo de mesa.',
                 style: TextStyle(color: VenueColors.aviso)),
@@ -335,7 +339,7 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
             ev.comboPorMesa
                 ? 'Cada mesa paga su propio combo.'
                 : 'El combo se cobra una sola vez para todas las mesas seleccionadas.',
-            style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
+            style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
           ),
         ],
         const SizedBox(height: 12),
@@ -375,6 +379,10 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
         if (permisos?.aNombreDe ?? false) ...[
           const SizedBox(height: 12),
           DropdownButtonFormField<String?>(
+            borderRadius: BorderRadius.circular(12),
+            dropdownColor: VenueColors.superficie,
+            icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+            menuMaxHeight: 420,
             initialValue: _aNombreDe,
             isExpanded: true,
             decoration: const InputDecoration(
@@ -408,11 +416,15 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
             _cortesia
                 ? 'Queda en 0 Bs. No se pide comprobante ni genera comisión.'
                 : 'Una cortesía mantiene el combo pero queda en 0 Bs y no paga comisión.',
-            style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
+            style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
           ),
         ],
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
+          borderRadius: BorderRadius.circular(12),
+          dropdownColor: VenueColors.superficie,
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+          menuMaxHeight: 420,
           initialValue: _estado,
           decoration: InputDecoration(
             labelText: 'Estado',
@@ -514,7 +526,7 @@ class QrDeCobro extends ConsumerWidget {
         }
         final q = s.data;
         if (q == null) {
-          return const Padding(
+          return Padding(
             padding: EdgeInsets.all(12),
             child: Text('El admin todavía no cargó ningún QR de cobro.',
                 style: TextStyle(color: VenueColors.aviso)),
@@ -531,7 +543,7 @@ class QrDeCobro extends ConsumerWidget {
           const SizedBox(height: 6),
           Text('La plata de las mesas entra siempre a ${q.nombre}.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: VenueColors.textoSuave, fontSize: 13)),
+              style: TextStyle(color: VenueColors.textoSuave, fontSize: 13)),
         ]);
       },
     );
@@ -642,19 +654,19 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
             prim.cortesia ? 'Cortesía · 0 Bs' : '${prim.precio} Bs',
             etiquetaEstado[m.estado] ?? m.estado,
           ].join(' · '),
-          style: const TextStyle(color: VenueColors.textoSuave, fontSize: 15),
+          style: TextStyle(color: VenueColors.textoSuave, fontSize: 15),
         ),
         if (vendedor != null)
           Text('La vendió ${vendedor.nombre} · ${vendedor.team}',
-              style: const TextStyle(color: VenueColors.textoSuave)),
+              style: TextStyle(color: VenueColors.textoSuave)),
         if (prim.botellas.isNotEmpty)
           Text('Botellas: ${prim.botellas.join(', ')}',
-              style: const TextStyle(color: VenueColors.textoSuave)),
+              style: TextStyle(color: VenueColors.textoSuave)),
         if (m.estado == 'reservada' && vence != null)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text('Reserva sin pago · vence ${horaCorta(vence)}',
-                style: const TextStyle(
+                style: TextStyle(
                     color: VenueColors.aviso, fontWeight: FontWeight.w700)),
           ),
         if (m.estado == 'pagada' && !prim.pagoVerificado && prim.precio > 0)
@@ -662,11 +674,11 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
                 'Pago por verificar${prim.metodoPago == null ? '' : ' · cobrado en ${prim.metodoPago}'} — falta que el admin lo confirme',
-                style: const TextStyle(
+                style: TextStyle(
                     color: VenueColors.aviso, fontWeight: FontWeight.w700)),
           ),
         if (m.estado == 'pagada' && prim.pagoVerificado)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text('Pago verificado',
                 style: TextStyle(color: VenueColors.ok, fontWeight: FontWeight.w700)),
@@ -843,6 +855,10 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
                 decoration: const InputDecoration(labelText: 'Cliente')),
             const SizedBox(height: 12),
             DropdownButtonFormField<String?>(
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: VenueColors.superficie,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+              menuMaxHeight: 420,
               initialValue: combos.any((x) => x.id == combo) ? combo : null,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Combo'),
@@ -980,6 +996,10 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
           const SizedBox(width: 10),
           Expanded(
             child: DropdownButtonFormField<String>(
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: VenueColors.superficie,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+              menuMaxHeight: 420,
               initialValue: _cat,
               decoration: const InputDecoration(labelText: 'Categoría'),
               items: const [
@@ -1002,6 +1022,10 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
         Row(children: [
           Expanded(
             child: DropdownButtonFormField<String?>(
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: VenueColors.superficie,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+              menuMaxHeight: 420,
               initialValue: teams.containsKey(_team) ? _team : null,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Team asignado'),
@@ -1017,6 +1041,10 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
           const SizedBox(width: 10),
           Expanded(
             child: DropdownButtonFormField<String>(
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: VenueColors.superficie,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+              menuMaxHeight: 420,
               initialValue: _planta,
               decoration: const InputDecoration(labelText: 'Piso'),
               items: [
@@ -1269,7 +1297,7 @@ class _ConfirmarPagos extends ConsumerWidget {
         Text('Confirmar pagos (${pend.length})',
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
-        const Text('Mesas cobradas que esperan que confirmes que la plata entró.',
+        Text('Mesas cobradas que esperan que confirmes que la plata entró.',
             style: TextStyle(color: VenueColors.textoSuave)),
         if (pend.isEmpty)
           const Padding(
@@ -1281,14 +1309,14 @@ class _ConfirmarPagos extends ConsumerWidget {
               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
           Text(
               '${m.precio} Bs · ${m.metodoPago ?? 'sin método'} · la vendió ${equipo[m.vendidoPor]?.nombre ?? '?'}',
-              style: const TextStyle(color: VenueColors.textoSuave)),
+              style: TextStyle(color: VenueColors.textoSuave)),
           if (m.comprobanteUrl != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: ImagenComprobante(referencia: m.comprobanteUrl!, ancho: 200),
             )
           else
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 6),
               child: Text('Sin comprobante adjunto',
                   style: TextStyle(color: VenueColors.aviso)),

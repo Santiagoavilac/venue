@@ -191,7 +191,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                   ),
               ]),
               if (d.filtro)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(bottom: 6),
                   child: Text('Lista filtrada: solo quienes cargaron prepagadas y los agregados a mano.',
                       style: TextStyle(color: VenueColors.aviso, fontSize: 12.5)),
@@ -204,7 +204,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                     hintText: 'Buscar relacionador…', prefixIcon: Icon(Icons.search_rounded)),
               ),
               if (visibles.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.all(28),
                   child: Text('Nadie en la lista.',
                       textAlign: TextAlign.center, style: TextStyle(color: VenueColors.textoSuave)),
@@ -214,7 +214,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                   padding: const EdgeInsets.fromLTRB(2, 16, 2, 4),
                   child: Text(
                     '${g.key.toUpperCase()} · ${g.value.where((p) => atendido(p.id)).length}/${g.value.length}',
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: VenueColors.textoSuave, fontSize: 12.5,
                         fontWeight: FontWeight.w800, letterSpacing: .6),
                   ),
@@ -306,7 +306,7 @@ class _FiltroCajaState extends ConsumerState<_FiltroCaja> {
                   prefixIcon: Icon(Icons.search_rounded)),
             ),
             if (lista.isEmpty)
-              const Padding(
+              Padding(
                   padding: EdgeInsets.all(14),
                   child: Text('Nadie agregado a mano.',
                       style: TextStyle(color: VenueColors.textoSuave))),

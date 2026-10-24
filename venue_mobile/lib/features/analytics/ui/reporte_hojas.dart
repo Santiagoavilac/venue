@@ -42,7 +42,7 @@ Widget _cargando<T>(Future<T> f, Widget Function(T) pintar) => FutureBuilder<T>(
           return Padding(
               padding: const EdgeInsets.all(24),
               child: Text(mensajeDeError(s.error!),
-                  style: const TextStyle(color: VenueColors.aviso)));
+                  style: TextStyle(color: VenueColors.aviso)));
         }
         if (!s.hasData) {
           return const Padding(
@@ -151,7 +151,7 @@ class _ComisionesState extends ConsumerState<_Comisiones> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(p.nombre),
                   Text('${p.usadas} manillas · ${p.comRrpp} Bs',
-                      style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
+                      style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
                 ]),
               ),
               SizedBox(
@@ -185,7 +185,7 @@ class _ComisionesState extends ConsumerState<_Comisiones> {
       ));
     }
     return _lista('Comisiones · ${ev.nombre}', [
-      const Text(
+      Text(
         'Tocá un team para editar los Bs por manilla de cada relacionador (vacío = lo que fija el evento). Se paga solo sobre las ingresadas.',
         style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5, height: 1.35),
       ),
@@ -240,6 +240,10 @@ class _BonosState extends ConsumerState<_Bonos> {
 
     return _lista('Bonos · ${ev.nombre}', [
       DropdownButtonFormField<String?>(
+        borderRadius: BorderRadius.circular(12),
+        dropdownColor: VenueColors.superficie,
+        icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+        menuMaxHeight: 420,
         initialValue: _persona,
         isExpanded: true,
         decoration: const InputDecoration(labelText: 'Persona'),
@@ -294,7 +298,7 @@ class _BonosState extends ConsumerState<_Bonos> {
               subtitle: b['motivo'] == null ? null : Text('${b['motivo']}'),
               trailing: IconButton(
                   tooltip: 'Eliminar bono',
-                  icon: const Icon(Icons.close_rounded, color: VenueColors.mal),
+                  icon: Icon(Icons.close_rounded, color: VenueColors.mal),
                   onPressed: () => hacer(() => repo.borrarBono(b['id'] as String), 'Bono eliminado')),
             ),
         ]);
@@ -414,7 +418,7 @@ Future<void> hojaTelefonos(BuildContext context) =>
                               }
                             },
                             child: const Text('Cargar'))
-                        : const Text('sin número', style: TextStyle(color: VenueColors.textoSuave)),
+                        : Text('sin número', style: TextStyle(color: VenueColors.textoSuave)),
               ),
           ]);
         });

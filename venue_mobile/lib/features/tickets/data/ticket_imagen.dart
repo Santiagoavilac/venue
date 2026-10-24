@@ -41,7 +41,7 @@ class TicketDatos {
   /// Entrada "de la casa": marco dorado.
   final bool oro;
 
-  String get mensaje => '🎟️ $tipo · $boliche — $evento · $fecha\n$cliente\n'
+  String get mensaje => '$tipo · $boliche — $evento · $fecha\n$cliente\n'
       'Válida para 1 solo ingreso. Presentá este QR en puerta.';
 }
 

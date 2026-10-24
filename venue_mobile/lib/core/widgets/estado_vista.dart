@@ -41,7 +41,7 @@ class MensajeVista extends StatelessWidget {
               Text(
                 detalle!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: VenueColors.textoSuave, height: 1.4),
+                style: TextStyle(color: VenueColors.textoSuave, height: 1.4),
               ),
             ],
             if (accion != null && alTocar != null) ...[

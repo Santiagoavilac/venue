@@ -137,7 +137,7 @@ class InventarioScreen extends ConsumerWidget {
                                 fontSize: 20, fontWeight: FontWeight.w800,
                                 color: f['bajo_stock'] == true ? VenueColors.aviso : null)),
                         Text(f['bajo_stock'] == true ? 'botellas · BAJO' : 'botellas',
-                            style: const TextStyle(fontSize: 11, color: VenueColors.textoSuave)),
+                            style: TextStyle(fontSize: 11, color: VenueColors.textoSuave)),
                       ],
                     ),
                   ),
@@ -206,6 +206,10 @@ class _NuevaBebidaState extends ConsumerState<_NuevaBebida> {
           ]),
           const SizedBox(height: 10),
           DropdownButtonFormField<String?>(
+            borderRadius: BorderRadius.circular(12),
+            dropdownColor: VenueColors.superficie,
+            icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+            menuMaxHeight: 420,
             initialValue: cats.any((c) => c['id'] == _categoria) ? _categoria : null,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Categoría'),
@@ -297,9 +301,13 @@ class _RecibirLoteState extends ConsumerState<RecibirLote> {
           const Text('Recibir mercadería', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
           const SizedBox(height: 12),
           if (bebidas.isEmpty)
-            const Text('Todavía no hay bebidas cargadas. Las crea el propietario.',
+            Text('Todavía no hay bebidas cargadas. Las crea el propietario.',
                 style: TextStyle(color: VenueColors.aviso)),
           DropdownButtonFormField<String?>(
+            borderRadius: BorderRadius.circular(12),
+            dropdownColor: VenueColors.superficie,
+            icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+            menuMaxHeight: 420,
             initialValue: _bebida,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Bebida'),
@@ -437,7 +445,7 @@ class _DetalleBebida extends ConsumerWidget {
           children: [
             Text('${fila['nombre']}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             Text('${fila['ml_total']} ml · ${fila['botellas_equiv']} botellas · ${fila['valor_bs']} Bs',
-                style: const TextStyle(color: VenueColors.textoSuave)),
+                style: TextStyle(color: VenueColors.textoSuave)),
             const SizedBox(height: 8),
             if (lotes.isEmpty) const Text('Sin lotes con stock.'),
             for (final l in lotes)
@@ -453,7 +461,7 @@ class _DetalleBebida extends ConsumerWidget {
                         Text(
                             '${l['ml_actual']} ml · recibido ${_fecha(l['recibido_at'])}'
                             '${l['costo_unitario'] == null ? '' : ' · ${l['costo_unitario']} Bs c/u'}',
-                            style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
+                            style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
                       ]),
                     ),
                     TextButton(onPressed: () => ajustar(l), child: const Text('Contar')),
@@ -548,7 +556,7 @@ class _ConteoState extends ConsumerState<_Conteo> {
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         children: [
           const Text('Conteo de la noche', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-          const Text('Contá lo que hay de verdad. Lo que no toques queda como dice el sistema.',
+          Text('Contá lo que hay de verdad. Lo que no toques queda como dice el sistema.',
               style: TextStyle(color: VenueColors.textoSuave)),
           const SizedBox(height: 10),
           SegmentedButton<String>(
@@ -575,7 +583,7 @@ class _ConteoState extends ConsumerState<_Conteo> {
                     Text(
                         '${f['codigo']} · sistema ${botellasDe(f['ml_sistema'] as num, f['volumen_ml'] as num)} bot. (${f['ml_sistema']} ml)'
                         '${f['ml_contado'] == null ? '' : ' · ya contado ${f['ml_contado']} ml'}',
-                        style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
+                        style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
                   ]),
                 ),
                 SizedBox(
@@ -652,7 +660,7 @@ class _Carta extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           children: [
             const Text('Carta y recetas', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            const Text('Un trago se puede activar recién cuando tiene receta: es lo que descuenta del stock.',
+            Text('Un trago se puede activar recién cuando tiene receta: es lo que descuenta del stock.',
                 style: TextStyle(color: VenueColors.textoSuave)),
             for (final t in tragos)
               ExpansionTile(
@@ -737,6 +745,10 @@ class _AgregarARecetaState extends State<_AgregarAReceta> {
   Widget build(BuildContext context) => Row(children: [
         Expanded(
           child: DropdownButtonFormField<String?>(
+            borderRadius: BorderRadius.circular(12),
+            dropdownColor: VenueColors.superficie,
+            icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+            menuMaxHeight: 420,
             initialValue: _b,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Bebida', isDense: true),
@@ -778,7 +790,7 @@ class _Turno extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           children: [
             Text('Turno · ${ev.nombre}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            const Text('Cada bartender vende solo en las barras que tenga marcadas.',
+            Text('Cada bartender vende solo en las barras que tenga marcadas.',
                 style: TextStyle(color: VenueColors.textoSuave)),
             if (gente.isEmpty)
               const Padding(padding: EdgeInsets.all(16), child: Text('No hay cuentas con rol Barra en este boliche.')),
@@ -825,7 +837,7 @@ class _CortesiasConfig extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           children: [
             const Text('Cortesías', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            const Text('Cuántos vasos de cortesía puede pedir cada relacionador por evento. 0 = ninguno.',
+            Text('Cuántos vasos de cortesía puede pedir cada relacionador por evento. 0 = ninguno.',
                 style: TextStyle(color: VenueColors.textoSuave)),
             const SizedBox(height: 12),
             TextField(controller: t, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Vasos por persona')),

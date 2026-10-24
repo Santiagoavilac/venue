@@ -119,7 +119,7 @@ class _PedirTelefonoState extends ConsumerState<_PedirTelefono> {
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Es para avisarte los cambios de horario, el cierre de venta y lo de tu rendición sin depender de que estés en el grupo. Se carga una sola vez.',
             textAlign: TextAlign.center,
             style: TextStyle(color: VenueColors.textoSuave, height: 1.45),
@@ -146,7 +146,7 @@ class _PedirTelefonoState extends ConsumerState<_PedirTelefono> {
           ),
           const SizedBox(height: 8),
           if (widget.obliga)
-            const Text('Sin tu número no vas a poder seguir usando la app.',
+            Text('Sin tu número no vas a poder seguir usando la app.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: VenueColors.aviso))
           else

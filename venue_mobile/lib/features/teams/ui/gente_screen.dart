@@ -9,12 +9,12 @@ import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
 import '../../../core/widgets/patron.dart';
-import '../../analytics/ui/reporte_hojas.dart';
 import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/data/eventos.dart';
 import '../data/equipo.dart';
 import '../data/gente.dart';
+import 'team_detalle_screen.dart';
 
 Future<T?> _hoja<T>(BuildContext context, Widget child) => showModalBottomSheet<T>(
       context: context,
@@ -106,7 +106,7 @@ class MiTeamScreen extends ConsumerWidget {
                         const Text('Invitar a un relacionador',
                             style: TextStyle(fontWeight: FontWeight.w800)),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                             'Mandale el link: se registra solo y queda en tu team.',
                             style: TextStyle(color: VenueColors.textoSuave)),
                         const SizedBox(height: 10),
@@ -148,7 +148,7 @@ class MiTeamScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             if (lista.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(24),
                 child: Text('Todavía no tenés relacionadores en este boliche.',
                     textAlign: TextAlign.center,
@@ -162,9 +162,7 @@ class MiTeamScreen extends ConsumerWidget {
                         fontWeight: FontWeight.w600,
                         color: g.activo ? null : VenueColors.textoSuave)),
                 subtitle: Text('@${g.usuario}${g.activo ? '' : ' · en pausa'}'),
-                onTap: ev == null
-                    ? null
-                    : () => hojaDetallePersona(context, g.id, g.nombre, ev),
+                onTap: () => abrirPersona(context, g.id, g.nombre, eventoId: ev?.id),
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                   IconButton(
                     tooltip: 'Restablecer contraseña',
@@ -232,13 +230,11 @@ class _CabeceraGente extends ConsumerWidget {
     String rolDe(Usuario u) => equipo[u.id]?.rol ?? u.rol;
     final admins = usuarios.where((u) => rolDe(u) == 'admin').length;
     final activos = usuarios.where((u) => u.activo).length;
-    final marca = Theme.of(context).colorScheme.primary;
     String pl(int n, String s) => '$n $s${n == 1 ? '' : 's'}';
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Encabezado(
-        etiqueta: 'Gestión',
-        titulo: 'Administración de usuarios y equipos',
+        titulo: 'Usuarios',
         contexto: '${club?.nombre ?? ''} · ${pl(usuarios.length, 'usuario')} · ${pl(teams.length, 'team')}',
         acciones: [
           FilledButton.icon(
@@ -254,22 +250,18 @@ class _CabeceraGente extends ConsumerWidget {
           ),
         ],
       ),
-      GrillaIndicadores(children: [
-        Indicador(
-            icono: Icons.person_outline_rounded,
-            etiqueta: 'Usuarios totales',
-            valor: '${usuarios.length}'),
-        Indicador(icono: Icons.groups_outlined, etiqueta: 'Teams', valor: '${teams.length}'),
-        Indicador(
-            icono: Icons.shield_outlined,
-            etiqueta: 'Administradores',
-            valor: '$admins',
-            tono: Tono.marca),
-        Indicador(
-            icono: Icons.check_circle_outline,
-            etiqueta: 'Activos',
-            valor: '$activos',
-            tono: Tono.ok),
+      FilaFichas(children: [
+        FichaDato(
+            icono: Icons.person_outline_rounded, etiqueta: 'Usuarios', valor: '${usuarios.length}'),
+        FichaDato(
+            icono: Icons.groups_outlined, etiqueta: 'Teams', valor: '${teams.length}',
+            color: VenueColors.info),
+        FichaDato(
+            icono: Icons.shield_outlined, etiqueta: 'Admins', valor: '$admins',
+            color: VenueColors.aviso),
+        FichaDato(
+            icono: Icons.check_circle_outline, etiqueta: 'Activos', valor: '$activos',
+            color: VenueColors.ok),
       ]),
       const SizedBox(height: 16),
       Align(
@@ -277,9 +269,8 @@ class _CabeceraGente extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: VenueColors.superficie,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: VenueColors.linea),
+            color: VenueColors.superficie2,
+            borderRadius: BorderRadius.circular(11),
           ),
           child: TabBar(
             isScrollable: true,
@@ -288,8 +279,10 @@ class _CabeceraGente extends ConsumerWidget {
             indicatorSize: TabBarIndicatorSize.tab,
             labelPadding: const EdgeInsets.symmetric(horizontal: 22),
             indicator: BoxDecoration(
-              color: marca.withValues(alpha: .22),
-              borderRadius: BorderRadius.circular(9),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? VenueColors.superficieAlta
+                  : VenueColors.superficie,
+              borderRadius: BorderRadius.circular(8),
             ),
             tabs: [
               const Tab(text: 'Usuarios', height: 42),
@@ -355,6 +348,10 @@ class _Usuarios extends ConsumerStatefulWidget {
 class _UsuariosState extends ConsumerState<_Usuarios> {
   String _q = '';
 
+  /// Grupos (teams) desplegados. Arrancan plegados para no tener la lista
+  /// entera encima; al buscar se abren todos.
+  final _abiertos = <String>{};
+
   @override
   Widget build(BuildContext context) {
     final usuarios = ref.watch(usuariosProvider);
@@ -402,18 +399,18 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
                   borderRadius: BorderRadius.circular(7),
                   border: Border.all(color: VenueColors.linea),
                 ),
-                child: const Text('Vos',
+                child: Text('Vos',
                     style: TextStyle(fontSize: 11.5, color: VenueColors.textoSuave)),
               ),
             ],
           ]);
           final teamW = Row(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.groups_outlined, size: 16, color: VenueColors.textoTenue),
+            Icon(Icons.groups_outlined, size: 16, color: VenueColors.textoTenue),
             const SizedBox(width: 6),
             Flexible(
               child: Text(team ?? 'Sin team',
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13.5, color: VenueColors.textoSuave)),
+                  style: TextStyle(fontSize: 13.5, color: VenueColors.textoSuave)),
             ),
           ]);
           final estado = u.activo
@@ -424,7 +421,7 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
               onTap: () => abrir(u),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                     border: Border(bottom: BorderSide(color: VenueColors.lineaSuave))),
                 child: Row(children: [
                   Inicial(u.nombre, lado: 42),
@@ -433,11 +430,11 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
                   Expanded(
                       flex: 11,
                       child: Text('@${u.usuario}',
-                          style: const TextStyle(color: VenueColors.textoSuave, fontSize: 14))),
+                          style: TextStyle(color: VenueColors.textoSuave, fontSize: 14))),
                   Expanded(flex: 11, child: Align(alignment: Alignment.centerLeft, child: _RolBadge(rol))),
                   Expanded(flex: 10, child: teamW),
                   Expanded(flex: 8, child: Align(alignment: Alignment.centerLeft, child: estado)),
-                  const Icon(Icons.more_horiz_rounded, color: VenueColors.textoSuave),
+                  Icon(Icons.more_horiz_rounded, color: VenueColors.textoSuave),
                 ]),
               ),
             );
@@ -446,10 +443,9 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
             padding: const EdgeInsets.only(bottom: 10),
             child: Material(
               color: VenueColors.superficie,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: VenueColors.linea),
-              ),
+              elevation: elevacionTarjeta,
+              shadowColor: const Color(0x29101828),
+              shape: formaTarjeta,
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: () => abrir(u),
@@ -467,7 +463,7 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
                         ]),
                         const SizedBox(height: 3),
                         Text('@${u.usuario}',
-                            style: const TextStyle(fontSize: 13, color: VenueColors.textoTenue)),
+                            style: TextStyle(fontSize: 13, color: VenueColors.textoTenue)),
                         const SizedBox(height: 9),
                         Wrap(
                           spacing: 12,
@@ -517,17 +513,95 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
                       SizedBox(width: 24),
                     ]),
                   ),
-                  const Divider(height: 1, color: VenueColors.linea),
+                  Divider(height: 1, color: VenueColors.linea),
                   for (final u in lista) fila(u),
                 ]),
               )
             else
-              for (final u in lista) fila(u),
+              ..._grupos(lista, equipo, fila, abiertosTodos: q.isNotEmpty),
           ],
         );
       },
     );
   }
+
+  /// La gente agrupada por team (sin team al final), cada grupo plegable.
+  List<Widget> _grupos(List<Usuario> lista, Map<String, Miembro> equipo,
+      Widget Function(Usuario) fila, {required bool abiertosTodos}) {
+    const sinTeam = 'Sin team';
+    final porTeam = <String, List<Usuario>>{};
+    for (final u in lista) {
+      final t = equipo[u.id]?.teamId != null ? equipo[u.id]!.team : sinTeam;
+      (porTeam[t] ??= []).add(u);
+    }
+    final nombres = porTeam.keys.toList()
+      ..sort((a, b) => a == sinTeam ? 1 : b == sinTeam ? -1 : a.compareTo(b));
+    return [
+      for (final t in nombres) ...[
+        _CabeceraGrupo(
+          titulo: t,
+          cantidad: porTeam[t]!.length,
+          activos: porTeam[t]!.where((u) => u.activo).length,
+          abierto: abiertosTodos || _abiertos.contains(t),
+          alTocar: abiertosTodos
+              ? null
+              : () => setState(() => _abiertos.contains(t) ? _abiertos.remove(t) : _abiertos.add(t)),
+        ),
+        if (abiertosTodos || _abiertos.contains(t)) ...[
+          for (final u in porTeam[t]!) fila(u),
+          const SizedBox(height: 6),
+        ],
+      ],
+    ];
+  }
+}
+
+class _CabeceraGrupo extends StatelessWidget {
+  const _CabeceraGrupo({
+    required this.titulo,
+    required this.cantidad,
+    required this.activos,
+    required this.abierto,
+    this.alTocar,
+  });
+  final String titulo;
+  final int cantidad, activos;
+  final bool abierto;
+  final VoidCallback? alTocar;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Tarjeta(
+          padding: EdgeInsets.zero,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: alTocar,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              child: Row(children: [
+                Inicial(titulo, lado: 34),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(titulo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+                    Text(
+                      '$cantidad ${cantidad == 1 ? 'persona' : 'personas'}'
+                      '${activos < cantidad ? ' · ${cantidad - activos} en pausa' : ''}',
+                      style: TextStyle(fontSize: 13, color: VenueColors.textoSuave),
+                    ),
+                  ]),
+                ),
+                AnimatedRotation(
+                  turns: abierto ? .5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      );
 }
 
 class _Cab extends StatelessWidget {
@@ -535,7 +609,7 @@ class _Cab extends StatelessWidget {
   final String t;
   @override
   Widget build(BuildContext context) => Text(t.toUpperCase(),
-      style: const TextStyle(
+      style: TextStyle(
           fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1, color: VenueColors.textoTenue));
 }
 
@@ -590,6 +664,10 @@ class _AltaUsuarioState extends ConsumerState<_AltaUsuario> {
           Row(children: [
             Expanded(
               child: DropdownButtonFormField<String>(
+                borderRadius: BorderRadius.circular(12),
+                dropdownColor: VenueColors.superficie,
+                icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+                menuMaxHeight: 420,
                 initialValue: _rol,
                 decoration: const InputDecoration(labelText: 'Rol'),
                 items: [
@@ -602,6 +680,10 @@ class _AltaUsuarioState extends ConsumerState<_AltaUsuario> {
             const SizedBox(width: 10),
             Expanded(
               child: DropdownButtonFormField<String?>(
+                borderRadius: BorderRadius.circular(12),
+                dropdownColor: VenueColors.superficie,
+                icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+                menuMaxHeight: 420,
                 initialValue: _team,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Team'),
@@ -720,9 +802,9 @@ class _EditarUsuarioState extends ConsumerState<_EditarUsuario> {
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
-        Text('@${g.usuario}', style: const TextStyle(color: VenueColors.textoSuave)),
+        Text('@${g.usuario}', style: TextStyle(color: VenueColors.textoSuave)),
         if (protegida)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Text('Esta cuenta administrativa está protegida: solo su dueño puede modificarla.',
                 style: TextStyle(color: VenueColors.aviso)),
@@ -736,6 +818,10 @@ class _EditarUsuarioState extends ConsumerState<_EditarUsuario> {
         Row(children: [
           Expanded(
             child: DropdownButtonFormField<String>(
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: VenueColors.superficie,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+              menuMaxHeight: 420,
               initialValue: roles.contains(_rol) ? _rol : null,
               decoration: const InputDecoration(labelText: 'Rol base'),
               items: [
@@ -748,6 +834,10 @@ class _EditarUsuarioState extends ConsumerState<_EditarUsuario> {
           const SizedBox(width: 10),
           Expanded(
             child: DropdownButtonFormField<String?>(
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: VenueColors.superficie,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+              menuMaxHeight: 420,
               initialValue: teams.any((t) => t.id == _team) ? _team : null,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Team base'),
@@ -784,6 +874,10 @@ class _EditarUsuarioState extends ConsumerState<_EditarUsuario> {
                 SizedBox(width: 86, child: Text(c.nombre, overflow: TextOverflow.ellipsis)),
                 Expanded(
                   child: DropdownButtonFormField<String>(
+                    borderRadius: BorderRadius.circular(12),
+                    dropdownColor: VenueColors.superficie,
+                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+                    menuMaxHeight: 420,
                     initialValue: _rolEn[c.id] ?? _rol,
                     isExpanded: true,
                     decoration: const InputDecoration(isDense: true),
@@ -981,74 +1075,89 @@ class _Teams extends ConsumerWidget {
             label: const Text('Nuevo team'),
           ),
           for (final t in lista)
-            Card(
-              margin: const EdgeInsets.only(top: 10),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-                child: Row(children: [
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(t.nombre,
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-                      Text(
-                        '${equipo.values.where((m) => m.teamId == t.id).length} personas'
-                        '${equipo[t.jefeId] == null ? '' : ' · jefe ${equipo[t.jefeId]!.nombre}'}',
-                        style: const TextStyle(color: VenueColors.textoSuave),
-                      ),
-                    ]),
-                  ),
-                  IconButton(
-                      tooltip: 'Compartir invitación',
-                      onPressed: () => _compartirInvitacion(context, t, club.nombre),
-                      icon: const Icon(Icons.ios_share_rounded)),
-                  PopupMenuButton<String>(
-                    onSelected: (k) async {
-                      if (k == 'editar') return formulario(t);
-                      final otros = lista.where((x) => x.id != t.id).toList();
-                      String? destino;
-                      final si = await showDialog<bool>(
-                        context: context,
-                        builder: (c) => StatefulBuilder(
-                          builder: (c, set) => AlertDialog(
-                            title: Text('Eliminar ${t.nombre}'),
-                            content: Column(mainAxisSize: MainAxisSize.min, children: [
-                              const Text('Su gente pasa al team que elijas, o queda sin team.'),
-                              const SizedBox(height: 10),
-                              DropdownButtonFormField<String?>(
-                                initialValue: destino,
-                                isExpanded: true,
-                                items: [
-                                  const DropdownMenuItem<String?>(
-                                      value: null, child: Text('— dejar sin team —')),
-                                  for (final o in otros)
-                                    DropdownMenuItem<String?>(value: o.id, child: Text(o.nombre)),
-                                ],
-                                onChanged: (v) => set(() => destino = v),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Tarjeta(
+                padding: EdgeInsets.zero,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => abrirTeam(context, t),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+                    child: Row(children: [
+                          Inicial(t.nombre, lado: 38),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(t.nombre,
+                                  style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 1),
+                              Text(
+                                '${equipo.values.where((m) => m.teamId == t.id).length} personas'
+                                '${equipo[t.jefeId] == null ? '' : ' · jefe ${equipo[t.jefeId]!.nombre}'}',
+                                style: TextStyle(fontSize: 13, color: VenueColors.textoSuave),
                               ),
                             ]),
-                            actions: [
-                              TextButton(
-                                  onPressed: () => Navigator.pop(c, false),
-                                  child: const Text('Cancelar')),
-                              TextButton(
-                                  onPressed: () => Navigator.pop(c, true),
-                                  style: TextButton.styleFrom(foregroundColor: VenueColors.mal),
-                                  child: const Text('Eliminar team')),
+                          ),
+                          IconButton(
+                              tooltip: 'Compartir invitación',
+                              onPressed: () => _compartirInvitacion(context, t, club.nombre),
+                              icon: Icon(Icons.ios_share_rounded, size: 20, color: VenueColors.textoSuave)),
+                          PopupMenuButton<String>(
+                            onSelected: (k) async {
+                              if (k == 'editar') return formulario(t);
+                              final otros = lista.where((x) => x.id != t.id).toList();
+                              String? destino;
+                              final si = await showDialog<bool>(
+                                context: context,
+                                builder: (c) => StatefulBuilder(
+                                  builder: (c, set) => AlertDialog(
+                                    title: Text('Eliminar ${t.nombre}'),
+                                    content: Column(mainAxisSize: MainAxisSize.min, children: [
+                                      const Text('Su gente pasa al team que elijas, o queda sin team.'),
+                                      const SizedBox(height: 10),
+                                      DropdownButtonFormField<String?>(
+                                        borderRadius: BorderRadius.circular(12),
+                                        dropdownColor: VenueColors.superficie,
+                                        icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+                                        menuMaxHeight: 420,
+                                        initialValue: destino,
+                                        isExpanded: true,
+                                        items: [
+                                          const DropdownMenuItem<String?>(
+                                              value: null, child: Text('— dejar sin team —')),
+                                          for (final o in otros)
+                                            DropdownMenuItem<String?>(value: o.id, child: Text(o.nombre)),
+                                        ],
+                                        onChanged: (v) => set(() => destino = v),
+                                      ),
+                                    ]),
+                                    actions: [
+                                      TextButton(
+                                          onPressed: () => Navigator.pop(c, false),
+                                          child: const Text('Cancelar')),
+                                      TextButton(
+                                          onPressed: () => Navigator.pop(c, true),
+                                          style: TextButton.styleFrom(foregroundColor: VenueColors.mal),
+                                          child: const Text('Eliminar team')),
+                                    ],
+                                  ),
+                                ),
+                              );
+                              if (si == true) {
+                                await hacer(() => repo.eliminarTeam(t.id, destino: destino),
+                                    '${t.nombre} eliminado');
+                              }
+                            },
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(value: 'editar', child: Text('Editar')),
+                              PopupMenuItem(value: 'eliminar', child: Text('Eliminar')),
                             ],
                           ),
-                        ),
-                      );
-                      if (si == true) {
-                        await hacer(() => repo.eliminarTeam(t.id, destino: destino),
-                            '${t.nombre} eliminado');
-                      }
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'editar', child: Text('Editar')),
-                      PopupMenuItem(value: 'eliminar', child: Text('Eliminar')),
-                    ],
+                          Icon(Icons.chevron_right_rounded, color: VenueColors.textoTenue),
+                    ]),
                   ),
-                ]),
+                ),
               ),
             ),
         ],

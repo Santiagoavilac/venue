@@ -384,7 +384,7 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                     alQuitar: null,
                   ),
                 if (!filtrados.any((i) => normalizar(i.nombre).contains(q)))
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.all(24),
                     child: Text('Nadie anotado con ese nombre.',
                         textAlign: TextAlign.center,
@@ -484,7 +484,7 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                               cupo != null
                                   ? (lleno ? 'tuyos · cupo lleno' : 'tuyos · quedan ${cupo - propios}')
                                   : 'tuyos${p.rol == Rol.admin ? ' · sin límite' : ''}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                   color: VenueColors.textoSuave, fontSize: 13),
                             ),
                           ],
@@ -497,7 +497,7 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                             await abrirEditarLista(context, ref, ev.id, l.id);
                             _recargar();
                           },
-                          icon: const Icon(Icons.tune_rounded,
+                          icon: Icon(Icons.tune_rounded,
                               color: VenueColors.textoSuave),
                         ),
                       if (rs.length > 1)
@@ -534,7 +534,7 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                 ),
               ),
               if (rs.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.all(20),
                   child: Text('Nadie anotado todavía.',
                       textAlign: TextAlign.center,
@@ -627,10 +627,12 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip(this.texto, {this.color = VenueColors.textoSuave, this.borde = false});
+  const _Chip(this.texto, {Color? color, this.borde = false}) : _color = color;
   final String texto;
-  final Color color;
+  final Color? _color;
   final bool borde;
+
+  Color get color => _color ?? VenueColors.textoSuave;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -692,7 +694,7 @@ class _FilaInvitado extends StatelessWidget {
                           fontSize: 15.5, fontWeight: FontWeight.w600)),
                   if (sub != null)
                     Text(sub!,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 12.5, color: VenueColors.textoSuave, height: 1.3)),
                   if (i.ingreso || i.codigo != null)
                     Text(
@@ -751,6 +753,10 @@ class _Desplegable extends StatelessWidget {
     final orden = opciones.entries.toList()
       ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
     return DropdownButtonFormField<String?>(
+      borderRadius: BorderRadius.circular(12),
+      dropdownColor: VenueColors.superficie,
+      icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+      menuMaxHeight: 420,
       initialValue: opciones.containsKey(valor) ? valor : null,
       isExpanded: true,
       decoration: const InputDecoration(
@@ -797,7 +803,7 @@ class _AnotarSheetState extends State<_AnotarSheet> {
           Text('Anotar en ${widget.lista.nombre}',
               style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
-          const Text('Un nombre completo por línea.',
+          Text('Un nombre completo por línea.',
               style: TextStyle(color: VenueColors.textoSuave)),
           const SizedBox(height: 12),
           TextField(
@@ -811,6 +817,10 @@ class _AnotarSheetState extends State<_AnotarSheet> {
           if (widget.vendedores.isNotEmpty) ...[
             const SizedBox(height: 12),
             DropdownButtonFormField<String?>(
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: VenueColors.superficie,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+              menuMaxHeight: 420,
               initialValue: _de,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'A nombre de'),

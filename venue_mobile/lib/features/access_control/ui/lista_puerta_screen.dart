@@ -296,7 +296,7 @@ class _Fila extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(sub,
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: VenueColors.textoSuave, fontSize: 13)),
                   if (p.sinTope || p.filtrada || p.anulada)
                     Padding(
@@ -305,8 +305,8 @@ class _Fila extends StatelessWidget {
                         if (p.sinTope)
                           const _Chip('de la casa', Color(0xFFE8B530)),
                         if (p.filtrada)
-                          const _Chip('no pasó filtro', VenueColors.mal),
-                        if (p.anulada) const _Chip('anulada', VenueColors.mal),
+                          _Chip('no pasó filtro', VenueColors.mal),
+                        if (p.anulada) _Chip('anulada', VenueColors.mal),
                       ]),
                     ),
                 ],
@@ -325,7 +325,7 @@ class _Fila extends StatelessWidget {
               const SizedBox(width: 56)
             else if (p.ingreso) ...[
               Text(horaCorta(p.ingresoAt!),
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: VenueColors.textoSuave,
                       fontWeight: FontWeight.w600)),
               const SizedBox(width: 6),

@@ -81,7 +81,7 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            const Text(
+            Text(
               'Al registrarte quedás en el team de quien te pasó el link.',
               style: TextStyle(color: VenueColors.textoSuave, height: 1.4),
             ),
@@ -121,7 +121,7 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
             if (_error != null) ...[
               const SizedBox(height: 14),
               Text(_error!,
-                  style: const TextStyle(color: VenueColors.mal, height: 1.35)),
+                  style: TextStyle(color: VenueColors.mal, height: 1.35)),
             ],
             const SizedBox(height: 22),
             FilledButton(

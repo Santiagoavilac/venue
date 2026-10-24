@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/estado_vista.dart';
+import '../../../core/widgets/patron.dart' show LogoClub;
 import '../../authentication/data/sesion.dart';
 import '../../teams/data/gente.dart';
 import '../../teams/ui/gente_screen.dart';
@@ -14,33 +15,11 @@ class MarcaClub extends StatelessWidget {
   final double lado;
 
   @override
-  Widget build(BuildContext context) {
-    final a = club.primario ?? VenueColors.marcaPorDefecto;
-    final b = club.secundario ?? a;
-    return Container(
-      width: lado,
-      height: lado,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(lado * .28),
-        gradient: LinearGradient(
-          colors: [a, b],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Text(
-        club.inicial,
-        style: TextStyle(
-          fontSize: lado * .46,
-          fontWeight: FontWeight.w900,
-          color: ThemeData.estimateBrightnessForColor(a) == Brightness.dark
-              ? Colors.white
-              : Colors.black,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LogoClub(
+      inicial: club.inicial,
+      color: club.primario ?? VenueColors.marcaPorDefecto,
+      url: club.logoUrl,
+      lado: lado);
 }
 
 /// Elegir el boliche en el que se va a trabajar. Con uno solo, se entra
@@ -91,7 +70,7 @@ class SelectorClubScreen extends ConsumerWidget {
                   style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Elegí el boliche en el que vas a trabajar',
                   style: TextStyle(color: VenueColors.textoSuave, fontSize: 16),
                 ),
@@ -124,13 +103,13 @@ class SelectorClubScreen extends ConsumerWidget {
                                     if (c.subtitulo?.isNotEmpty ?? false)
                                       Text(
                                         c.subtitulo!,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                             color: VenueColors.textoSuave),
                                       ),
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.chevron_right_rounded,
+                              Icon(Icons.chevron_right_rounded,
                                   color: VenueColors.textoSuave),
                             ],
                           ),

@@ -111,9 +111,6 @@ class _RevolverState extends State<Revolver> {
             color: alCentro ? marca.withValues(alpha: .22) : VenueColors.superficieAlta,
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: alCentro ? marca : VenueColors.linea, width: alCentro ? 2 : 1),
-            boxShadow: alCentro
-                ? [BoxShadow(color: marca.withValues(alpha: .35), blurRadius: 18)]
-                : null,
           ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(o.icono, size: 38, color: alCentro ? marca : VenueColors.texto),

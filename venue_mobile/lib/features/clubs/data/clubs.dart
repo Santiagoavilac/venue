@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 import '../../../core/networking/supabase.dart';
 import '../../../core/theme/venue_theme.dart';
@@ -13,6 +14,7 @@ class Club {
     this.inicialTexto,
     this.primario,
     this.secundario,
+    this.logoUrl,
   });
 
   final String id;
@@ -21,6 +23,9 @@ class Club {
   final String? inicialTexto;
   final Color? primario;
   final Color? secundario;
+
+  /// Logo cargado por el admin (null: se muestra la inicial).
+  final String? logoUrl;
 
   String get inicial {
     final t = (inicialTexto?.isNotEmpty ?? false) ? inicialTexto! : nombre;
@@ -34,6 +39,7 @@ class Club {
         inicialTexto: j['inicial'] as String?,
         primario: colorDesdeHex(j['color_primario'] as String?),
         secundario: colorDesdeHex(j['color_secundario'] as String?),
+        logoUrl: j['logo_url'] as String?,
       );
 }
 
@@ -71,13 +77,20 @@ final clubsProvider = FutureProvider<List<Club>>((ref) async {
   final sb = ref.watch(supabaseProvider);
   final ids = ((await sb.rpc('mis_clubs')) as List).cast<String>();
   if (ids.isEmpty) return const [];
-  final filas = await sb
+  Future<List<Map<String, dynamic>>> traer(String cols) => sb
       .from('clubs')
-      .select('id, nombre, subtitulo, inicial, color_primario, color_secundario')
+      .select(cols)
       .inFilter('id', ids)
       .eq('activo', true)
       .order('nombre', ascending: true);
-  return filas.map(Club.desde).toList();
+  const cols = 'id, nombre, subtitulo, inicial, color_primario, color_secundario';
+  try {
+    return (await traer('$cols, logo_url')).map(Club.desde).toList();
+  } on PostgrestException catch (e) {
+    // base sin db/32-logo-boliche.sql todavía: anda igual, sin logos
+    if (e.code != '42703') rethrow;
+    return (await traer(cols)).map(Club.desde).toList();
+  }
 });
 
 /// Boliche en el que se está trabajando. Se reinicia al cambiar de cuenta.

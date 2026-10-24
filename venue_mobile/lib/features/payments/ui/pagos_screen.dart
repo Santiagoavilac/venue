@@ -144,7 +144,7 @@ class PagosScreen extends ConsumerWidget {
                 _ResumenTeams(lista: otros, titulo: esAdmin ? 'Todos los teams' : 'Mi team'),
                 const SizedBox(height: 8),
                 if (otros.isEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.all(20),
                     child: Text('Nadie de tu team vendió entradas en este evento.',
                         textAlign: TextAlign.center,
@@ -206,7 +206,7 @@ class PagosScreen extends ConsumerWidget {
               Text(esAdmin ? 'Comprobantes · verificación' : 'Comprobantes subidos',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
               if (lista.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.all(20),
                   child: Text('Todavía no se subió ningún comprobante.',
                       textAlign: TextAlign.center,
@@ -277,7 +277,7 @@ class _MiCuenta extends StatelessWidget {
           ]),
           const SizedBox(height: 10),
           if (x == null)
-            const Text('No vendiste entradas en este evento.',
+            Text('No vendiste entradas en este evento.',
                 style: TextStyle(color: VenueColors.textoSuave))
           else ...[
             _Linea('Ingresaron', '${x.ingresaron} de ${x.vendidas} vendidas'),
@@ -321,7 +321,7 @@ class _Linea extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
         child: Row(children: [
-          Expanded(child: Text(t, style: const TextStyle(color: VenueColors.textoSuave))),
+          Expanded(child: Text(t, style: TextStyle(color: VenueColors.textoSuave))),
           Text(v, style: const TextStyle(fontWeight: FontWeight.w700)),
         ]),
       );
@@ -394,7 +394,7 @@ class _TarjetaTeam extends StatelessWidget {
                 Text(nombre, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                 Text(
                     '${filas.where((r) => r.pagado).length}/${filas.length} pagaron · $total Bs en total',
-                    style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
+                    style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
               ]),
             ),
             TextButton.icon(
@@ -416,16 +416,16 @@ class _TarjetaTeam extends StatelessWidget {
                     Text(
                       '${r.ingresaron} de ${r.vendidas} ingresaron · paga ${r.aPagar} Bs'
                       '${r.rendido > 0 ? ' · subió ${r.rendido} Bs' : ''}',
-                      style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
+                      style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
                     ),
                     if (r.pagado && r.marcadoPor != null)
                       Text('check de ${r.marcadoPor}',
-                          style: const TextStyle(color: VenueColors.ok, fontSize: 12)),
+                          style: TextStyle(color: VenueColors.ok, fontSize: 12)),
                     if (r.comprobantes.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       _Capturas(r.comprobantes),
                     ] else
-                      const Text('sin captura',
+                      Text('sin captura',
                           style: TextStyle(color: VenueColors.aviso, fontSize: 12)),
                   ]),
                 ),
@@ -484,7 +484,7 @@ class _Caja extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(titulo,
-                style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
+                style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
             const SizedBox(height: 3),
             Text(valor,
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
@@ -623,7 +623,7 @@ class _RendirState extends ConsumerState<_Rendir> {
             }
             final url = s.data;
             if (url == null || url.isEmpty) {
-              return const Padding(
+              return Padding(
                 padding: EdgeInsets.only(bottom: 12),
                 child: Text(
                     'Todavía no hay QR de cobro cargado — pedíselo antes de transferir.',
@@ -685,7 +685,7 @@ class _RendirState extends ConsumerState<_Rendir> {
           esAdmin
               ? 'El pago nace pendiente hasta que lo verifiques contra el extracto.'
               : 'Sin la foto de la transferencia el pago no se puede registrar. Nace pendiente hasta que el admin lo verifique contra el extracto.',
-          style: const TextStyle(color: VenueColors.textoSuave, fontSize: 12.5, height: 1.35),
+          style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5, height: 1.35),
         ),
       ],
     );
@@ -722,13 +722,13 @@ class _Comprobante extends ConsumerWidget {
             if (p.concepto.isNotEmpty) p.concepto,
             if (p.nroOperacion != null) 'Op. ${p.nroOperacion}',
           ].join(' · '),
-          style: const TextStyle(color: VenueColors.textoSuave),
+          style: TextStyle(color: VenueColors.textoSuave),
         ),
         const SizedBox(height: 14),
         if (p.comprobante != null)
           Center(child: ImagenComprobante(referencia: p.comprobante!, ancho: 300))
         else
-          const Text('Sin captura adjunta.', style: TextStyle(color: VenueColors.aviso)),
+          Text('Sin captura adjunta.', style: TextStyle(color: VenueColors.aviso)),
         if (puedeAdjuntar) ...[
           const SizedBox(height: 14),
           OutlinedButton.icon(
@@ -805,7 +805,7 @@ class _QrsCobroState extends ConsumerState<_QrsCobro> {
           children: [
             const Text('QRs de cobro',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            const Text('Cargá un QR por cada cuenta que cobra. Se muestra el primero activo.',
+            Text('Cargá un QR por cada cuenta que cobra. Se muestra el primero activo.',
                 style: TextStyle(color: VenueColors.textoSuave)),
             if (s.connectionState != ConnectionState.done)
               const Padding(
@@ -830,7 +830,7 @@ class _QrsCobroState extends ConsumerState<_QrsCobro> {
                   IconButton(
                       tooltip: 'Eliminar ${q.nombre}',
                       onPressed: () => _hacer(() => repo.borrarQr(q.id), 'QR eliminado'),
-                      icon: const Icon(Icons.close_rounded, color: VenueColors.mal)),
+                      icon: Icon(Icons.close_rounded, color: VenueColors.mal)),
                 ]),
               ),
             const Divider(height: 26),

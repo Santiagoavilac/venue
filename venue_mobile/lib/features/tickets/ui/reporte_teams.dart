@@ -92,7 +92,7 @@ class _ReporteTeams extends ConsumerWidget {
             Text(
               '${general.vendidas} vendidas · ${general.ingresaron} ingresaron · ${general.total} Bs'
               '${general.anuladas > 0 ? ' · ${general.anuladas} anuladas' : ''}',
-              style: const TextStyle(color: VenueColors.textoSuave),
+              style: TextStyle(color: VenueColors.textoSuave),
             ),
             if (general.fases.length > 1) ...[
               const SizedBox(height: 8),
@@ -100,7 +100,7 @@ class _ReporteTeams extends ConsumerWidget {
             ],
             const SizedBox(height: 12),
             if (orden.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(24),
                 child: Text('Todavía no hay entradas vendidas.',
                     textAlign: TextAlign.center,
@@ -138,7 +138,7 @@ class _TarjetaTeam extends StatelessWidget {
           subtitle: Text(
             '${g.vendidas} vendidas · ${g.ingresaron} ingresaron'
             '${g.anuladas > 0 ? ' · ${g.anuladas} anuladas' : ''}',
-            style: const TextStyle(color: VenueColors.textoSuave, fontSize: 13),
+            style: TextStyle(color: VenueColors.textoSuave, fontSize: 13),
           ),
           children: [
             _Fases(g),
@@ -149,7 +149,7 @@ class _TarjetaTeam extends StatelessWidget {
                 child: Row(children: [
                   Expanded(child: Text(v.key)),
                   Text('${v.value.n} · ${v.value.total} Bs',
-                      style: const TextStyle(color: VenueColors.textoSuave)),
+                      style: TextStyle(color: VenueColors.textoSuave)),
                 ]),
               ),
           ],
@@ -180,7 +180,7 @@ class _Fases extends StatelessWidget {
                 Expanded(
                     child: Text(f.key, style: const TextStyle(fontWeight: FontWeight.w700))),
                 Text('${f.value.n} × ${f.value.precio} Bs = ${f.value.total} Bs',
-                    style: const TextStyle(color: VenueColors.textoSuave)),
+                    style: TextStyle(color: VenueColors.textoSuave)),
               ]),
             ),
         ]),

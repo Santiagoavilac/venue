@@ -109,7 +109,7 @@ class VeredictoCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       r.quien!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         color: VenueColors.textoSuave,
                       ),
@@ -129,7 +129,7 @@ class VeredictoCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       r.detalle!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         height: 1.35,
                         color: VenueColors.textoSuave,

@@ -31,7 +31,7 @@ Future<void> compartirTanda(BuildContext context, List<TicketDatos> tickets) asy
       files: archivos,
       text: tickets.length == 1
           ? p.mensaje
-          : '🎟️ ${tickets.length} entradas · ${p.boliche} — ${p.evento} · ${p.fecha}\n'
+          : '${tickets.length} entradas · ${p.boliche} — ${p.evento} · ${p.fecha}\n'
               '${tickets.map((t) => t.cliente).join('\n')}\n'
               'Cada QR vale para 1 solo ingreso.',
     ));

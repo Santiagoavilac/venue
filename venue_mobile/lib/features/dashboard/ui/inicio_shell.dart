@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/routing/secciones.dart';
 import '../../../core/sync/cola_offline.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
@@ -22,11 +23,13 @@ import '../../clubs/data/clubs.dart';
 import '../../events/ui/eventos_screen.dart';
 import '../../events/ui/gestion_screen.dart';
 import '../../payments/ui/pagos_screen.dart';
+import '../../teams/data/gente.dart';
 import '../../teams/ui/gente_screen.dart';
 import '../../vip_tables/ui/mesas_screen.dart';
 import '../../access_control/ui/accesos_screen.dart';
 import '../../analytics/ui/reporte_screen.dart';
-import 'cuenta_screen.dart';
+import 'panel_perfil.dart';
+import 'tutorial.dart';
 
 class _Seccion {
   const _Seccion(this.titulo, this.icono, this.iconoOn, this.pantalla,
@@ -45,12 +48,23 @@ class _Seccion {
 
 /// Secciones disponibles para un rol. La primera es su pantalla de trabajo:
 /// el portero abre directo en el escáner, que es lo que hace toda la noche.
-List<_Seccion> _seccionesPara(Rol rol) => [
+/// El perfil y los ajustes no son una sección: van en el panel lateral.
+List<_Seccion> _seccionesPara(Rol rol) {
+  final l = _secciones(rol);
+  if (rol != Rol.admin) return l;
+  // el admin tiene a un toque lo de la noche; Accesos, Reporte y Usuarios
+  // quedan detrás de "Más"
+  const orden = ['Eventos', 'Escáner', 'Mesas', 'Pagos', 'Accesos', 'Reporte', 'Usuarios'];
+  int pos(_Seccion s) => orden.contains(s.titulo) ? orden.indexOf(s.titulo) : orden.length;
+  return [...l]..sort((a, b) => pos(a).compareTo(pos(b)));
+}
+
+List<_Seccion> _secciones(Rol rol) => [
       // los que venden arrancan en Eventos, con el resumen de la noche
       if (rol.vende)
         _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
             rol == Rol.admin ? const GestionEventosScreen() : const EventosScreen(),
-            grupo: 'Inicio'),
+            grupo: 'Inicio', encabezadoPropio: true),
       // módulo barra: pestañas propias, no ven nada de puerta
       if (rol == Rol.propietario) ...const [
         _Seccion('Inventario', Icons.inventory_2_outlined, Icons.inventory_2_rounded,
@@ -101,14 +115,28 @@ List<_Seccion> _seccionesPara(Rol rol) => [
         const _Seccion('Mi team', Icons.groups_outlined, Icons.groups_rounded,
             MiTeamScreen(), grupo: 'Team'),
       if (rol == Rol.admin)
-        const _Seccion('Gente', Icons.manage_accounts_outlined,
+        const _Seccion('Usuarios', Icons.manage_accounts_outlined,
             Icons.manage_accounts_rounded, GenteScreen(), encabezadoPropio: true),
       if (rol.veEventos && !rol.vende)
         const _Seccion('Eventos', Icons.event_outlined, Icons.event_rounded,
-            EventosScreen(), grupo: 'Inicio'),
-      const _Seccion('Cuenta', Icons.person_outline_rounded,
-          Icons.person_rounded, CuentaScreen(), grupo: 'Perfil'),
+            EventosScreen(), grupo: 'Inicio', encabezadoPropio: true),
     ];
+
+/// Pestaña abierta. Vive fuera del widget para sobrevivir al cambio de modo
+/// claro/oscuro (que vuelve a montar la app); se reinicia al cambiar de
+/// boliche o de cuenta.
+class _SeccionActual extends Notifier<int> {
+  @override
+  int build() {
+    ref.watch(clubActivoIdProvider);
+    ref.watch(usuarioIdProvider);
+    return 0;
+  }
+
+  void ir(int i) => state = i;
+}
+
+final _seccionActualProvider = NotifierProvider<_SeccionActual, int>(_SeccionActual.new);
 
 class InicioShell extends ConsumerStatefulWidget {
   const InicioShell({super.key});
@@ -119,9 +147,16 @@ class InicioShell extends ConsumerStatefulWidget {
 
 class _InicioShellState extends ConsumerState<InicioShell>
     with WidgetsBindingObserver {
-  int _i = 0;
+  int get _i => ref.read(_seccionActualProvider);
+  set _i(int v) => ref.read(_seccionActualProvider.notifier).ir(v);
   bool _bienvenida = false;
   Timer? _reintento;
+  final _andamio = GlobalKey<ScaffoldState>();
+  final _claveBarra = GlobalKey();
+  final _claveAvatar = GlobalKey();
+  bool _tutorial = false;
+
+  void _abrirPerfil() => _andamio.currentState?.openEndDrawer();
 
   @override
   void initState() {
@@ -163,6 +198,7 @@ class _InicioShellState extends ConsumerState<InicioShell>
   @override
   Widget build(BuildContext context) {
     final rol = ref.watch(rolProvider);
+    ref.watch(_seccionActualProvider);
     return rol.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
@@ -188,15 +224,28 @@ class _InicioShellState extends ConsumerState<InicioShell>
         }
         if (!_bienvenida) {
           _bienvenida = true;
-          WidgetsBinding.instance.addPostFrameCallback(
-              (_) => correrBienvenida(context, ref));
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            await correrBienvenida(context, ref);
+            // después de los avisos, el tutorial (una sola vez)
+            final uid = ref.read(usuarioIdProvider);
+            if (uid != null && mounted && !await tutorialVisto(uid) && mounted) {
+              setState(() => _tutorial = true);
+            }
+          });
         }
         final pendientes = ref.watch(pendientesProvider);
         final secciones = _seccionesPara(r);
+        // otra pantalla pidió ir a una sección (accesos rápidos del inicio)
+        ref.listen(seccionPedidaProvider, (_, t) {
+          if (t == null) return;
+          final k = secciones.indexWhere((x) => x.titulo == t);
+          if (k >= 0) setState(() => _i = k);
+          ref.read(seccionPedidaProvider.notifier).atendida();
+        });
+        ref.listen(tutorialPedidoProvider, (_, _) => setState(() => _tutorial = true));
         final i = _i.clamp(0, secciones.length - 1);
         final sec = secciones[i];
         final ancho = MediaQuery.sizeOf(context).width >= 1000;
-        final iCuenta = secciones.indexWhere((x) => x.pantalla is CuentaScreen);
 
         // Lo que se ve debajo de la barra superior: aviso de cola sin
         // enviar, encabezado (si la pantalla no trae el suyo) y la pantalla.
@@ -209,10 +258,7 @@ class _InicioShellState extends ConsumerState<InicioShell>
             if (!sec.encabezadoPropio)
               Padding(
                 padding: EdgeInsets.fromLTRB(ancho ? 32 : 16, ancho ? 28 : 18, ancho ? 32 : 16, 0),
-                child: Encabezado(
-                  etiqueta: sec.grupo.isEmpty ? null : sec.grupo,
-                  titulo: sec.titulo,
-                ),
+                child: Encabezado(titulo: sec.titulo),
               ),
             Expanded(
               child: ancho && sec.encabezadoPropio
@@ -224,16 +270,20 @@ class _InicioShellState extends ConsumerState<InicioShell>
 
         final barra = _BarraSuperior(
           ancho: ancho,
-          alCuenta: iCuenta < 0 ? null : () => setState(() => _i = iCuenta),
+          alCuenta: _abrirPerfil,
+          claveAvatar: _claveAvatar,
         );
 
         if (ancho) {
           return Scaffold(
+            key: _andamio,
+            endDrawer: const PanelPerfil(),
             body: Row(children: [
               _Lateral(
                 secciones: secciones,
                 actual: i,
                 alElegir: (n) => setState(() => _i = n),
+                alPerfil: _abrirPerfil,
                 rol: r,
               ),
               Expanded(
@@ -246,70 +296,221 @@ class _InicioShellState extends ConsumerState<InicioShell>
           );
         }
 
-        // En el teléfono entran cuatro; el resto va detrás de "Más".
-        final conMas = secciones.length > 5;
-        final enBarra = conMas ? secciones.sublist(0, 4) : secciones;
-        return Scaffold(
+        // En el teléfono entran cuatro y "Más" a la derecha: con más de
+        // cinco botones quedan chicos para el dedo.
+        const enLaBarra = 4;
+        final conMas = secciones.length > enLaBarra;
+        final enBarra = conMas ? secciones.sublist(0, enLaBarra) : secciones;
+        Future<void> elegirEnBarra(int n) async {
+          if (!conMas || n < enLaBarra) return setState(() => _i = n);
+          final elegido = await showModalBottomSheet<int>(
+            context: context,
+            isScrollControlled: true,
+            // el dedo gira el tambor: arrastrar no cierra la hoja
+            enableDrag: false,
+            showDragHandle: true,
+            builder: (c) => SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Text('Más', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+                  Text('Deslizá hacia los costados y tocá la que quieras',
+                      style: TextStyle(color: VenueColors.textoSuave, fontSize: 13)),
+                  Revolver(
+                    opciones: [
+                      for (var k = enLaBarra; k < secciones.length; k++)
+                        OpcionRevolver(secciones[k].titulo, secciones[k].iconoOn, actual: k == i),
+                    ],
+                    alElegir: (n) => Navigator.pop(c, n + enLaBarra),
+                  ),
+                ]),
+              ),
+            ),
+          );
+          if (elegido != null && mounted) setState(() => _i = elegido);
+        }
+
+        final andamio = Scaffold(
+          key: _andamio,
+          endDrawer: const PanelPerfil(),
           body: SafeArea(
             bottom: false,
             child: Column(children: [barra, Expanded(child: contenido)]),
           ),
+          // barra flotante: tarjeta redondeada separada de los bordes
           bottomNavigationBar: secciones.length < 2
               ? null
-              : DecoratedBox(
-                  decoration: const BoxDecoration(
-                      border: Border(top: BorderSide(color: VenueColors.lineaSuave))),
-                  child: NavigationBar(
-                    selectedIndex: conMas && i >= 4 ? 4 : i,
-                    onDestinationSelected: (n) async {
-                      if (!conMas || n < 4) return setState(() => _i = n);
-                      final elegido = await showModalBottomSheet<int>(
-                        context: context,
-                        isScrollControlled: true,
-                        // el dedo gira el tambor: arrastrar no cierra la hoja
-                        enableDrag: false,
-                        showDragHandle: true,
-                        builder: (c) => SafeArea(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                            child: Column(mainAxisSize: MainAxisSize.min, children: [
-                              const Text('Más',
-                                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
-                              const Text('Deslizá hacia los costados y tocá la que quieras',
-                                  style: TextStyle(color: VenueColors.textoSuave, fontSize: 13)),
-                              Revolver(
-                                opciones: [
-                                  for (var k = 4; k < secciones.length; k++)
-                                    OpcionRevolver(secciones[k].titulo, secciones[k].iconoOn,
-                                        actual: k == i),
-                                ],
-                                alElegir: (n) => Navigator.pop(c, n + 4),
-                              ),
-                            ]),
-                          ),
-                        ),
-                      );
-                      if (elegido != null && mounted) setState(() => _i = elegido);
-                    },
-                    destinations: [
-                      for (final s in enBarra)
-                        NavigationDestination(
-                          icon: Icon(s.icono),
-                          selectedIcon: Icon(s.iconoOn),
-                          label: s.titulo,
-                        ),
-                      if (conMas)
-                        const NavigationDestination(
-                            icon: Icon(Icons.more_horiz_rounded), label: 'Más'),
+              : SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                  key: _claveBarra,
+                  margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: VenueColors.superficie,
+                    borderRadius: BorderRadius.circular(24),
+                    border: bordeTarjeta,
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x1A101828), blurRadius: 24, offset: Offset(0, 8)),
                     ],
                   ),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: SizedBox(
+                    height: 70,
+                    child: Row(children: [
+                      for (var n = 0; n < enBarra.length + (conMas ? 1 : 0); n++)
+                        Expanded(
+                          child: _BotonBarra(
+                            icono: n < enBarra.length ? enBarra[n].icono : Icons.more_horiz_rounded,
+                            iconoOn: n < enBarra.length ? enBarra[n].iconoOn : Icons.more_horiz_rounded,
+                            texto: n < enBarra.length ? enBarra[n].titulo : 'Más',
+                            activo: n == (conMas && i >= enLaBarra ? enLaBarra : i),
+                            alTocar: () => elegirEnBarra(n),
+                          ),
+                        ),
+                    ]),
+                  ),
+                  ),
+                ),
                 ),
         );
+        if (!_tutorial || secciones.length < 2) return andamio;
+
+        // rectángulo del botón n de la barra de abajo
+        final total = enBarra.length + (conMas ? 1 : 0);
+        Rect? boton(int n) {
+          final b = _claveBarra.currentContext?.findRenderObject() as RenderBox?;
+          if (b == null || !b.hasSize) return null;
+          final o = b.localToGlobal(Offset.zero);
+          final w = b.size.width / total;
+          return Rect.fromLTWH(o.dx + w * n, o.dy, w, b.size.height);
+        }
+
+        Rect? avatar() {
+          final b = _claveAvatar.currentContext?.findRenderObject() as RenderBox?;
+          if (b == null || !b.hasSize) return null;
+          return b.localToGlobal(Offset.zero) & b.size;
+        }
+
+        final pasos = [
+          for (final (n, s) in enBarra.indexed)
+            PasoTutorial(
+              icono: s.iconoOn,
+              titulo: s.titulo,
+              texto: _queEs(s.titulo, r),
+              objetivo: () => boton(n),
+              alMostrar: () => setState(() => _i = n),
+            ),
+          if (conMas)
+            PasoTutorial(
+              icono: Icons.more_horiz_rounded,
+              titulo: 'Más',
+              texto: 'Acá están ${_enLista([for (final s in secciones.skip(enLaBarra)) s.titulo])}. '
+                  'Se eligen girando la ruleta.',
+              objetivo: () => boton(enLaBarra),
+            ),
+          PasoTutorial(
+            icono: Icons.person_rounded,
+            titulo: 'Tu perfil',
+            texto: 'Tocá tu inicial para editar tu perfil, cambiar a modo oscuro'
+                '${r == Rol.admin ? ', elegir los colores y el logo del boliche' : ''} o cerrar sesión. '
+                'Desde ahí también podés ver este tutorial de nuevo.',
+            objetivo: avatar,
+            alMostrar: () => setState(() => _i = 0),
+          ),
+        ];
+        return Stack(children: [
+          andamio,
+          Positioned.fill(
+            child: TutorialGuiado(
+              pasos: pasos,
+              alTerminar: () {
+                final uid = ref.read(usuarioIdProvider);
+                if (uid != null) marcarTutorialVisto(uid);
+                setState(() {
+                  _tutorial = false;
+                  _i = 0;
+                });
+              },
+            ),
+          ),
+        ]);
       },
     );
   }
 }
 
+String _enLista(List<String> l) => l.length < 2
+    ? l.join()
+    : '${l.sublist(0, l.length - 1).join(', ')} y ${l.last}';
+
+/// Qué es cada sección, en una o dos líneas para el tutorial.
+String _queEs(String titulo, Rol rol) => switch (titulo) {
+      'Eventos' => rol == Rol.admin
+          ? 'Tu evento de la noche con sus números. Desde "Gestionar evento" lo editás, '
+              'armás las listas y las fases, y creás eventos nuevos.'
+          : 'El evento de la noche con sus números y tus accesos rápidos.',
+      'Escáner' => 'Escaneá los QR en la puerta. Cada entrada vale para un solo ingreso.',
+      'Mesas' => 'El plano del boliche: qué mesas están libres, vender y reservar.',
+      'Pagos' => 'Lo que se cobró y lo que falta, por team y por persona.',
+      'Accesos' => 'Anotá invitados en las listas y vendé entradas con QR.',
+      'Reporte' => 'El cierre del evento: la plata, la asistencia, los mejores relacionadores y cada team.',
+      'Stats' => 'Tus números del evento: cuántos entraron por vos y tu comisión.',
+      'Mi team' => 'Tu team y lo que vendió cada uno.',
+      'Usuarios' => 'Tu gente agrupada por team: roles, permisos y altas.',
+      'Puerta' => 'La lista de invitados para marcar quién entra.',
+      'RRPPs' => 'Los relacionadores de la noche y sus invitados.',
+      'Vender' => 'Cobrá en la barra.',
+      'Relacionadores' => 'Lo que hay que pagarle a cada relacionador.',
+      _ => 'Tocá aquí para abrir $titulo.',
+    };
+
+
+/// Un botón de la barra de abajo: el activo en el color del boliche y con
+/// un punto debajo.
+class _BotonBarra extends StatelessWidget {
+  const _BotonBarra({
+    required this.icono, required this.iconoOn, required this.texto,
+    required this.activo, required this.alTocar,
+  });
+  final IconData icono, iconoOn;
+  final String texto;
+  final bool activo;
+  final VoidCallback alTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = activo ? Theme.of(context).colorScheme.primary : VenueColors.textoTenue;
+    return Semantics(
+      button: true,
+      selected: activo,
+      label: texto,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: alTocar,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(activo ? iconoOn : icono, size: 26, color: c),
+          const SizedBox(height: 3),
+          Text(texto,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 12.5, fontWeight: activo ? FontWeight.w700 : FontWeight.w500, color: c)),
+          const SizedBox(height: 3),
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+                color: activo ? c : Colors.transparent, shape: BoxShape.circle),
+          ),
+        ]),
+      ),
+    );
+  }
+}
 
 /// Aviso fijo: la persona tiene que saber que está trabajando sin señal y
 /// que hay cosas por enviar.
@@ -374,7 +575,7 @@ Future<void> _cambiarClub(BuildContext context, WidgetRef ref) async {
                             secondary: cl.secundario ?? cl.primario ?? VenueColors.marcaPorDefecto,
                           ),
                     ),
-                    child: MarcaClub(inicial: cl.inicial, lado: 34),
+                    child: MarcaClub(inicial: cl.inicial, logo: cl.logoUrl, lado: 34),
                   ),
                   title: Text(cl.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
                   trailing: cl.id == actual ? const Icon(Icons.check_rounded) : null,
@@ -382,11 +583,20 @@ Future<void> _cambiarClub(BuildContext context, WidgetRef ref) async {
                 ),
               ),
             ),
+          const SizedBox(height: 4),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.pop(c, ''),
+            icon: const Icon(Icons.storefront_outlined),
+            label: const Text('Ver todos los boliches'),
+          ),
         ],
       ),
     ),
   );
-  if (elegido != null && elegido != actual) {
+  // '' es la pantalla con todos los boliches (y "Nuevo boliche")
+  if (elegido == '') {
+    ref.read(clubActivoIdProvider.notifier).elegir(null);
+  } else if (elegido != null && elegido != actual) {
     ref.read(clubActivoIdProvider.notifier).elegir(elegido);
   }
 }
@@ -434,25 +644,29 @@ Future<void> _cambiarEvento(BuildContext context, WidgetRef ref) async {
   if (elegido != null) ref.read(eventoElegidoProvider.notifier).elegir(elegido);
 }
 
-/// Píldora con borde: el contenedor de boliche y evento en la barra.
+/// Píldora del evento de trabajo en la barra.
 class _Pildora extends StatelessWidget {
   const _Pildora({required this.child, this.alTocar});
   final Widget child;
   final VoidCallback? alTocar;
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: VenueColors.superficie,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(13),
-          side: const BorderSide(color: VenueColors.linea),
-        ),
+  Widget build(BuildContext context) => Container(
         clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: alTocar,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            child: child,
+        decoration: BoxDecoration(
+          color: VenueColors.superficie,
+          borderRadius: BorderRadius.circular(16),
+          border: bordeTarjeta,
+          boxShadow: sombraTarjeta,
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: alTocar,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: child,
+            ),
           ),
         ),
       );
@@ -460,93 +674,99 @@ class _Pildora extends StatelessWidget {
 
 /// Barra superior: boliche, evento y cuenta. La misma que la web.
 class _BarraSuperior extends ConsumerWidget {
-  const _BarraSuperior({required this.ancho, this.alCuenta});
+  const _BarraSuperior({required this.ancho, this.alCuenta, this.claveAvatar});
   final bool ancho;
   final VoidCallback? alCuenta;
+
+  /// Para que el tutorial sepa dónde está la inicial.
+  final Key? claveAvatar;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final club = ref.watch(clubActivoProvider);
     final ev = ref.watch(eventoActivoProvider);
     final perfil = ref.watch(perfilProvider).value;
-    final varios = (ref.watch(clubsProvider).value?.length ?? 0) > 1;
+    // con un boliche solo no hay nada que cambiar, salvo el superadmin, que
+    // desde la lista da de alta boliches nuevos
+    final varios = (ref.watch(clubsProvider).value?.length ?? 0) > 1 ||
+        (ref.watch(plataformaProvider).value ?? false);
     final variosEv = (ref.watch(eventosProvider).value?.length ?? 0) > 1;
-    final marca = Theme.of(context).colorScheme.primary;
 
-    final pClub = _Pildora(
-      alTocar: varios ? () => _cambiarClub(context, ref) : null,
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        MarcaClub(inicial: club?.inicial ?? '·', lado: 32),
-        if (ancho) ...[
-          const SizedBox(width: 10),
-          Text(club?.nombre ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          if (varios) ...[
-            const SizedBox(width: 8),
-            const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: VenueColors.textoTenue),
-          ],
-        ],
+    // boliche como en Fourvenues: logo y "Club / Nombre ▾"
+    final pClub = InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: varios ? () => _cambiarClub(context, ref) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          MarcaClub(inicial: club?.inicial ?? '·', logo: club?.logoUrl, lado: 46),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Club', style: TextStyle(fontSize: 13, color: VenueColors.textoSuave, height: 1.1)),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Flexible(
+                    child: Text(club?.nombre ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, height: 1.2)),
+                  ),
+                  if (varios)
+                    Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: VenueColors.textoSuave),
+                ]),
+              ],
+            ),
+          ),
+        ]),
+      ),
+    );
+    final textoEv = Text.rich(
+      TextSpan(children: [
+        TextSpan(text: ev?.nombre ?? 'Sin evento', style: const TextStyle(fontWeight: FontWeight.w600)),
+        if (ev != null)
+          TextSpan(text: '  ·  ${ev.fechaCorta}', style: TextStyle(color: VenueColors.textoSuave)),
       ]),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 15),
     );
     final pEv = _Pildora(
       alTocar: variosEv ? () => _cambiarEvento(context, ref) : null,
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.calendar_today_outlined, size: 19, color: VenueColors.textoSuave),
-        const SizedBox(width: 10),
-        Flexible(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(ev?.nombre ?? 'Sin evento',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.2)),
-              if (ev != null)
-                Text(ev.fechaCorta,
-                    style: const TextStyle(fontSize: 12, color: VenueColors.textoTenue, height: 1.25)),
-            ],
-          ),
-        ),
+      child: Row(mainAxisSize: ancho ? MainAxisSize.min : MainAxisSize.max, children: [
+        Icon(Icons.calendar_today_outlined, size: 20, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 12),
+        ancho ? Flexible(child: textoEv) : Expanded(child: textoEv),
         if (variosEv) ...[
-          const SizedBox(width: 8),
-          const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: VenueColors.textoTenue),
+          const SizedBox(width: 6),
+          Icon(Icons.chevron_right_rounded, size: 22, color: VenueColors.textoSuave),
         ],
       ]),
     );
-    final avatar = Material(
-      color: Color.alphaBlend(marca.withValues(alpha: .22), VenueColors.superficie2),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: marca.withValues(alpha: .4)),
-      ),
-      clipBehavior: Clip.antiAlias,
+    // la inicial abre el panel de perfil y ajustes
+    final avatar = Semantics(
+      key: claveAvatar,
+      button: true,
+      label: 'Perfil y ajustes',
       child: InkWell(
+        customBorder: const CircleBorder(),
         onTap: alCuenta,
-        child: SizedBox(
-          width: 46,
-          height: 46,
-          child: Center(
-            child: Text(perfil?.inicial ?? '·',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          ),
-        ),
+        child: Inicial(perfil?.nombre ?? '·', lado: 46),
       ),
     );
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: ancho ? 28 : 14, vertical: ancho ? 14 : 10),
-      decoration: const BoxDecoration(
-        color: VenueColors.fondo,
-        border: Border(bottom: BorderSide(color: VenueColors.lineaSuave)),
-      ),
-      child: Row(children: [
-        pClub,
-        const SizedBox(width: 10),
-        if (ancho) pEv else Expanded(child: Align(alignment: Alignment.centerLeft, child: pEv)),
-        if (ancho) const Spacer(),
-        const SizedBox(width: 10),
-        avatar,
-      ]),
+      padding: EdgeInsets.fromLTRB(ancho ? 28 : 16, ancho ? 14 : 8, ancho ? 28 : 16, 10),
+      color: VenueColors.fondo,
+      child: ancho
+          ? Row(children: [pClub, const SizedBox(width: 16), pEv, const Spacer(), avatar])
+          : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [Expanded(child: Align(alignment: Alignment.centerLeft, child: pClub)), avatar]),
+              const SizedBox(height: 12),
+              pEv,
+            ]),
     );
   }
 }
@@ -558,11 +778,13 @@ class _Lateral extends ConsumerWidget {
     required this.secciones,
     required this.actual,
     required this.alElegir,
+    required this.alPerfil,
     required this.rol,
   });
   final List<_Seccion> secciones;
   final int actual;
   final ValueChanged<int> alElegir;
+  final VoidCallback alPerfil;
   final Rol rol;
 
   @override
@@ -571,15 +793,13 @@ class _Lateral extends ConsumerWidget {
     final perfil = ref.watch(perfilProvider).value;
     final varios = (ref.watch(clubsProvider).value?.length ?? 0) > 1;
     final esq = Theme.of(context).colorScheme;
-    final iCuenta = secciones.indexWhere((x) => x.pantalla is CuentaScreen);
-
     Widget item(int k) {
       final s = secciones[k];
       final on = k == actual;
       return Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Material(
-          color: on ? esq.primary.withValues(alpha: .17) : Colors.transparent,
+          color: on ? VenueColors.superficie2 : Colors.transparent,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -589,7 +809,7 @@ class _Lateral extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(children: [
                 Icon(on ? s.iconoOn : s.icono,
-                    size: 21, color: on ? esq.secondary : VenueColors.textoSuave),
+                    size: 21, color: on ? esq.primary : VenueColors.textoSuave),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Text(s.titulo,
@@ -608,7 +828,7 @@ class _Lateral extends ConsumerWidget {
 
     return Container(
       width: 256,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: VenueColors.lateral,
         border: Border(right: BorderSide(color: VenueColors.lineaSuave)),
       ),
@@ -619,17 +839,16 @@ class _Lateral extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
             child: Material(
               color: VenueColors.superficie,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: VenueColors.linea),
-              ),
+              elevation: elevacionTarjeta,
+              shadowColor: const Color(0x29101828),
+              shape: formaTarjeta,
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: varios ? () => _cambiarClub(context, ref) : null,
                 child: Padding(
                   padding: const EdgeInsets.all(11),
                   child: Row(children: [
-                    MarcaClub(inicial: club?.inicial ?? '·', lado: 40),
+                    MarcaClub(inicial: club?.inicial ?? '·', logo: club?.logoUrl, lado: 40),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -637,11 +856,11 @@ class _Lateral extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                         Text(varios ? 'Cambiar local' : rol.etiqueta,
-                            style: const TextStyle(fontSize: 12.5, color: VenueColors.textoTenue)),
+                            style: TextStyle(fontSize: 12.5, color: VenueColors.textoTenue)),
                       ]),
                     ),
                     if (varios)
-                      const Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoTenue),
+                      Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoTenue),
                   ]),
                 ),
               ),
@@ -651,18 +870,17 @@ class _Lateral extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               children: [
-                for (var k = 0; k < secciones.length; k++)
-                  if (k != iCuenta) item(k),
+                for (var k = 0; k < secciones.length; k++) item(k),
               ],
             ),
           ),
           Container(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: VenueColors.lineaSuave))),
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: iCuenta < 0 ? null : () => alElegir(iCuenta),
+              onTap: alPerfil,
               child: Padding(
                 padding: const EdgeInsets.all(8),
                 child: Row(children: [
@@ -670,7 +888,7 @@ class _Lateral extends ConsumerWidget {
                     radius: 21,
                     backgroundColor: VenueColors.superficie2,
                     child: Text(perfil?.inicial ?? '·',
-                        style: const TextStyle(fontWeight: FontWeight.w700, color: VenueColors.texto)),
+                        style: TextStyle(fontWeight: FontWeight.w700, color: VenueColors.texto)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -679,10 +897,10 @@ class _Lateral extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                       Text(rol.etiqueta,
-                          style: const TextStyle(fontSize: 12.5, color: VenueColors.textoTenue)),
+                          style: TextStyle(fontSize: 12.5, color: VenueColors.textoTenue)),
                     ]),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: VenueColors.textoTenue),
+                  Icon(Icons.chevron_right_rounded, color: VenueColors.textoTenue),
                 ]),
               ),
             ),

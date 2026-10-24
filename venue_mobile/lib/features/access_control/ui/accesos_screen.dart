@@ -13,8 +13,8 @@ import '../../guestlists/ui/listas_screen.dart';
 import '../../tickets/data/entradas.dart';
 import '../../tickets/ui/entradas_screen.dart';
 
-/// Accesos para quien vende: Resumen, Listas, Entradas y —solo la cuenta
-/// principal— Historial. Es la misma sección de la web, con las mismas
+/// Accesos para quien vende: Listas, Entradas y —solo la cuenta principal—
+/// Historial. El resumen de números está en la tarjeta del evento. Es la misma sección de la web, con las mismas
 /// pestañas.
 class AccesosScreen extends ConsumerWidget {
   const AccesosScreen({super.key});
@@ -36,7 +36,7 @@ class AccesosScreen extends ConsumerWidget {
       });
     }
     return DefaultTabController(
-      length: conHistorial ? 4 : 3,
+      length: conHistorial ? 3 : 2,
       child: Column(
         children: [
           TabBar(
@@ -45,7 +45,6 @@ class AccesosScreen extends ConsumerWidget {
             tabs: [
               const Tab(text: 'Listas'),
               const Tab(text: 'Entradas'),
-              const Tab(text: 'Resumen'),
               if (conHistorial) const Tab(text: 'Historial'),
             ],
           ),
@@ -54,7 +53,6 @@ class AccesosScreen extends ConsumerWidget {
               children: [
                 const ListasScreen(),
                 const EntradasScreen(),
-                const ResumenView(),
                 if (conHistorial) const HistorialView(),
               ],
             ),
@@ -132,14 +130,14 @@ class _Dato extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(titulo,
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: VenueColors.textoSuave, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(valor,
                     style: TextStyle(
                         fontSize: 34, fontWeight: FontWeight.w800, color: color)),
                 Text(pie,
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: VenueColors.textoSuave, fontSize: 12.5)),
               ],
             ),

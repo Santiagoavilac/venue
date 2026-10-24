@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'core/config/env.dart';
+import 'core/theme/apariencia.dart';
 import 'core/security/llavero.dart';
 
 Future<void> main() async {
@@ -21,5 +22,9 @@ Future<void> main() async {
     publishableKey: Env.supabaseAnonKey,
     authOptions: FlutterAuthClientOptions(localStorage: LlaveroStorage()),
   );
-  runApp(const ProviderScope(child: VenueApp()));
+  final apariencia = await aparienciaGuardada();
+  runApp(ProviderScope(
+    overrides: [aparienciaInicialProvider.overrideWithValue(apariencia)],
+    child: const VenueApp(),
+  ));
 }

@@ -88,7 +88,7 @@ class _RrppsScreenState extends ConsumerState<RrppsScreen> {
                               padding: const EdgeInsets.fromLTRB(2, 14, 2, 6),
                               child: Text(
                                 '${t.toUpperCase()} · ${porTeam[t]!.length}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: VenueColors.textoSuave,
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w800,

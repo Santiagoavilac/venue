@@ -239,6 +239,14 @@ class GenteRepository {
         'inicial': nombre.isEmpty ? null : nombre[0].toUpperCase(),
       }).eq('id', id);
 
+  /// Colores de la app para este boliche (los demás datos no se tocan).
+  Future<void> fijarColores(String clubId, {required String primario, required String secundario}) =>
+      _sb.from('clubs').update({'color_primario': primario, 'color_secundario': secundario}).eq('id', clubId);
+
+  /// Guarda (o con null, quita) el logo del boliche.
+  Future<void> fijarLogo(String clubId, String? url) =>
+      _sb.from('clubs').update({'logo_url': url}).eq('id', clubId);
+
   Future<void> desactivarClub(String id) =>
       _sb.from('clubs').update({'activo': false}).eq('id', id);
 

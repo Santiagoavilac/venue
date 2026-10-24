@@ -1,14 +1,19 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/media/imagenes.dart';
 import '../../../core/networking/supabase.dart';
+import '../../../core/routing/secciones.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
 import '../../../core/widgets/patron.dart';
+import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../../teams/data/gente.dart';
+import '../../tickets/data/ticket_imagen.dart';
 import '../data/eventos.dart';
 import '../data/gestion.dart';
 
@@ -101,6 +106,7 @@ class GestionEventosScreen extends ConsumerWidget {
     final eventos = ref.watch(eventosGestionProvider);
     final activo = ref.watch(eventoActivoProvider);
     final club = ref.watch(clubActivoIdProvider);
+    final perfil = ref.watch(perfilProvider).value;
     final repo = ref.read(gestionRepositoryProvider);
     if (club == null) return const SizedBox.shrink();
 
@@ -144,27 +150,53 @@ class GestionEventosScreen extends ConsumerWidget {
       child: VistaAsync(
         valor: eventos,
         reintentar: recargar,
-        datos: (lista) => ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            Row(children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () async {
-                    if (await _hoja<bool>(context, const _NuevoEvento()) == true) recargar();
-                  },
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Nuevo evento'),
-                ),
+        datos: (lista) {
+          // arriba el evento de trabajo en grande; después los accesos
+          // rápidos y el resto de los eventos
+          final hayHero = lista.any((e) => e['id'] == activo?.id && e['estado'] != 'cerrado');
+          final orden = [
+            ...lista.where((e) => hayHero && e['id'] == activo?.id),
+            ...lista.where((e) => !(hayHero && e['id'] == activo?.id)),
+          ];
+          final accionesRapidas = <Widget>[
+            const TituloBloque('Accesos rápidos'),
+            GrillaAcciones(children: [
+              AccionRapida(
+                icono: Icons.calendar_today_outlined,
+                titulo: 'Crear evento',
+                alTocar: () async {
+                  if (await _hoja<bool>(context, const _NuevoEvento()) == true) recargar();
+                },
               ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 54)),
-                onPressed: () => _hoja(context, const _Avisos()),
-                icon: const Icon(Icons.campaign_outlined),
-                label: const Text('Avisos'),
+              AccionRapida(
+                icono: Icons.groups_outlined,
+                titulo: 'Ver invitados',
+                color: VenueColors.aviso,
+                alTocar: () => ref.read(seccionPedidaProvider.notifier).ir('Accesos'),
+              ),
+              AccionRapida(
+                icono: Icons.campaign_outlined,
+                titulo: 'Avisos',
+                color: VenueColors.info,
+                alTocar: () => _hoja(context, const _Avisos()),
+              ),
+              AccionRapida(
+                icono: Icons.bar_chart_rounded,
+                titulo: 'Reporte',
+                color: VenueColors.ok,
+                alTocar: () => ref.read(seccionPedidaProvider.notifier).ir('Reporte'),
               ),
             ]),
+            if (orden.length > 1) const TituloBloque('Otros eventos'),
+          ];
+          return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            Saludo(
+              nombre: perfil?.primerNombre ?? '',
+              detalle: hayHero ? 'Gestioná tu próximo evento' : 'Elegí un evento para trabajar',
+            ),
+            if (!hayHero) ...accionesRapidas,
             if (lista.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(top: 40),
@@ -174,13 +206,14 @@ class GestionEventosScreen extends ConsumerWidget {
                   detalle: 'Creá el primero. Nace como borrador: nadie lo ve hasta que lo publiques.',
                 ),
               ),
-            for (final e in lista)
+            for (final (k, e) in orden.indexed) ...[
               _TarjetaEvento(
                 evento: e,
                 seleccionado: e['id'] == activo?.id,
                 alElegir: e['estado'] == 'cerrado'
                     ? null
                     : () => ref.read(eventoElegidoProvider.notifier).elegir(e['id'] as String),
+                alIr: (t) => ref.read(seccionPedidaProvider.notifier).ir(t),
                 alAccion: (k) async {
                   final id = e['id'] as String, nombre = e['nombre'] as String;
                   switch (k) {
@@ -212,7 +245,7 @@ class GestionEventosScreen extends ConsumerWidget {
                       await hacer(() async {
                         final url = await ref.read(archivosProvider).subirDiseno(b, 'ticket-$id.jpg');
                         await repo.editar(id, {'ticket_url': url});
-                      }, 'Arte del ticket actualizado');
+                      }, 'Imagen del evento actualizada');
                     case 'cerrar':
                       if (await confirmar('Cerrar $nombre',
                           'Deja de aparecer para el equipo y pasa al histórico. Sus datos se conservan.',
@@ -228,8 +261,11 @@ class GestionEventosScreen extends ConsumerWidget {
                   }
                 },
               ),
+              if (k == 0 && hayHero) ...accionesRapidas,
+            ],
           ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -238,48 +274,103 @@ class GestionEventosScreen extends ConsumerWidget {
 class _TarjetaEvento extends StatelessWidget {
   const _TarjetaEvento({
     required this.evento, required this.seleccionado, required this.alElegir, required this.alAccion,
+    required this.alIr,
   });
   final Fila evento;
   final bool seleccionado;
   final VoidCallback? alElegir;
-  final ValueChanged<String> alAccion;
+  final Future<void> Function(String) alAccion;
+
+  /// Ir a otra sección del inicio ("Escáner", "Mesas").
+  final ValueChanged<String> alIr;
 
   @override
   Widget build(BuildContext context) {
     final e = evento;
     final a = accionesDeEvento(e);
     final cerrado = e['estado'] == 'cerrado';
-    final marca = Theme.of(context).colorScheme.primary;
-    // el evento elegido se abre con sus números y sus acciones a la vista;
-    // los demás quedan en una fila con el menú
-    final abierto = seleccionado && !cerrado;
-    return Card(
-      margin: const EdgeInsets.only(top: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: seleccionado ? marca : VenueColors.linea, width: seleccionado ? 1.8 : 1),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: alElegir,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(14, 12, abierto ? 14 : 4, 12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
+    String hora(dynamic h) => '$h'.padRight(5).substring(0, 5);
+    final fecha = DateTime.tryParse('${e['fecha']}');
+    final fechaTxt = fecha == null ? '${e['fecha']}' : fechaLarga(fecha);
+    final menu = PopupMenuButton<String>(
+      tooltip: 'Acciones del evento',
+      icon: const Icon(Icons.more_horiz_rounded),
+      onSelected: alAccion,
+      itemBuilder: (_) => [
+        const PopupMenuItem(value: 'editar', child: Text('Editar')),
+        const PopupMenuItem(value: 'listas', child: Text('Listas y cupos')),
+        const PopupMenuItem(value: 'fases', child: Text('Fases de preventa')),
+        const PopupMenuItem(value: 'horarios', child: Text('Horario de venta')),
+        const PopupMenuItem(value: 'arte', child: Text('Imagen del evento')),
+        if (a.cerrar) const PopupMenuItem(value: 'cerrar', child: Text('Cerrar evento')),
+        const PopupMenuItem(value: 'eliminar', child: Text('Eliminar')),
+      ],
+    );
+
+    // el evento elegido se abre grande, con su imagen, sus números y sus
+    // acciones a la vista (como la app de Bowie y BurTown)
+    if (seleccionado && !cerrado) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: HeroEvento(
+          eventoId: e['id'] as String,
+          nombre: '${e['nombre']}',
+          detalle: [
+            fechaTxt,
+            if (e['hora_inicio'] != null) '${hora(e['hora_inicio'])} – ${hora(e['hora_fin'])} hs',
+            'Manilla ${e['precio_manilla']} Bs',
+          ].join(' · '),
+          imagen: e['ticket_url'] as String?,
+          estado: e['publicado'] == false
+              ? ('borrador', VenueColors.aviso)
+              : fecha != null && _esHoy(fecha)
+                  ? ('hoy', VenueColors.ok)
+                  : ('próximo', null),
+          menu: menu,
+          principal: a.publicar
+              ? FilledButton.icon(
+                  onPressed: () => alAccion('publicar'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.campaign_rounded, size: 20),
+                  label: const Text('Publicar evento'),
+                )
+              : null,
+          gestionar: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => _EventoDetalle(eventoId: e['id'] as String, alAccion: alAccion))),
+          atajos: [
+            (Icons.format_list_bulleted_rounded, 'Listas', () => alAccion('listas')),
+            (Icons.qr_code_scanner_rounded, 'Escanear QR', () => alIr('Escáner')),
+            (Icons.table_bar_outlined, 'Mesas', () => alIr('Mesas')),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Tarjeta(
+        padding: EdgeInsets.zero,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: alElegir,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+            child: Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${e['nombre']}',
                       style: TextStyle(
-                          fontSize: abierto ? 22 : 17, fontWeight: FontWeight.w800,
+                          fontSize: 16, fontWeight: FontWeight.w600,
                           color: cerrado ? VenueColors.textoSuave : null)),
                   const SizedBox(height: 2),
                   Text(
                     [
-                      '${e['fecha']}',
-                      if (abierto && e['hora_inicio'] != null)
-                        '${'${e['hora_inicio']}'.padRight(5).substring(0, 5)}–${'${e['hora_fin']}'.padRight(5).substring(0, 5)}',
+                      fechaTxt,
                       '${e['precio_manilla']} Bs',
-                      if (e['publicado'] == false) 'BORRADOR · solo lo ves vos',
+                      if (e['publicado'] == false) 'borrador · solo lo ves vos',
                       if (cerrado) 'cerrado',
                       if (e['venta_por_fases'] == true) 'por fases',
                     ].join(' · '),
@@ -291,60 +382,664 @@ class _TarjetaEvento extends StatelessWidget {
               ),
               if (a.publicar)
                 TextButton(onPressed: () => alAccion('publicar'), child: const Text('Publicar')),
-              PopupMenuButton<String>(
-                tooltip: 'Acciones del evento',
-                onSelected: alAccion,
-                itemBuilder: (_) => [
-                  const PopupMenuItem(value: 'editar', child: Text('Editar')),
-                  const PopupMenuItem(value: 'listas', child: Text('Listas y cupos')),
-                  const PopupMenuItem(value: 'fases', child: Text('Fases de preventa')),
-                  const PopupMenuItem(value: 'horarios', child: Text('Horario de venta')),
-                  const PopupMenuItem(value: 'arte', child: Text('Arte del ticket')),
-                  if (a.cerrar) const PopupMenuItem(value: 'cerrar', child: Text('Cerrar evento')),
-                  const PopupMenuItem(value: 'eliminar', child: Text('Eliminar')),
-                ],
-              ),
+              menu,
             ]),
-            if (abierto) ...[
-              const SizedBox(height: 12),
-              NumerosEvento(eventoId: e['id'] as String),
-              const SizedBox(height: 10),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final (k, t, i) in const [
-                  ('editar', 'Editar', Icons.edit_outlined),
-                  ('listas', 'Listas', Icons.list_alt_rounded),
-                  ('fases', 'Fases', Icons.local_activity_outlined),
-                  ('horarios', 'Horario', Icons.schedule_rounded),
-                  ('arte', 'Diseño', Icons.image_outlined),
-                ])
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 40),
-                        padding: const EdgeInsets.symmetric(horizontal: 12)),
-                    onPressed: () => alAccion(k),
-                    icon: Icon(i, size: 18),
-                    label: Text(t),
-                  ),
-                if (a.cerrar)
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 40),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        foregroundColor: VenueColors.mal),
-                    onPressed: () => alAccion('cerrar'),
-                    icon: const Icon(Icons.lock_outline_rounded, size: 18),
-                    label: const Text('Cerrar'),
-                  ),
-              ]),
-            ],
-          ]),
+          ),
         ),
       ),
     );
   }
 }
 
-/// Listas, QR emitidos, mesas vendidas e ingresos por lista del evento.
+bool _esHoy(DateTime f) {
+  final h = DateTime.now();
+  return f.year == h.year && f.month == h.month && f.day == h.day;
+}
+
+const _diasLargos = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
+const _mesesLargos = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+/// "sáb, 24 oct".
+String fechaLarga(DateTime f) => '${_diasLargos[f.weekday - 1]}, ${f.day} ${_mesesLargos[f.month - 1]}';
+
+/// Tarjeta grande del evento de trabajo: la foto con el estado, el nombre y
+/// el horario; abajo los cuatro números, "Gestionar evento" y los atajos de
+/// la noche.
+class HeroEvento extends StatelessWidget {
+  const HeroEvento({
+    super.key,
+    required this.eventoId,
+    required this.nombre,
+    required this.detalle,
+    this.imagen,
+    this.estado,
+    this.menu,
+    this.principal,
+    this.gestionar,
+    this.atajos = const [],
+  });
+
+  final String eventoId;
+  final String nombre;
+  final String detalle;
+  final String? imagen;
+
+  /// Texto y color de la etiqueta (null: el de la marca).
+  final (String, Color?)? estado;
+  final Widget? menu;
+  final Widget? principal;
+  final VoidCallback? gestionar;
+
+  /// (ícono, texto, al tocar): los botones chicos de abajo.
+  final List<(IconData, String, VoidCallback)> atajos;
+
+  @override
+  Widget build(BuildContext context) {
+    final marca = Theme.of(context).colorScheme.primary;
+    final conImagen = imagen != null && imagen!.isNotEmpty;
+    final ce = estado?.$2 ?? marca;
+    final fondo = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color.lerp(marca, Colors.black, .35)!, Color.lerp(marca, Colors.black, .8)!],
+        ),
+      ),
+    );
+    final etiqueta = estado == null
+        ? null
+        : estado!.$1.isEmpty
+            ? ''
+            : estado!.$1[0].toUpperCase() + estado!.$1.substring(1);
+
+    final portada = ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: conImagen ? 200 : 170,
+        child: Stack(fit: StackFit.expand, children: [
+          if (conImagen)
+            Image.network(imagen!, fit: BoxFit.cover, errorBuilder: (_, _, _) => fondo)
+          else
+            fondo,
+          // velo para que el texto se lea sobre cualquier foto
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: .15),
+                  Colors.black.withValues(alpha: .35),
+                  Colors.black.withValues(alpha: .80),
+                ],
+                stops: const [0, .45, 1],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 10, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                if (etiqueta != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Color.lerp(ce, Colors.white, .80),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(color: ce, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(etiqueta,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color.lerp(ce, Colors.black, .45))),
+                    ]),
+                  ),
+                const Spacer(),
+                if (menu != null)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: .35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconTheme(
+                        data: const IconThemeData(color: Colors.white), child: menu!),
+                  ),
+              ]),
+              const Spacer(),
+              Text(nombre,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 28,
+                    height: 1.08,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                    color: Colors.white,
+                    shadows: [Shadow(color: Colors.black.withValues(alpha: .5), blurRadius: 12)],
+                  )),
+              const SizedBox(height: 6),
+              Text(detalle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: .88))),
+            ]),
+          ),
+        ]),
+      ),
+    );
+
+    final botonGestionar = gestionar == null
+        ? null
+        : (principal != null ? FilledButton.tonal : FilledButton.new)(
+            onPressed: gestionar,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            child: const Row(children: [
+              SizedBox(width: 22),
+              Expanded(
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.settings_rounded, size: 22),
+                  SizedBox(width: 10),
+                  Text('Gestionar evento'),
+                ]),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 22),
+            ]),
+          );
+
+    return Tarjeta(
+      padding: const EdgeInsets.all(10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        portada,
+        const SizedBox(height: 10),
+        NumerosEvento(eventoId: eventoId),
+        if (principal != null) ...[
+          const SizedBox(height: 10),
+          principal!,
+        ],
+        if (botonGestionar != null) ...[
+          const SizedBox(height: 10),
+          botonGestionar,
+        ],
+        if (atajos.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Row(children: [
+            for (final (k, (icono, texto, f)) in atajos.indexed) ...[
+              if (k > 0) const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: f,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    foregroundColor: VenueColors.texto,
+                    backgroundColor: VenueColors.superficie2,
+                    side: BorderSide(color: VenueColors.linea),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(icono, size: 20),
+                      const SizedBox(width: 8),
+                      Text(texto, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+                    ]),
+                  ),
+                ),
+              ),
+            ],
+          ]),
+        ],
+      ]),
+    );
+  }
+}
+
+/// Pantalla de un evento: su portada, cómo se ve la entrada en cada fase
+/// (se elige la fase arriba y se ve el ticket) y todo lo que se le puede
+/// tocar. Las acciones son las mismas de la tarjeta del inicio.
+class _EventoDetalle extends ConsumerStatefulWidget {
+  const _EventoDetalle({required this.eventoId, required this.alAccion});
+  final String eventoId;
+  final Future<void> Function(String) alAccion;
+
+  @override
+  ConsumerState<_EventoDetalle> createState() => _EventoDetalleState();
+}
+
+class _EventoDetalleState extends ConsumerState<_EventoDetalle> {
+  late Future<List<Fila>> _fases = _cargarFases();
+
+  /// Fase de la vista previa (null: la vigente o la primera).
+  String? _fase;
+  bool _saliendo = false;
+
+  Future<List<Fila>> _cargarFases() => ref.read(gestionRepositoryProvider).fases(widget.eventoId);
+
+  Future<void> _hacer(String k) async {
+    await widget.alAccion(k);
+    if (mounted) setState(() => _fases = _cargarFases());
+  }
+
+  Future<void> _arteDeFase(Fila f) async {
+    try {
+      final b = await elegirImagen(lado: 1400);
+      if (b == null) return;
+      final url = await ref.read(archivosProvider).subirDiseno(b, 'fase-${f['id']}.jpg');
+      await ref.read(gestionRepositoryProvider).arteDeFase(f['id'] as String, url);
+      if (mounted) {
+        setState(() => _fases = _cargarFases());
+        avisar(context, 'Arte de ${f['nombre']} actualizado');
+      }
+    } catch (e) {
+      if (mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lista = ref.watch(eventosGestionProvider).value;
+    final e = lista?.where((x) => x['id'] == widget.eventoId).firstOrNull;
+    // eliminado o cerrado: vuelve al inicio
+    if (lista != null && (e == null || e['estado'] == 'cerrado')) {
+      if (!_saliendo) {
+        _saliendo = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Navigator.of(context).maybePop();
+        });
+      }
+      return const Scaffold();
+    }
+    if (e == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+
+    final a = accionesDeEvento(e);
+    final club = ref.watch(clubActivoProvider);
+    final marca = Theme.of(context).colorScheme.primary;
+    String hora(dynamic h) => '$h'.padRight(5).substring(0, 5);
+    final fecha = DateTime.tryParse('${e['fecha']}');
+    final fechaTxt = fecha == null ? '${e['fecha']}' : fechaLarga(fecha);
+    final horario = e['hora_inicio'] == null ? null : '${hora(e['hora_inicio'])} – ${hora(e['hora_fin'])} hs';
+    final imagen = e['ticket_url'] as String?;
+    final conImagen = imagen != null && imagen.isNotEmpty;
+    final porFases = e['venta_por_fases'] == true;
+    final borrador = e['publicado'] == false;
+
+    final portada = SizedBox(
+      height: 300,
+      child: Stack(fit: StackFit.expand, children: [
+        if (conImagen)
+          Image.network(imagen, fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => ColoredBox(color: Color.lerp(marca, Colors.black, .7)!))
+        else
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color.lerp(marca, Colors.black, .3)!, Color.lerp(marca, Colors.black, .8)!],
+              ),
+            ),
+          ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: .45),
+                Colors.black.withValues(alpha: .10),
+                Colors.black.withValues(alpha: .85),
+              ],
+              stops: const [0, .4, 1],
+            ),
+          ),
+        ),
+        SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 18),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                _BotonRedondo(
+                  icono: Icons.arrow_back_rounded,
+                  tooltip: 'Volver',
+                  alTocar: () => Navigator.of(context).maybePop(),
+                ),
+                const Spacer(),
+                _BotonRedondo(
+                  icono: Icons.image_outlined,
+                  tooltip: 'Cambiar imagen',
+                  alTocar: () => _hacer('arte'),
+                ),
+              ]),
+              const Spacer(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .18),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(borrador ? 'Borrador · solo lo ves vos' : 'Publicado',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(height: 10),
+                  Text('${e['nombre']}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 30, height: 1.05, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  Text([fechaTxt, ?horario, 'Manilla ${e['precio_manilla']} Bs'].join(' · '),
+                      style: TextStyle(color: Colors.white.withValues(alpha: .88), fontSize: 14.5)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      ]),
+    );
+
+    Widget fila(IconData icono, Color color, String titulo, String? detalle, String accion,
+            {bool peligro = false}) =>
+        ListTile(
+          contentPadding: const EdgeInsets.fromLTRB(14, 4, 10, 4),
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: color.withValues(alpha: .14), shape: BoxShape.circle),
+            child: Icon(icono, size: 21, color: color),
+          ),
+          title: Text(titulo,
+              style: TextStyle(fontWeight: FontWeight.w600, color: peligro ? VenueColors.mal : null)),
+          subtitle: detalle == null
+              ? null
+              : Text(detalle, style: TextStyle(color: VenueColors.textoSuave, fontSize: 13)),
+          trailing: peligro ? null : Icon(Icons.chevron_right_rounded, color: VenueColors.textoTenue),
+          onTap: () => _hacer(accion),
+        );
+
+    return Scaffold(
+      body: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          portada,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              NumerosEvento(eventoId: widget.eventoId),
+              if (a.publicar) ...[
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => _hacer('publicar'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.campaign_rounded, size: 20),
+                  label: const Text('Publicar evento'),
+                ),
+              ],
+              const TituloBloque('Así se ve la entrada'),
+              FutureBuilder<List<Fila>>(
+                future: _fases,
+                builder: (context, snap) {
+                  final fs = porFases ? (snap.data ?? const <Fila>[]) : const <Fila>[];
+                  final vigente = fs.where((f) => f['vigente'] == true).firstOrNull;
+                  final elegida = fs.where((f) => f['id'] == _fase).firstOrNull ?? vigente ?? fs.firstOrNull;
+                  final artePropio = (elegida?['ticket_url'] as String?)?.isNotEmpty ?? false;
+                  final datos = TicketDatos(
+                    payload: 'EVT:${widget.eventoId}:VISTA-PREVIA',
+                    codigo: 'VISTA PREVIA',
+                    cliente: 'Nombre del cliente',
+                    boliche: club?.nombre ?? '',
+                    evento: '${e['nombre']}',
+                    fecha: fechaTxt,
+                    tipo: elegida?['nombre'] as String? ?? 'Entrada prepagada',
+                    color: club?.primario,
+                    arteUrl: artePropio ? elegida!['ticket_url'] as String : imagen,
+                    fase: artePropio ? null : elegida?['nombre'] as String?,
+                  );
+                  return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    // las fases como en la venta: se toca una y se ve su entrada
+                    SizedBox(
+                      height: 72,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          if (fs.isEmpty)
+                            _OpcionFase(
+                              titulo: 'Precio único',
+                              precio: '${e['precio_manilla']} Bs',
+                              detalle: porFases ? 'sin fases cargadas' : 'sin fases',
+                              elegida: true,
+                              alTocar: () {},
+                            ),
+                          for (final f in fs) ...[
+                            _OpcionFase(
+                              titulo: '${f['nombre']}',
+                              precio: '${f['precio']} Bs',
+                              detalle: f['agotada'] == true
+                                  ? 'agotada'
+                                  : f['vigente'] == true
+                                      ? 'a la venta'
+                                      : f['cupo'] == null
+                                          ? '${f['vendidas'] ?? 0} vendidas'
+                                          : 'quedan ${f['quedan']}',
+                              vigente: f['vigente'] == true,
+                              elegida: f['id'] == elegida?['id'],
+                              alTocar: () => setState(() => _fase = f['id'] as String),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _VistaEntrada(datos: datos),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: elegida == null ? () => _hacer('arte') : () => _arteDeFase(elegida),
+                          icon: const Icon(Icons.image_outlined, size: 18),
+                          label: Text(elegida == null ? 'Cambiar imagen' : 'Arte de ${elegida['nombre']}'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _hacer('fases'),
+                          icon: const Icon(Icons.layers_outlined, size: 18),
+                          label: Text(porFases ? 'Editar fases' : 'Vender por fases'),
+                        ),
+                      ),
+                    ]),
+                  ]);
+                },
+              ),
+              const TituloBloque('Configuración'),
+              Tarjeta(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(children: [
+                  fila(Icons.edit_outlined, marca, 'Datos del evento',
+                      [fechaTxt, ?horario, 'Manilla ${e['precio_manilla']} Bs'].join(' · '), 'editar'),
+                  Divider(height: 1, indent: 68, color: VenueColors.lineaSuave),
+                  fila(Icons.format_list_bulleted_rounded, VenueColors.aviso, 'Listas y cupos',
+                      'Quién anota en cada lista y cuántos', 'listas'),
+                  Divider(height: 1, indent: 68, color: VenueColors.lineaSuave),
+                  fila(Icons.layers_outlined, VenueColors.info, 'Fases de preventa',
+                      porFases ? 'Precio y stock por fase' : 'Apagado: un solo precio', 'fases'),
+                  Divider(height: 1, indent: 68, color: VenueColors.lineaSuave),
+                  fila(Icons.schedule_rounded, VenueColors.ok, 'Horario de venta',
+                      'Desde y hasta cuándo se vende', 'horarios'),
+                  Divider(height: 1, indent: 68, color: VenueColors.lineaSuave),
+                  fila(Icons.image_outlined, marca, 'Imagen del evento',
+                      conImagen ? 'Tocá para cambiarla' : 'Sin imagen', 'arte'),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              Tarjeta(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(children: [
+                  if (a.cerrar) ...[
+                    fila(Icons.lock_outline_rounded, VenueColors.mal, 'Cerrar evento',
+                        'Pasa al histórico; los datos se conservan', 'cerrar', peligro: true),
+                    Divider(height: 1, indent: 68, color: VenueColors.lineaSuave),
+                  ],
+                  fila(Icons.delete_outline_rounded, VenueColors.mal, 'Eliminar evento',
+                      'Borra todo lo del evento', 'eliminar', peligro: true),
+                ]),
+              ),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BotonRedondo extends StatelessWidget {
+  const _BotonRedondo({required this.icono, required this.tooltip, required this.alTocar});
+  final IconData icono;
+  final String tooltip;
+  final VoidCallback alTocar;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.black.withValues(alpha: .35),
+        shape: const CircleBorder(),
+        child: IconButton(
+          tooltip: tooltip,
+          onPressed: alTocar,
+          icon: Icon(icono, color: Colors.white),
+        ),
+      );
+}
+
+/// Una fase para elegir en la vista previa: nombre, precio y estado.
+class _OpcionFase extends StatelessWidget {
+  const _OpcionFase({
+    required this.titulo,
+    required this.precio,
+    required this.detalle,
+    required this.elegida,
+    required this.alTocar,
+    this.vigente = false,
+  });
+  final String titulo, precio, detalle;
+  final bool elegida, vigente;
+  final VoidCallback alTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    final marca = Theme.of(context).colorScheme.primary;
+    return Material(
+      color: elegida ? marca.withValues(alpha: .10) : VenueColors.superficie,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: elegida ? marca : VenueColors.linea, width: elegida ? 1.6 : 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: alTocar,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 16, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                if (vigente) ...[
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(color: VenueColors.ok, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                const SizedBox(width: 8),
+                Text(precio,
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5, color: marca)),
+              ]),
+              const SizedBox(height: 2),
+              Text(detalle, style: TextStyle(fontSize: 12.5, color: VenueColors.textoSuave)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// El ticket dibujado como sale al venderlo. Se redibuja cuando cambia la
+/// fase o el arte.
+class _VistaEntrada extends StatefulWidget {
+  const _VistaEntrada({required this.datos});
+  final TicketDatos datos;
+
+  @override
+  State<_VistaEntrada> createState() => _VistaEntradaState();
+}
+
+class _VistaEntradaState extends State<_VistaEntrada> {
+  late Future<Uint8List> _img = dibujarTicket(widget.datos);
+
+  String _clave(TicketDatos d) => '${d.tipo}|${d.arteUrl}|${d.fase}|${d.evento}|${d.fecha}|${d.color}';
+
+  @override
+  void didUpdateWidget(_VistaEntrada old) {
+    super.didUpdateWidget(old);
+    if (_clave(old.datos) != _clave(widget.datos)) _img = dibujarTicket(widget.datos);
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+        constraints: const BoxConstraints(maxHeight: 520),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: VenueColors.superficie2,
+          borderRadius: BorderRadius.circular(radioTarjeta),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: FutureBuilder<Uint8List>(
+          future: _img,
+          builder: (context, s) {
+            if (s.hasError) {
+              return Padding(
+                padding: const EdgeInsets.all(30),
+                child: Text('No se pudo dibujar la vista previa',
+                    style: TextStyle(color: VenueColors.textoSuave)),
+              );
+            }
+            if (!s.hasData) {
+              return const SizedBox(height: 260, child: Center(child: CircularProgressIndicator()));
+            }
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(s.data!, fit: BoxFit.contain, gaplessPlayback: true),
+            );
+          },
+        ),
+      );
+}
+
+/// Anotados en listas, QR emitidos, mesas vendidas e ingresos por lista.
 class NumerosEvento extends ConsumerWidget {
   const NumerosEvento({super.key, required this.eventoId});
   final String eventoId;
@@ -353,11 +1048,15 @@ class NumerosEvento extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final n = ref.watch(numerosEventoProvider(eventoId)).value;
     String v(int? x) => x == null ? '…' : '$x';
-    return GrillaIndicadores(children: [
-      Indicador(icono: Icons.groups_rounded, etiqueta: 'Listas', valor: v(n?.listas), tono: Tono.aviso),
-      Indicador(icono: Icons.qr_code_2_rounded, etiqueta: 'QR emitidos', valor: v(n?.qr), tono: Tono.marca),
-      Indicador(icono: Icons.table_bar_rounded, etiqueta: 'Mesas vendidas', valor: v(n?.mesas)),
-      Indicador(icono: Icons.how_to_reg_rounded, etiqueta: 'Ingresaron (lista)', valor: v(n?.ingresaron), tono: Tono.ok),
+    return FilaFichas(children: [
+      FichaDato(
+          icono: Icons.groups_outlined, etiqueta: 'Listas', valor: v(n?.listas),
+          color: VenueColors.aviso),
+      FichaDato(icono: Icons.qr_code_2_rounded, etiqueta: 'QR', valor: v(n?.qr)),
+      FichaDato(icono: Icons.table_bar_outlined, etiqueta: 'Mesas', valor: v(n?.mesas)),
+      FichaDato(
+          icono: Icons.how_to_reg_outlined, etiqueta: 'Entraron', valor: v(n?.ingresaron),
+          color: VenueColors.ok),
     ]);
   }
 }
@@ -421,7 +1120,7 @@ class _NuevoEventoState extends ConsumerState<_NuevoEvento> {
               decoration: const InputDecoration(labelText: 'Bs por manilla al RRPP'))),
         ]),
         const SizedBox(height: 8),
-        const Text('Nace como borrador, con las listas "Invitados" y "Free Cover Girls".',
+        Text('Nace como borrador, con las listas "Invitados" y "Free Cover Girls".',
             style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
         const SizedBox(height: 14),
         FilledButton(
@@ -754,7 +1453,7 @@ class _ListaFormState extends ConsumerState<_ListaForm> {
           ),
           const Divider(height: 28),
           const Text('Cupos especiales', style: TextStyle(fontWeight: FontWeight.w800)),
-          const Text(
+          Text(
               'El cupo de acá manda sobre el general. Ejemplo: la lista da 1 invitado a cada relacionador, pero a una persona puntual le das 3.',
               style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5, height: 1.35)),
           _CuposEspeciales(listaId: l!['id'] as String, club: club),
@@ -937,7 +1636,7 @@ class _CuposEspecialesState extends ConsumerState<_CuposEspeciales> {
               shrinkWrap: true,
               children: [
                 if (filtrados.isEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.all(16),
                     child: Text('Nadie coincide con el filtro.',
                         textAlign: TextAlign.center,
@@ -954,7 +1653,7 @@ class _CuposEspecialesState extends ConsumerState<_CuposEspeciales> {
                             label: Text('cupo ${cupos[g['id']]}'),
                             visualDensity: VisualDensity.compact,
                             side: BorderSide(color: Theme.of(context).colorScheme.primary))
-                        : const Text('general', style: TextStyle(color: VenueColors.textoSuave)),
+                        : Text('general', style: TextStyle(color: VenueColors.textoSuave)),
                     onTap: () => _editar(g, cupos[g['id']]),
                   ),
               ],
@@ -1144,7 +1843,7 @@ class _CuposFaseState extends ConsumerState<_CuposFase> {
         children: [
           Text('Cupos por team · ${widget.fase['nombre']}',
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-          const Text('Cuántas entradas de esta fase puede vender cada team. Vacío o 0 = sin tope propio.',
+          Text('Cuántas entradas de esta fase puede vender cada team. Vacío o 0 = sin tope propio.',
               style: TextStyle(color: VenueColors.textoSuave)),
           if (!s.hasData)
             const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator())),
@@ -1231,7 +1930,7 @@ class _HorariosState extends ConsumerState<_Horarios> {
             child: const Text('Guardar horario')),
         const Divider(height: 28),
         const Text('Excepciones', style: TextStyle(fontWeight: FontWeight.w800)),
-        const Text('Un team (o una persona) que puede vender más tarde que el resto.',
+        Text('Un team (o una persona) que puede vender más tarde que el resto.',
             style: TextStyle(color: VenueColors.textoSuave)),
         FutureBuilder(
           key: ValueKey(_v),
@@ -1264,6 +1963,10 @@ class _HorariosState extends ConsumerState<_Horarios> {
         ),
         const SizedBox(height: 10),
         DropdownButtonFormField<String?>(
+          borderRadius: BorderRadius.circular(12),
+          dropdownColor: VenueColors.superficie,
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+          menuMaxHeight: 420,
           key: ValueKey(_porTeam),
           initialValue: _quien,
           isExpanded: true,
@@ -1339,7 +2042,7 @@ class _AvisosState extends ConsumerState<_Avisos> {
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
         const Text('Avisos al equipo', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-        const Text('Le aparecen a cada uno al entrar, una sola vez. Queda registrado quién lo leyó.',
+        Text('Le aparecen a cada uno al entrar, una sola vez. Queda registrado quién lo leyó.',
             style: TextStyle(color: VenueColors.textoSuave)),
         const SizedBox(height: 12),
         TextField(controller: _t, decoration: const InputDecoration(labelText: 'Título', isDense: true)),
@@ -1351,6 +2054,10 @@ class _AvisosState extends ConsumerState<_Avisos> {
         Row(children: [
           Expanded(
             child: DropdownButtonFormField<String>(
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: VenueColors.superficie,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+              menuMaxHeight: 420,
               initialValue: _destino,
               decoration: const InputDecoration(labelText: 'Para', isDense: true),
               items: const [
@@ -1366,6 +2073,10 @@ class _AvisosState extends ConsumerState<_Avisos> {
             const SizedBox(width: 8),
             Expanded(
               child: DropdownButtonFormField<String?>(
+                borderRadius: BorderRadius.circular(12),
+                dropdownColor: VenueColors.superficie,
+                icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+                menuMaxHeight: 420,
                 initialValue: _team,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Team', isDense: true),
@@ -1432,7 +2143,7 @@ class _AvisosState extends ConsumerState<_Avisos> {
                           v ? 'Aviso activado' : 'Aviso en pausa')),
                   IconButton(
                       tooltip: 'Eliminar aviso',
-                      icon: const Icon(Icons.close_rounded, color: VenueColors.mal),
+                      icon: Icon(Icons.close_rounded, color: VenueColors.mal),
                       onPressed: () => hacer(() => repo.borrarAviso(a['id'] as String), 'Aviso eliminado')),
                 ]),
               ),
