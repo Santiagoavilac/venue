@@ -89,9 +89,31 @@ class GestionRepository {
     await _sb.from('lista_tipos').update({'orden': a['orden']}).eq('id', b['id'] as String);
   }
 
-  // ── cupos especiales por persona ──
-  Future<List<Fila>> cuposDeLista(String listaId) =>
-      _sb.from('cupo_rrpp').select('user_id, cupo').eq('lista_tipo_id', listaId);
+  // ── excepciones por persona: otro cupo y/o otra hora de ingreso ──
+  /// La hora propia (`ingreso_hasta`) existe recién con db/34; sin eso se
+  /// leen solo los cupos y [excepcionesConHora] queda en false.
+  bool excepcionesConHora = true;
+
+  Future<List<Fila>> cuposDeLista(String listaId) async {
+    try {
+      final r = await _sb.from('cupo_rrpp').select('user_id, cupo, ingreso_hasta').eq('lista_tipo_id', listaId);
+      excepcionesConHora = true;
+      return r;
+    } on PostgrestException catch (e) {
+      if (e.code != '42703') rethrow;
+      excepcionesConHora = false;
+      return _sb.from('cupo_rrpp').select('user_id, cupo').eq('lista_tipo_id', listaId);
+    }
+  }
+
+  /// Guarda la excepción de una persona. null = lo general de la lista.
+  Future<void> fijarExcepcionLista(String listaId, String usuarioId, {int? cupo, String? ingresoHasta}) =>
+      _sb.from('cupo_rrpp').upsert({
+        'lista_tipo_id': listaId,
+        'user_id': usuarioId,
+        'cupo': cupo,
+        if (excepcionesConHora) 'ingreso_hasta': ingresoHasta,
+      });
 
   Future<List<Fila>> personasConCupo(String clubId) async =>
       ((await _sb.rpc('roster_cupos', params: {'p_club': clubId})) as List)

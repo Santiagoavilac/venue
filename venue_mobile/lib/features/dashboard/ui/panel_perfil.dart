@@ -8,12 +8,15 @@ import '../../../core/sync/cola_offline.dart';
 import '../../../core/theme/apariencia.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
+import '../../../core/widgets/foto_persona.dart';
 import '../../../core/widgets/patron.dart' hide MarcaClub;
 import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../../clubs/ui/selector_club_screen.dart';
 import '../../teams/data/gente.dart';
 import '../../teams/ui/gente_screen.dart' show OpcionesBoliche;
+import '../data/perfil_cambios.dart';
+import 'credencial.dart';
 import 'tutorial.dart';
 
 /// Panel de perfil: se abre desde la inicial de arriba a la derecha. Tiene
@@ -55,7 +58,32 @@ class PanelPerfil extends ConsumerWidget {
             ]),
             // la cuenta arriba: es donde se la espera
             Column(children: [
-              Inicial(perfil?.nombre ?? '·', lado: 72),
+              // tocando la foto se cambia (la primera vez directo; después la aprueba el admin)
+              Semantics(
+                button: true,
+                label: 'Cambiar foto',
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: perfil == null ? null : () => cambiarMiFoto(context, ref, perfil),
+                  child: Stack(clipBehavior: Clip.none, children: [
+                    FotoPersona(nombre: perfil?.nombre ?? '·', url: perfil?.fotoUrl, tam: 72),
+                    Positioned(
+                      right: -4,
+                      bottom: -2,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: VenueColors.superficie,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: VenueColors.linea),
+                        ),
+                        child: Icon(Icons.photo_camera_outlined, size: 15, color: VenueColors.texto),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
               const SizedBox(height: 12),
               Text(perfil?.nombre ?? '',
                   textAlign: TextAlign.center,
@@ -77,7 +105,26 @@ class PanelPerfil extends ConsumerWidget {
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: const Text('Editar perfil'),
               ),
+              const _Pendiente(),
             ]),
+            if (rol != null && rol != Rol.portero) ...[
+              const SizedBox(height: 18),
+              _Grupo(children: [
+                _Fila(
+                  inicio: _Circulo(Icons.qr_code_2_rounded, club?.primario ?? VenueColors.marcaPorDefecto),
+                  titulo: 'Mi credencial',
+                  detalle: 'Tu QR para mostrar en la puerta',
+                  alTocar: () => cerrarYHacer(() => verMiCredencial(context)),
+                ),
+                if (rol == Rol.admin && club != null)
+                  _Fila(
+                    inicio: _Circulo(Icons.how_to_reg_outlined, VenueColors.aviso),
+                    titulo: 'Cambios de perfil',
+                    detalle: 'Fotos y nombres por aprobar',
+                    alTocar: () => cerrarYHacer(() => verSolicitudesPerfil(context, club.id)),
+                  ),
+              ]),
+            ],
             if (club != null) ...[
               const _Rotulo('Boliche'),
               _Grupo(children: [
@@ -169,6 +216,32 @@ class PanelPerfil extends ConsumerWidget {
   }
 }
 
+/// Aviso de un cambio propio que espera al admin.
+class _Pendiente extends ConsumerWidget {
+  const _Pendiente();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(miSolicitudProvider).value;
+    if (s == null) return const SizedBox.shrink();
+    final que = [
+      if (s.fotoNueva != null) 'foto',
+      if (s.nombreNuevo != null) 'nombre (${s.nombreNuevo})',
+    ].join(' y ');
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: VenueColors.aviso.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text('Cambio de $que esperando al administrador.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: VenueColors.aviso)),
+    );
+  }
+}
+
 /// Ícono blanco en un círculo de color (filas del panel).
 class _Circulo extends StatelessWidget {
   const _Circulo(this.icono, this.color);
@@ -236,18 +309,23 @@ class _EditarPerfilState extends ConsumerState<_EditarPerfil> {
     setState(() => _ocupado = true);
     final sb = ref.read(supabaseProvider);
     try {
-      // solo el nombre: el resto del perfil (rol, team…) no se toca desde acá
+      // solo el nombre: el resto del perfil (rol, team…) no se toca desde acá.
+      // Salvo para el admin, queda esperando que el admin lo apruebe.
+      var pendiente = false;
       if (nombre != widget.perfil.nombre) {
-        await sb.from('profiles').update({'nombre': nombre}).eq('id', widget.perfil.id);
+        pendiente = !await ref.read(perfilCambiosProvider).solicitar(nombre: nombre);
       }
       if (_tel.text.trim().isNotEmpty) {
         await sb.rpc('guardar_telefono', params: {'p_tel': _tel.text.trim()});
       }
       if (clave.isNotEmpty) await sb.auth.updateUser(UserAttributes(password: clave));
       ref.invalidate(perfilProvider);
+      ref.invalidate(miSolicitudProvider);
       if (!mounted) return;
       Navigator.pop(context);
-      avisar(context, 'Perfil actualizado');
+      avisar(context, pendiente
+          ? 'Listo. El cambio de nombre queda esperando al administrador'
+          : 'Perfil actualizado');
     } catch (e) {
       if (mounted) {
         avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);

@@ -1452,24 +1452,37 @@ class _ListaFormState extends ConsumerState<_ListaForm> {
             child: const Text('Eliminar lista'),
           ),
           const Divider(height: 28),
-          const Text('Cupos especiales', style: TextStyle(fontWeight: FontWeight.w800)),
+          const Text('Excepciones', style: TextStyle(fontWeight: FontWeight.w800)),
           Text(
-              'El cupo de acá manda sobre el general. Ejemplo: la lista da 1 invitado a cada relacionador, pero a una persona puntual le das 3.',
+              'Lo de acá manda sobre lo general. Ejemplo: todos anotan 1 y entran hasta las 23:00, pero a una persona le das 5 y sus invitados entran hasta las 00:00.',
               style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5, height: 1.35)),
-          _CuposEspeciales(listaId: l!['id'] as String, club: club),
+          _CuposEspeciales(
+            listaId: l!['id'] as String,
+            club: club,
+            cupoGeneral: (l!['cupo_por_rrpp'] as num?)?.toInt(),
+            horaLista: (l!['ingreso_hasta'] as String?)?.substring(0, 5),
+          ),
         ],
       ],
     );
   }
 }
 
-/// Cupos especiales de una lista con filtros: buscar por nombre, por team y
-/// por rol, ver quién ya tiene uno, y darle el mismo cupo a todos los que
-/// quedaron filtrados (por ejemplo, 3 a todo un team).
+/// Excepciones de una lista con filtros: buscar por nombre, por team y por
+/// rol, ver quién ya tiene una, y darle el mismo cupo a todos los que
+/// quedaron filtrados (por ejemplo, 3 a todo un team). Cada excepción puede
+/// cambiar el cupo, la hora de ingreso de sus invitados, o las dos.
 class _CuposEspeciales extends ConsumerStatefulWidget {
-  const _CuposEspeciales({required this.listaId, required this.club});
+  const _CuposEspeciales({
+    required this.listaId,
+    required this.club,
+    this.cupoGeneral,
+    this.horaLista,
+  });
   final String listaId;
   final String club;
+  final int? cupoGeneral;
+  final String? horaLista;
   @override
   ConsumerState<_CuposEspeciales> createState() => _CuposEspecialesState();
 }
@@ -1504,41 +1517,27 @@ class _CuposEspecialesState extends ConsumerState<_CuposEspeciales> {
     }
   }
 
-  Future<void> _editar(Fila g, int? actual) async {
-    final c = TextEditingController(text: actual?.toString() ?? '');
-    final r = await showDialog<String>(
+  Future<void> _editar(Fila g, _Excepcion? actual) async {
+    final repo = ref.read(gestionRepositoryProvider);
+    final r = await showDialog<_Excepcion>(
       context: context,
-      builder: (d) => AlertDialog(
-        title: Text('Cupo de ${g['nombre']}'),
-        content: TextField(
-          controller: c,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Invitados en esta lista'),
-        ),
-        actions: [
-          if (actual != null)
-            TextButton(
-                onPressed: () => Navigator.pop(d, 'quitar'),
-                style: TextButton.styleFrom(foregroundColor: VenueColors.mal),
-                child: const Text('Quitar')),
-          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancelar')),
-          FilledButton(
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 42)),
-              onPressed: () => Navigator.pop(d, c.text),
-              child: const Text('Guardar')),
-        ],
+      builder: (d) => _DialogoExcepcion(
+        nombre: '${g['nombre']}',
+        actual: actual,
+        cupoGeneral: widget.cupoGeneral,
+        horaLista: widget.horaLista,
+        conHora: repo.excepcionesConHora,
       ),
     );
     if (r == null) return;
-    final repo = ref.read(gestionRepositoryProvider);
     final id = g['id'] as String;
-    if (r == 'quitar') {
-      return _hacer(() => repo.quitarCupo(widget.listaId, id), 'Cupo especial quitado');
+    if (r.quitar) {
+      return _hacer(() => repo.quitarCupo(widget.listaId, id), 'Excepción quitada');
     }
-    final n = int.tryParse(r.trim());
-    if (n == null || n < 0) return;
-    await _hacer(() => repo.fijarCupo(widget.listaId, id, n), 'Cupo de ${g['nombre']}: $n');
+    await _hacer(
+      () => repo.fijarExcepcionLista(widget.listaId, id, cupo: r.cupo, ingresoHasta: r.hora),
+      'Excepción de ${g['nombre']} guardada',
+    );
   }
 
   @override
@@ -1550,7 +1549,13 @@ class _CuposEspecialesState extends ConsumerState<_CuposEspeciales> {
           return const Padding(
               padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()));
         }
-        final cupos = {for (final c in s.data![0]) c['user_id'] as String: (c['cupo'] as num).toInt()};
+        final cupos = {
+          for (final c in s.data![0])
+            c['user_id'] as String: _Excepcion(
+              cupo: (c['cupo'] as num?)?.toInt(),
+              hora: (c['ingreso_hasta'] as String?)?.substring(0, 5),
+            ),
+        };
         final gente = s.data![1];
         final teams = {for (final g in gente) '${g['team'] ?? 'Sin team'}'}.toList()..sort();
         final q = normalizar(_q.trim());
@@ -1650,7 +1655,7 @@ class _CuposEspecialesState extends ConsumerState<_CuposEspeciales> {
                     subtitle: Text('${g['team'] ?? 'Sin team'} · ${g['rol'] ?? ''}'),
                     trailing: cupos.containsKey(g['id'])
                         ? Chip(
-                            label: Text('cupo ${cupos[g['id']]}'),
+                            label: Text(cupos[g['id']]!.resumen),
                             visualDensity: VisualDensity.compact,
                             side: BorderSide(color: Theme.of(context).colorScheme.primary))
                         : Text('general', style: TextStyle(color: VenueColors.textoSuave)),
@@ -1663,6 +1668,125 @@ class _CuposEspecialesState extends ConsumerState<_CuposEspeciales> {
       },
     );
   }
+}
+
+/// Lo que cambia para una persona en una lista. null = lo general.
+class _Excepcion {
+  const _Excepcion({this.cupo, this.hora, this.quitar = false});
+  final int? cupo;
+  final String? hora;
+  final bool quitar;
+
+  String get resumen => [
+        if (cupo != null) 'cupo $cupo',
+        if (hora != null) 'hasta $hora',
+      ].join(' · ');
+}
+
+class _DialogoExcepcion extends StatefulWidget {
+  const _DialogoExcepcion({
+    required this.nombre,
+    required this.conHora,
+    this.actual,
+    this.cupoGeneral,
+    this.horaLista,
+  });
+  final String nombre;
+  final _Excepcion? actual;
+  final int? cupoGeneral;
+  final String? horaLista;
+  final bool conHora;
+
+  @override
+  State<_DialogoExcepcion> createState() => _DialogoExcepcionState();
+}
+
+class _DialogoExcepcionState extends State<_DialogoExcepcion> {
+  late final _cupo = TextEditingController(text: widget.actual?.cupo?.toString() ?? '');
+  late String? _hora = widget.actual?.hora;
+
+  @override
+  void dispose() {
+    _cupo.dispose();
+    super.dispose();
+  }
+
+  Future<void> _elegirHora() async {
+    final base = _hora ?? widget.horaLista ?? '23:00';
+    final p = base.split(':');
+    final t = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: int.parse(p[0]), minute: int.parse(p[1])),
+      helpText: 'Sus invitados entran hasta',
+    );
+    if (t != null) {
+      setState(() => _hora = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}');
+    }
+  }
+
+  void _guardar() {
+    final txt = _cupo.text.trim();
+    final n = txt.isEmpty ? null : int.tryParse(txt);
+    if (txt.isNotEmpty && (n == null || n < 0)) {
+      avisar(context, 'El cupo tiene que ser 0 o más', tipo: TipoAviso.aviso);
+      return;
+    }
+    if (n == null && _hora == null) {
+      avisar(context, 'Poné un cupo o una hora', tipo: TipoAviso.aviso);
+      return;
+    }
+    Navigator.pop(context, _Excepcion(cupo: n, hora: _hora));
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text('Excepción de ${widget.nombre}'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          TextField(
+            controller: _cupo,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: 'Cuántos puede anotar',
+              hintText: 'General: ${widget.cupoGeneral ?? 'sin límite'}',
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (widget.conHora) ...[
+            Text('Sus invitados entran hasta', style: TextStyle(fontSize: 13, color: VenueColors.textoSuave)),
+            const SizedBox(height: 6),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _elegirHora,
+                  icon: const Icon(Icons.schedule_rounded, size: 18),
+                  label: Text(_hora ?? (widget.horaLista != null ? 'La de la lista (${widget.horaLista})' : 'Toda la noche')),
+                ),
+              ),
+              if (_hora != null)
+                IconButton(
+                  tooltip: 'Usar la hora de la lista',
+                  onPressed: () => setState(() => _hora = null),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+            ]),
+          ] else
+            Text('Para dar otro horario hay que preparar la base (db/34-excepciones-credencial.sql).',
+                style: TextStyle(fontSize: 12.5, color: VenueColors.textoSuave)),
+        ]),
+        actions: [
+          if (widget.actual != null)
+            TextButton(
+                onPressed: () => Navigator.pop(context, const _Excepcion(quitar: true)),
+                style: TextButton.styleFrom(foregroundColor: VenueColors.mal),
+                child: const Text('Quitar')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 42)),
+              onPressed: _guardar,
+              child: const Text('Guardar')),
+        ],
+      );
 }
 
 // ── fases de preventa ──

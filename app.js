@@ -46,7 +46,8 @@ const CFG = window.CONFIG || {};
 const RPC_LECTURA = new Set([
   "resumen_evento", "liquidacion_evento", "historico_eventos", "ranking_rrpp",
   "reporte_fases", "reporte_filtro", "fases_evento", "fase_vigente",
-  "cupos_fase", "ventana_venta", "excepciones_venta", "mis_cupos",
+  "cupos_fase", "ventana_venta", "excepciones_venta", "mis_cupos", "mis_horas_lista",
+  "mi_solicitud_perfil", "solicitudes_perfil",
   "mis_permisos_mesa", "mi_telefono", "roster_relacionadores", "roster_cupos",
   "roster_mi_team", "usuarios_sin_tope", "telefonos_equipo", "teams_efectivos",
   "vendedores_posibles", "buscar_registros", "avisos_admin",
@@ -700,8 +701,13 @@ function header() {
   $("#tbClubName") && ($("#tbClubName").innerHTML = marca);
   $("#tbClubMark") && ($("#tbClubMark").innerHTML = clubMarkHTML(club));
   $("#avatarM") && ($("#avatarM").textContent = ini);
-  // la inicial con su tono por nombre, el mismo que en la app
-  [$("#avatarM"), $("#avatarIni")].forEach(a => a && a.style.setProperty("--ini", tinte(me.nombre)));
+  // la inicial con su tono por nombre, el mismo que en la app; con foto, la foto
+  [$("#avatarM"), $("#avatarIni")].forEach(a => {
+    if (!a) return;
+    a.style.setProperty("--ini", tinte(me.nombre));
+    a.style.backgroundImage = me.foto_url ? `url("${me.foto_url.replace(/"/g, "%22")}")` : "";
+    a.classList.toggle("con-foto", !!me.foto_url);
+  });
   // flechita al lado del boliche solo si hay a dónde cambiar
   const hayOtros = myClubs().length > 1 || me.plataforma;
   qsa("#tbClub .chev, #clubChev").forEach(x => x.style.display = hayOtros ? "" : "none");
@@ -951,6 +957,10 @@ const rolBadge = r => `<span class="us-rol" data-r="${r}">${ico(ROL_ICO[r] || "u
 const TINTES = ["#7A3B2E", "#2F3F6B", "#4B2F6B", "#2E5A4B", "#6B5A2F", "#5A2F4B", "#2F5A6B"];
 const tinte = nm => { let h = 0; for (const c of String(nm || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0; return TINTES[h % TINTES.length]; };
 const inicial = nm => `<span class="ini" style="--ini:${tinte(nm)}">${esc((String(nm || "·").trim()[0] || "·").toUpperCase())}</span>`;
+/* la foto de la persona si tiene, si no su inicial */
+const avatarDe = (nm, foto) => foto
+  ? `<img class="ini ini-foto" src="${esc(foto)}" alt="${esc(nm || "")}" loading="lazy">`
+  : inicial(nm);
 
 const TAB_ICONS = {
   accesos: '<path d="M13 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h7"/><path d="M10 12h11M17.5 8.5L21 12l-3.5 3.5"/>',
@@ -2416,20 +2426,23 @@ let lsSortAcc = false; // orden: los que ingresaron arriba (por relacionador)
    Antes cada toque (abrir un acordeón, filtrar, ordenar, marcar un ingreso)
    volvía a descargarlos: en la puerta, con 300 check-ins, eran 300 descargas
    de ~190 KB cada una. Ahora solo se vuelve a pedir cuando hace falta. */
-let lsRegs = null, lsCupos = null, lsEvId = null;
+let lsRegs = null, lsCupos = null, lsEvId = null, lsHoras = {};
 async function cargarRegistrosLista(forzar) {
   if (!forzar && lsEvId === ev.id && lsRegs) return;
   // "forzar" saltea el atajo local; la frescura real la gobierna el caché
   // de datos: cualquier escritura lo limpia y ahí sí se vuelve a la red.
-  const [{ data: todosRegs, error }, { data: misCupos }] = await conDatos("registrosLista", () => Promise.all([
+  const [{ data: todosRegs, error }, { data: misCupos }, { data: misHoras }] = await conDatos("registrosLista", () => Promise.all([
     traerTodo(() => sb.from("registros").select("*, rrpp:profiles!registros_rrpp_id_fkey(nombre,team_id)")
       .eq("evento_id", ev.id).order("created_at", { ascending: false }).order("id")),
-    sb.rpc("mis_cupos", { p_evento: ev.id })
+    sb.rpc("mis_cupos", { p_evento: ev.id }),
+    // la hora de ingreso propia (excepción); sin db/34 vuelve vacío
+    sb.rpc("mis_horas_lista", { p_evento: ev.id })
   ]));
   // El error se propaga en vez de tragarse: antes se avisaba por toast y se
   // seguía igual, dejando lsRegs en null y la pantalla a medio pintar.
   if (error) throw error;
   lsRegs = todosRegs || []; lsCupos = misCupos || []; lsEvId = ev.id;
+  lsHoras = {}; (misHoras || []).forEach(h => { if (h.especial) lsHoras[h.lista_tipo_id] = h.ingreso_hasta; });
 }
 /* repinta con lo que ya está en memoria (no toca la red) */
 const pintarListas = () => screenListas(true);
@@ -2560,7 +2573,8 @@ async function screenListas(soloPintar) {
           <span class="lst-nm">${esc(l.nombre)}</span>
           <span class="lst-cnt" title="Anotados"><b>${rs.length}</b> anotados</span>
           <span class="lst-cnt ok" title="Ingresaron"><b>${lce}</b> ingresaron</span>
-          ${l.ingreso_hasta ? `<span class="lst-cnt" style="color:var(--warn)" title="Hora límite de ingreso">hasta ${l.ingreso_hasta.slice(0, 5)}</span>` : ""}
+          ${lsHoras[l.id] ? `<span class="lst-cnt" style="color:var(--ok)" title="Tu excepción: tus invitados entran hasta esta hora">tus invitados hasta ${lsHoras[l.id].slice(0, 5)}</span>`
+            : l.ingreso_hasta ? `<span class="lst-cnt" style="color:var(--warn)" title="Hora límite de ingreso">hasta ${l.ingreso_hasta.slice(0, 5)}</span>` : ""}
           <span class="lst-tar">Free</span>
           ${me.rol === "admin" ? `<button class="lst-menu" data-editlt="${l.id}" title="Editar lista">⋮</button>` : ""}
         </div>
@@ -3270,6 +3284,9 @@ async function validar(raw) {
   if (!ev) return toast("Elegí un evento", "warn");
   let code = (raw || "").trim();
   let esLista = false;
+  // credencial de un relacionador: no es una entrada, se muestra su ficha
+  const mcr = code.match(/^CRD[:|]([\w-]+)[:|](\w+)$/i);
+  if (mcr) return verCredencial(mcr[2]);
   const ml = code.match(/LST[:|]([\w-]+)[:|](\w+)/i);
   const m = code.match(/EVT[:|]([\w-]+)[:|](\w+)/i);
   if (ml) {
@@ -3403,6 +3420,38 @@ function pintarRes(cls, big, sub, flagCode) {
     fb.classList.toggle("on", data.marcado);
     toast(data.marcado ? `${data.nombre} marcado — lo vendió ${data.rrpp}` : `Marca quitada a ${data.nombre}`, data.marcado ? "warn" : "ok");
   };
+}
+/* Lo que ve el portero al escanear la credencial: la foto grande para
+   comparar con la cara, quién es y qué tiene esta noche. No marca ingresos. */
+async function verCredencial(code) {
+  const { data: r, error } = await sb.rpc("ver_credencial", { p_evento: ev.id, p_code: code });
+  $("#scanCode").value = "";
+  if (faltaDb34(error)) return toast("Falta preparar la base para las credenciales (db/34-excepciones-credencial.sql)", "warn");
+  if (error) return esFallaDeRed(error) ? toast("Sin señal: probá de nuevo en unos segundos", "warn") : fail(error);
+  if (r.resultado !== "credencial") {
+    pintarRes("bad", { titulo: "Credencial no válida", nota: "Este QR ya no sirve: puede ser uno viejo. Pedile que lo genere de nuevo." });
+    feedback("bad"); return;
+  }
+  const ok = r.activo && r.del_boliche, cls = ok ? "ok" : "bad";
+  $("#scanResult").innerHTML = `<div class="res ${cls} res-v2 res-cred">
+    <div class="res-top">
+      <svg viewBox="0 0 24 24" class="ic res-ic">${RES_ICONS[cls]}</svg>
+      <span class="res-vd">${!r.activo ? "CUENTA PAUSADA" : !r.del_boliche ? "NO ES DE ACÁ" : "CREDENCIAL"}</span>
+    </div>
+    <div class="cred-foto grande">${avatarDe(r.nombre, r.foto_url)}</div>
+    <div class="res-nm">${esc(r.nombre)}</div>
+    <div class="res-tp">${esc(ROL_LABEL[r.rol] || r.rol || "Sin rol en este boliche")}${r.team ? ` · Team ${esc(r.team)}` : ""}</div>
+    <div class="res-quien">@${esc(r.usuario)}</div>
+    ${r.listas?.length ? `<div class="cred-listas">${r.listas.map(l => `<div class="cred-lista">
+      <b>${esc(l.nombre)}${l.especial ? ` <span class="pill">excepción</span>` : ""}</b>
+      <span>${l.cupo == null ? `${l.anotados} anotados` : `${l.anotados} de ${l.cupo} anotados`} · ${l.ingresaron} entraron</span>
+      <span>${r.sin_tope ? "Sus invitados entran a cualquier hora" : l.entra_hasta ? `Sus invitados entran hasta las ${esc(l.entra_hasta)}` : "Sin hora de cierre"}</span>
+    </div>`).join("")}</div>` : ""}
+    ${r.foto_url ? "" : `<div class="res-nota">No tiene foto cargada: pedile su carnet.</div>`}
+  </div>`;
+  window.Motion?.veredicto($("#scanResult").firstElementChild, cls);
+  feedback(ok ? "ok" : "bad");
+  reenfocarCodigo();
 }
 async function renderScan() {
   if (!ev) { $("#vfHint").textContent = "No hay evento activo."; return; }
@@ -6052,8 +6101,8 @@ function sheetEditarLista(l, evId, onDone, onBack) {
       ni genera entradas — la plata se sigue recibiendo en la puerta como siempre.</p>` : ""}
     <p class="hint" style="margin:-4px 0 14px">Después de esa hora el QR y el check-in de esta lista se rechazan en puerta. Dejalo vacío para que entren toda la noche. Si ponés una hora anterior al inicio del evento (ej. 02:00), se toma como la madrugada siguiente.</p>
     <button class="btn primary" id="elGo">Guardar</button>
-    <div class="sh-h" style="margin-top:20px">Cupos especiales<span class="r-sub">personas con más lugares</span></div>
-    <p class="hint" style="margin:-4px 0 10px">El cupo de acá manda sobre el general. Ejemplo: la lista da 1 invitado a cada relacionador, pero a una persona puntual le das 3.</p>
+    <div class="sh-h" style="margin-top:20px">Excepciones<span class="r-sub">personas con otro cupo u otro horario</span></div>
+    <p class="hint" style="margin:-4px 0 10px">Lo de acá manda sobre lo general. Ejemplo: todos anotan 1 y entran hasta las 23:00, pero a una persona le das 5 y sus invitados entran hasta las 00:00.</p>
     <div id="elCupos"><div class="empty">Cargando…</div></div>`);
   $("#elBack").onclick = volver;
   renderCuposLista(l);
@@ -6093,20 +6142,30 @@ function sheetEditarLista(l, evId, onDone, onBack) {
   };
 }
 
-/* cupos especiales de una lista: quién tiene más lugares que el resto */
+/* Excepciones de una lista: quién tiene otro cupo u otra hora de ingreso.
+   Las dos partes son opcionales (vacío = lo general de la lista). La hora
+   propia necesita db/34-excepciones-credencial.sql; sin eso queda el cupo. */
 async function renderCuposLista(l) {
   const cont = $("#elCupos"); if (!cont) return;
-  const [{ data: cupos }, { data: gente }, { data: fijos }] = await Promise.all([
-    sb.from("cupo_rrpp").select("user_id, cupo, p:profiles!cupo_rrpp_user_id_fkey(nombre, usuario)").eq("lista_tipo_id", l.id),
+  const selCupos = cols => sb.from("cupo_rrpp").select(`user_id, ${cols}, p:profiles!cupo_rrpp_user_id_fkey(nombre, usuario)`).eq("lista_tipo_id", l.id);
+  let [{ data: cupos, error: eC }, { data: gente }, { data: fijos }] = await Promise.all([
+    selCupos("cupo, ingreso_hasta"),
     sb.rpc("roster_cupos", { p_club: club }),
     // cupos fijos del boliche para listas con este nombre (no dependen del evento)
     sb.from("cupo_permanente").select("user_id, cupo, p:profiles!cupo_permanente_user_id_fkey(nombre, usuario)")
       .eq("club_id", club).ilike("lista_nombre", (l.nombre || "").trim())
   ]);
+  const conHora = !eC;
+  if (eC) ({ data: cupos } = await selCupos("cupo"));
   const lista = cupos || [], roster = gente || [], permanentes = fijos || [];
   const gral = l.cupo_por_rrpp ?? "sin límite";
-  const yaTienen = new Set((lista || []).map(c => c.user_id));
+  const horaGral = l.ingreso_hasta ? l.ingreso_hasta.slice(0, 5) : null;
+  const yaTienen = new Set(lista.map(c => c.user_id));
   const libres = roster.filter(g => !yaTienen.has(g.id));
+  const detalle = c => [
+    c.cupo != null ? `<b style="color:var(--accent-2)">${c.cupo}</b> en vez de ${gral}` : `cupo general (${gral})`,
+    c.ingreso_hasta ? `entran hasta <b style="color:var(--accent-2)">${c.ingreso_hasta.slice(0, 5)}</b>${horaGral ? ` en vez de ${horaGral}` : ""}` : null
+  ].filter(Boolean).join(" · ");
   // los fijos se muestran arriba y no se tocan desde acá: valen en todos los eventos
   const htmlFijos = permanentes.map(c => `
     <div class="list-row rc" style="border-color:rgba(139,92,246,.35)!important">
@@ -6116,41 +6175,56 @@ async function renderCuposLista(l) {
     </div>`).join("");
   cont.innerHTML = htmlFijos + (lista.length ? lista.map(c => `
     <div class="list-row rc">
-      <div class="r-l" style="flex:1;min-width:0"><span class="relmark">${esc((c.p?.nombre || "?")[0])}</span>
+      <div class="r-l" data-editcupo="${c.user_id}" style="flex:1;min-width:0;cursor:pointer"><span class="relmark">${esc((c.p?.nombre || "?")[0])}</span>
         <span class="rc-body"><span class="rc-nm">${esc(c.p?.nombre || "—")}</span>
-          <span class="rc-sub"><span>@${esc(c.p?.usuario || "")} · <b style="color:var(--accent-2)">${c.cupo}</b> en vez de ${gral}</span></span></span></div>
-      <button class="checkin" data-delcupo="${c.user_id}" title="Quitar cupo especial" style="background:var(--surface-3);color:var(--text-3);border-color:var(--line-2);padding:8px 11px">✕</button>
+          <span class="rc-sub"><span>@${esc(c.p?.usuario || "")} · ${detalle(c)}</span></span></span></div>
+      <button class="checkin" data-delcupo="${c.user_id}" title="Quitar excepción" style="background:var(--surface-3);color:var(--text-3);border-color:var(--line-2);padding:8px 11px">✕</button>
     </div>`).join("")
-    : (htmlFijos ? "" : `<div class="empty">Todos con el cupo general (${gral}).</div>`))
-    + (libres.length ? `<button class="btn ghost2" id="elAddCupo" style="margin-top:8px">+ Dar cupo especial a alguien</button>
-      <div id="elCupoForm"></div>` : "");
+    : (htmlFijos ? "" : `<div class="empty">Sin excepciones: todos con el cupo${horaGral ? " y el horario" : ""} de la lista.</div>`))
+    + `<button class="btn ghost2" id="elAddCupo" style="margin-top:8px${libres.length ? "" : ";display:none"}">+ Agregar una excepción</button>
+      <div id="elCupoForm"></div>`;
 
   document.querySelectorAll("#elCupos [data-delcupo]").forEach(b => b.onclick = async () => {
     const { error } = await sb.from("cupo_rrpp").delete().eq("lista_tipo_id", l.id).eq("user_id", b.dataset.delcupo);
     if (error) return fail(error);
-    toast("Cupo especial quitado", "warn");
+    toast("Excepción quitada", "warn");
     renderCuposLista(l);
   });
 
-  const add = $("#elAddCupo");
-  if (add) add.onclick = () => {
-    add.style.display = "none";
+  // mismo formulario para agregar y para editar (tocando la fila)
+  const formulario = previa => {
+    $("#elAddCupo").style.display = "none";
+    const quien = previa ? lista.find(c => c.user_id === previa) : null;
     $("#elCupoForm").innerHTML = `
-      <div class="row2" style="margin-top:8px">
-        <div class="field"><label>Persona</label><select id="elCupoWho">${libres.map(g =>
-          `<option value="${g.id}">${esc(g.nombre)} · ${esc(g.team)}</option>`).join("")}</select></div>
-        <div class="field"><label>Cuántos puede anotar</label><input id="elCupoN" type="number" min="0" value="${(l.cupo_por_rrpp || 1) + 2}"></div>
+      <div class="field" style="margin-top:8px"><label>Persona</label>${quien
+        ? `<input value="${esc(quien.p?.nombre || "")}" disabled><input type="hidden" id="elCupoWho" value="${quien.user_id}">`
+        : `<select id="elCupoWho">${libres.map(g => `<option value="${g.id}">${esc(g.nombre)} · ${esc(g.team)}</option>`).join("")}</select>`}</div>
+      <div class="row2">
+        <div class="field"><label>Cuántos puede anotar</label><input id="elCupoN" type="number" min="0" inputmode="numeric"
+          placeholder="General: ${esc(String(gral))}" value="${quien?.cupo ?? (quien ? "" : (l.cupo_por_rrpp || 1) + 2)}"></div>
+        <div class="field"><label>Sus invitados entran hasta</label><input id="elCupoH" type="time" ${conHora ? "" : "disabled"}
+          value="${quien?.ingreso_hasta ? quien.ingreso_hasta.slice(0, 5) : ""}"></div>
       </div>
-      <button class="btn primary" id="elCupoGo">Guardar cupo especial</button>`;
+      <small class="hint" style="display:block;margin:-4px 0 10px">${conHora
+        ? `Dejá vacío lo que no cambia. ${horaGral ? `La lista cierra a las ${horaGral}.` : "La lista no tiene hora de cierre."}`
+        : "Para dar otro horario hay que preparar la base (db/34-excepciones-credencial.sql)."}</small>
+      <button class="btn primary" id="elCupoGo">Guardar excepción</button>`;
     $("#elCupoGo").onclick = async () => {
-      const uid = $("#elCupoWho").value, n = +$("#elCupoN").value;
-      if (!uid || isNaN(n) || n < 0) return toast("Elegí persona y cantidad", "warn");
-      const { error } = await sb.from("cupo_rrpp").upsert({ lista_tipo_id: l.id, user_id: uid, cupo: n });
+      const uid = $("#elCupoWho").value, txt = $("#elCupoN").value.trim(), h = conHora ? $("#elCupoH").value : "";
+      const n = txt === "" ? null : +txt;
+      if (!uid) return toast("Elegí a la persona", "warn");
+      if (n != null && (isNaN(n) || n < 0)) return toast("El cupo tiene que ser 0 o más", "warn");
+      if (n == null && !h) return toast("Poné un cupo o una hora", "warn");
+      const fila = { lista_tipo_id: l.id, user_id: uid, cupo: n };
+      if (conHora) fila.ingreso_hasta = h || null;
+      const { error } = await sb.from("cupo_rrpp").upsert(fila);
       if (error) return fail(error);
-      toast(`Cupo especial guardado · ${n} lugares`);
+      toast("Excepción guardada");
       renderCuposLista(l);
     };
   };
+  $("#elAddCupo").onclick = () => formulario(null);
+  document.querySelectorAll("#elCupos [data-editcupo]").forEach(r => r.onclick = () => formulario(r.dataset.editcupo));
 }
 /* Cerrar el panel: tocando fuera, con la × o con Escape. Antes sólo se
    cerraba tocando fuera y un QR abierto se sentía atrapado. Lo de abajo
@@ -7071,7 +7145,7 @@ async function sheetMesa(m) {
       ${puedeCort ? `<div class="field"><label>Cortesía</label>
         <div class="seg"><button type="button" class="segbtn on" data-cort="0">Se cobra</button><button type="button" class="segbtn" data-cort="1">Cortesía</button></div>
         <small style="color:var(--text-3)" id="vmCortHint">Una cortesía mantiene el combo pero queda en 0 Bs y no paga comisión.</small></div>` : ""}
-      <div class="field"><label>Estado</label><select id="vmEst">
+      <div class="field" id="vmEstBox"><label>Estado</label><select id="vmEst">
         ${ev.permite_reserva === false ? "" : `<option value="reservada">Reservada — ${horasReserva()} h para pagar</option>`}
         <option value="pagada">Ya pagó</option></select>
         <small style="color:var(--text-3)" id="vmEstHint">${ev.permite_reserva === false
@@ -7110,7 +7184,9 @@ async function sheetMesa(m) {
     let metodoPago = "transferencia", urlCompVenta = null;
     const esAdminV = me.rol === "admin";
     const sincPago = () => {
-      const pagada = $("#vmEst").value === "pagada";
+      // una cortesía no se cobra: ni estado, ni método, ni comprobante
+      $("#vmEstBox").classList.toggle("hidden", esCortesia);
+      const pagada = $("#vmEst").value === "pagada" && !esCortesia;
       $("#vmPagoBox").classList.toggle("hidden", !pagada);
       $("#vmEstHint").textContent = !pagada
         ? `Si en ${HORAS_RESERVA} horas no se confirma el pago, la reserva se libera sola.`
@@ -7193,7 +7269,7 @@ async function sheetMesa(m) {
       esCortesia = b.dataset.cort === "1";
       document.querySelectorAll("#sheetBody [data-cort]").forEach(x => x.classList.toggle("on", x === b));
       // una cortesía no se cobra: no hay comprobante ni método que pedir
-      const pb = $("#vmPagoBox"); if (pb) pb.classList.toggle("hidden", esCortesia || $("#vmEst").value !== "pagada");
+      sincPago();
       const h = $("#vmCortHint");
       if (h) h.textContent = esCortesia
         ? "Queda en 0 Bs. No se pide comprobante ni genera comisión."
@@ -7206,7 +7282,7 @@ async function sheetMesa(m) {
       if (!$("#vmCombo").value && ev.combo_obligatorio !== false) return toast("No hay ningún combo habilitado para este tipo de mesa. Pedile al admin que habilite uno.", "warn");
       $("#vmGo").disabled = true;
       const botellas = $("#vmBot").value.split(",").map(s => s.trim()).filter(Boolean);
-      const manEx = +($("#vmMan")?.value || 0), estado = $("#vmEst").value, combo = $("#vmCombo").value || null;
+      const manEx = +($("#vmMan")?.value || 0), estado = esCortesia ? "pagada" : $("#vmEst").value, combo = $("#vmCombo").value || null;
       const efectivo = estado === "pagada" && metodoPago === "efectivo";
       const comp = estado === "pagada" && !esCortesia && metodoPago === "transferencia" ? urlCompVenta : null;
       let primaria, data;
@@ -7274,8 +7350,9 @@ async function sheetMesa(m) {
       ${vend?.nombre ? `<div class="r-sub" style="font-size:13px;color:var(--accent-2);margin-top:3px">Vendió: ${esc(vend.nombre)}</div>` : ""}
       ${teamVend ? `<div class="r-sub" style="font-size:13px;color:var(--accent-2);margin-top:2px">Team: ${esc(teamVend.nombre)}</div>` : ""}
       ${prim.pagada_at ? `<div class="r-sub" style="font-size:13px;color:var(--ok);margin-top:3px">Cobró: ${esc(pagBy?.nombre || "—")} · ${hora(prim.pagada_at)}</div>` : ""}
-      ${m.estado === "pagada" && !prim.pago_verificado ? `<div class="r-sub" style="font-size:13px;color:var(--warn);margin-top:3px">Pago por verificar${prim.metodo_pago ? ` · cobrado en ${esc(prim.metodo_pago)}` : ""} — falta que el admin lo confirme</div>` : ""}
-      ${m.estado === "pagada" && prim.pago_verificado && prim.verificado_at ? `<div class="r-sub" style="font-size:13px;color:var(--ok);margin-top:3px">✓ Pago verificado</div>` : ""}
+      ${m.estado === "pagada" && !prim.pago_verificado && !prim.cortesia ? `<div class="r-sub" style="font-size:13px;color:var(--warn);margin-top:3px">Pago por verificar${prim.metodo_pago ? ` · cobrado en ${esc(prim.metodo_pago)}` : ""} — falta que el admin lo confirme</div>` : ""}
+      ${prim.cortesia ? `<div class="r-sub" style="font-size:13px;color:var(--ok);margin-top:3px">Cortesía · no se cobra</div>`
+        : m.estado === "pagada" && prim.pago_verificado && prim.verificado_at ? `<div class="r-sub" style="font-size:13px;color:var(--ok);margin-top:3px">✓ Pago verificado</div>` : ""}
       ${m.estado === "reservada" && (prim.reservada_at || m.reservada_at) ? `<div class="r-sub" style="font-size:13px;color:var(--warn);margin-top:3px">Vence ${hora(new Date((prim.reserva_vence_at || m.reserva_vence_at) || new Date(prim.reservada_at || m.reservada_at).getTime() + HORAS_RESERVA * 36e5))} — si no se paga, se libera sola</div>` : ""}
       ${prim.comprobante_url ? `<div style="margin-top:10px"><img src="${esc(prim.comprobante_url)}" alt="comprobante" style="width:100%;max-width:260px;border-radius:12px;border:1px solid var(--line-2);display:block"><div class="hint" style="margin-top:4px">Comprobante de pago</div></div>` : ""}
       ${prim.botellas?.length ? `<div class="r-sub" style="font-size:13px;color:var(--text-2);margin-top:2px">Botellas: ${esc(prim.botellas.join(", "))}</div>` : ""}
@@ -7296,9 +7373,9 @@ async function sheetMesa(m) {
       <div style="height:14px"></div>
       ${soloVer ? `<div class="hint" style="text-align:center">Vista de jefe — solo lectura</div>` : `
       <button class="btn ghost2" id="mzEditar">Editar nombre y combo</button><div style="height:9px"></div>
-      ${m.estado !== "pagada" ? `<button class="btn ghost2" id="mzCobrar">Mostrar QR de cobro</button><div style="height:9px"></div>` : ""}
-      ${m.estado !== "pagada" ? `<button class="btn primary" id="mzPagar">Marcar pagada${esGrupo ? " (grupo)" : ""} — con comprobante</button><div style="height:9px"></div>` : ""}
-      ${m.estado === "pagada" && !prim.pago_verificado && me.rol === "admin" ? `
+      ${m.estado !== "pagada" && !prim.cortesia ? `<button class="btn ghost2" id="mzCobrar">Mostrar QR de cobro</button><div style="height:9px"></div>` : ""}
+      ${m.estado !== "pagada" && !prim.cortesia ? `<button class="btn primary" id="mzPagar">Marcar pagada${esGrupo ? " (grupo)" : ""} — con comprobante</button><div style="height:9px"></div>` : ""}
+      ${m.estado === "pagada" && !prim.pago_verificado && !prim.cortesia && me.rol === "admin" ? `
         <button class="btn primary" id="mzVerif">✓ Confirmar que el pago entró</button><div style="height:9px"></div>
         <button class="btn danger" id="mzRech">✕ Rechazar — volver a reservada</button><div style="height:9px"></div>` : ""}
       ${m.estado !== "ocupada" ? `<button class="btn ghost2" onclick="estadoMesa('${m.id}','ocupada')">Marcar ocupada (llegaron)</button><div style="height:9px"></div>` : ""}
@@ -8117,11 +8194,16 @@ function abrirPanelPerfil() {
     <span class="tx"><b>${t}</b>${d ? `<small>${d}</small>` : ""}</span>${extra}</button>`;
   $("#panelPerfil").innerHTML = `
     <div class="pp-cab">
-      ${inicial(me.nombre)}
+      <button class="pp-foto" data-pp="foto" aria-label="Cambiar foto">${avatarDe(me.nombre, me.foto_url)}<span class="pp-foto-ic">${ico("imagen")}</span></button>
       <b>${esc(me.nombre)}</b>
       <small>@${esc(me.usuario)} · ${esc(ROL_LABEL[me.rol] || me.rol)}</small>
       <button class="btn ghost2" data-pp="editar">${ico("lapiz")}Editar perfil</button>
+      <div id="ppPend"></div>
     </div>
+    ${me.rol !== "portero" ? `<div class="pp-grupo">
+      ${fila("credencial", "qr", "var(--brand-primary)", "Mi credencial", "Tu QR para mostrar en la puerta")}
+      ${me.rol === "admin" ? `<span id="ppSolic">${fila("solicitudes", "usuario", "var(--warning)", "Cambios de perfil", "Fotos y nombres por aprobar")}</span>` : ""}
+    </div>` : ""}
     ${c ? `<div class="pp-rot">Boliche</div>
     <div class="pp-grupo">
       <button class="pp-fila" data-pp="${varios ? "boliches" : ""}" ${varios ? "" : "disabled"}>
@@ -8141,14 +8223,19 @@ function abrirPanelPerfil() {
     <div class="pp-grupo" style="margin-top:24px">
       ${fila("salir", "salir", "var(--danger)", "Cerrar sesión", "", "", "peligro")}
     </div>
-    <input type="file" id="ppLogo" accept="image/png,image/jpeg,image/webp" class="hidden">`;
+    <input type="file" id="ppLogo" accept="image/png,image/jpeg,image/webp" class="hidden">
+    <input type="file" id="ppFoto" accept="image/png,image/jpeg,image/webp" class="hidden">`;
+  pintarPendientePerfil();
   $("#panelPerfil").classList.add("open"); $("#ppVelo").classList.add("show");
   qsa("#panelPerfil [data-pp]").forEach(b => b.onclick = () => {
     const op = b.dataset.pp;
     if (!op) return;
     if (op === "tema") { elegirTema(temaActual() === "oscuro" ? "claro" : "oscuro"); return abrirPanelPerfil(); }
     if (op === "logo") return subirLogoClub();
+    if (op === "foto") return subirMiFoto();
     cerrarPanelPerfil();
+    if (op === "credencial") return sheetCredencial();
+    if (op === "solicitudes") return sheetSolicitudesPerfil();
     if (op === "editar") return sheetEditarPerfil();
     if (op === "boliches") return showClubPicker(myClubs());
     if (op === "colores") return sheetColoresClub();
@@ -8168,7 +8255,7 @@ async function sheetEditarPerfil() {
     <div class="field"><label>Nombre y apellido</label><input id="epN" value="${esc(me.nombre)}" autocomplete="name"></div>
     <div class="field"><label>Teléfono</label><input id="epT" value="${esc(tel || "")}" inputmode="tel" autocomplete="tel" placeholder="7xxxxxxx"></div>
     <div class="field"><label>Nueva contraseña</label><input id="epP" type="password" placeholder="Dejala vacía para no cambiarla" autocomplete="new-password"></div>
-    <p class="hint" style="margin:-4px 0 12px">Tu usuario (@${esc(me.usuario)}) no se puede cambiar: es con lo que entrás.</p>
+    <p class="hint" style="margin:-4px 0 12px">Tu usuario (@${esc(me.usuario)}) no se puede cambiar: es con lo que entrás.${esAdminPerfil() ? "" : " El cambio de nombre lo aprueba el administrador."}</p>
     <button class="btn primary" id="epGo">Guardar</button>`);
   $("#epGo").onclick = async () => {
     const nombre = $("#epN").value.trim(), t = $("#epT").value.trim(), p = $("#epP").value;
@@ -8176,10 +8263,11 @@ async function sheetEditarPerfil() {
     if (p && p.length < 6) return toast("La contraseña tiene que tener 6 caracteres o más", "warn");
     const b = $("#epGo"); b.disabled = true;
     try {
+      let pendiente = false;
       if (nombre !== me.nombre) {
-        const { error } = await sb.from("profiles").update({ nombre }).eq("id", me.id);
-        if (error) throw error;
-        me.nombre = nombre;
+        const r = await pedirCambioPerfil({ nombre });
+        if (r === "aplicada") me.nombre = nombre;
+        pendiente = r === "pendiente";
       }
       if (t && t !== (tel || "")) {
         const { error } = await sb.rpc("guardar_telefono", { p_tel: t });
@@ -8189,9 +8277,111 @@ async function sheetEditarPerfil() {
         const { error } = await sb.auth.updateUser({ password: p });
         if (error) throw error;
       }
-      toast("Perfil actualizado"); closeSheet(); header();
+      toast(pendiente ? "Listo. El cambio de nombre queda esperando al administrador" : "Perfil actualizado");
+      closeSheet(); header();
     } catch (e) { b.disabled = false; fail(e); }
   };
+}
+
+/* ---------- foto, credencial y cambios de perfil (db/34) ----------
+   La primera foto entra directo. Después, cambiar foto o nombre es una
+   solicitud que el admin del boliche acepta o rechaza; los admins cambian
+   lo suyo sin pedir permiso. */
+const esAdminPerfil = () => me.rol === "admin" || me.admin_principal || me.plataforma;
+const faltaDb34 = e => !!e && ["PGRST202", "42703", "PGRST204", "42883"].includes(e.code);
+async function pedirCambioPerfil(cambios) {
+  const { data, error } = await sb.rpc("solicitar_cambio_perfil", { p_cambios: cambios });
+  if (faltaDb34(error)) {
+    // base sin preparar: se guarda como antes, directo
+    const { error: e2 } = await sb.from("profiles").update(cambios).eq("id", me.id);
+    if (e2) throw e2;
+    return "aplicada";
+  }
+  if (error) throw error;
+  return data?.estado || "aplicada";
+}
+async function pintarPendientePerfil() {
+  const box = $("#ppPend"); if (!box) return;
+  const { data } = await sb.rpc("mi_solicitud_perfil");
+  if (!data || !$("#ppPend")) return;
+  const que = [data.cambios?.foto_url ? "foto" : null, data.cambios?.nombre ? `nombre (${esc(data.cambios.nombre)})` : null].filter(Boolean).join(" y ");
+  box.innerHTML = `<div class="pp-aviso">Cambio de ${que} esperando al administrador.</div>`;
+}
+function subirMiFoto() {
+  const inp = $("#ppFoto"); inp.value = "";
+  inp.onchange = async () => {
+    const file = inp.files[0]; if (!file) return;
+    toast("Subiendo foto…");
+    try {
+      const blob = await dataUrlToBlob(await comprimirImg(file, 720, 0.85));
+      const path = `${me.id}/${Date.now()}.jpg`;
+      const { error: e1 } = await sb.storage.from("perfiles").upload(path, blob, { contentType: "image/jpeg" });
+      if (e1) {
+        if (/bucket/i.test(e1.message || "")) return toast("Falta preparar la base para las fotos (db/34-excepciones-credencial.sql)", "warn");
+        throw e1;
+      }
+      const { data: { publicUrl } } = sb.storage.from("perfiles").getPublicUrl(path);
+      const r = await pedirCambioPerfil({ foto_url: publicUrl });
+      if (r === "aplicada") { me.foto_url = publicUrl; header(); toast("Foto lista"); }
+      else toast("Foto enviada. La ve el administrador y la aprueba");
+      abrirPanelPerfil();
+    } catch (e) { fail(e); }
+  };
+  inp.click();
+}
+
+/* La credencial: lo que se muestra en la puerta. El portero la escanea con
+   el mismo escáner de entradas y le aparece la ficha de la persona. */
+async function sheetCredencial() {
+  const { data: code, error } = await sb.rpc("mi_credencial");
+  if (faltaDb34(error)) return toast("Falta preparar la base para las credenciales (db/34-excepciones-credencial.sql)", "warn");
+  if (error) return fail(error);
+  if (!teamsCache.length) await loadTeams().catch(() => { });
+  const c = clubData(club), team = teamsCache.find(t => t.id === me.team_id);
+  sheet(`<div class="credencial">
+      <div class="cred-cab">${c ? `<span class="club-mark sm">${clubMarkHTML(club)}</span><span>${esc(c.nombre)}</span>` : "<span>Venue</span>"}</div>
+      <div class="cred-foto">${avatarDe(me.nombre, me.foto_url)}</div>
+      <b class="cred-nm">${esc(me.nombre)}</b>
+      <small class="cred-sub">@${esc(me.usuario)} · ${esc(ROL_LABEL[me.rol] || me.rol)}${team ? ` · Team ${esc(team.nombre)}` : ""}</small>
+      <div class="cred-qr">${qrSvg(`CRD|${club}|${code}`, 6)}</div>
+      <small class="cred-pie">Mostrá este QR en la puerta. Es personal: no lo compartas.</small>
+    </div>
+    ${me.foto_url ? "" : `<p class="hint" style="text-align:center;margin:12px 0 0">Todavía no tenés foto. Tocá tu inicial en el perfil para subirla.</p>`}
+    <button class="btn ghost2" id="crRenovar" style="margin-top:14px">Generar un QR nuevo</button>
+    <p class="hint" style="text-align:center;margin:6px 0 0">Si alguien sacó foto a tu QR, generá uno nuevo: el anterior deja de servir.</p>`);
+  $("#crRenovar").onclick = async () => {
+    const { error: e } = await sb.rpc("renovar_credencial", { p_user: me.id });
+    if (e) return fail(e);
+    toast("QR nuevo listo"); sheetCredencial();
+  };
+}
+
+/* Admin: los cambios de foto y nombre que pidió su gente */
+async function sheetSolicitudesPerfil() {
+  const { data, error } = await sb.rpc("solicitudes_perfil", { p_club: club });
+  if (faltaDb34(error)) return toast("Falta preparar la base para esto (db/34-excepciones-credencial.sql)", "warn");
+  if (error) return fail(error);
+  const filas = data || [];
+  sheet(`<div class="sh-h">Cambios de perfil<span class="r-sub">${filas.length ? `${filas.length} por aprobar` : "nada pendiente"}</span></div>
+    ${filas.map(x => `<div class="solic">
+      <div class="solic-cab">${avatarDe(x.nombre, x.foto_url)}<span><b>${esc(x.nombre)}</b><small>@${esc(x.usuario)}${x.team ? ` · ${esc(x.team)}` : ""} · ${hora(x.created_at)}</small></span></div>
+      ${x.cambios.foto_url ? `<div class="solic-fotos">
+        <figure>${x.foto_url ? `<img src="${esc(x.foto_url)}" alt="Foto actual">` : `<span class="solic-vacia">Sin foto</span>`}<figcaption>Ahora</figcaption></figure>
+        <span class="solic-fl">${ico("chevron")}</span>
+        <figure><img src="${esc(x.cambios.foto_url)}" alt="Foto nueva"><figcaption>Nueva</figcaption></figure></div>` : ""}
+      ${x.cambios.nombre ? `<div class="solic-nm">Nombre: <s>${esc(x.nombre)}</s> &rarr; <b>${esc(x.cambios.nombre)}</b></div>` : ""}
+      <div class="row2" style="margin-top:10px">
+        <button class="btn ghost2" data-solno="${x.id}">Rechazar</button>
+        <button class="btn primary" data-solsi="${x.id}">Aprobar</button></div>
+    </div>`).join("") || `<div class="empty">Cuando alguien de tu equipo cambie su foto o su nombre, aparece acá para que lo apruebes.</div>`}`);
+  const resolver = async (id, si) => {
+    const { error: e } = await sb.rpc("resolver_solicitud_perfil", { p_id: id, p_aprobar: si });
+    if (e) return fail(e);
+    toast(si ? "Cambio aprobado" : "Cambio rechazado", si ? "ok" : "warn");
+    sheetSolicitudesPerfil();
+  };
+  qsa("#sheetBody [data-solsi]").forEach(b => b.onclick = () => resolver(b.dataset.solsi, true));
+  qsa("#sheetBody [data-solno]").forEach(b => b.onclick = () => resolver(b.dataset.solno, false));
 }
 
 /* Colores del boliche: los mismos 20 de la app, o uno a mano */

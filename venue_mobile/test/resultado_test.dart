@@ -72,4 +72,34 @@ void main() {
   test('solo PASA deja pasar', () {
     expect(Veredicto.values.where((v) => v.dejaPasar), [Veredicto.pasa]);
   });
+
+  test('credencial válida trae foto, team y las listas de la noche', () {
+    final x = ResultadoEscaneo.desdeCredencial({
+      'resultado': 'credencial',
+      'nombre': 'Rel Dos',
+      'usuario': 'r2',
+      'rol': 'rrpp',
+      'team': 'AQ',
+      'foto_url': 'https://x/perfiles/u/a.jpg',
+      'activo': true,
+      'del_boliche': true,
+      'sin_tope': false,
+      'listas': [
+        {'nombre': 'Invitados', 'cupo': 5, 'anotados': 3, 'ingresaron': 1, 'entra_hasta': '00:00', 'especial': true},
+      ],
+    }, codigo: 'ABC');
+    expect(x.veredicto, Veredicto.credencial);
+    expect(x.veredicto.dejaPasar, isFalse);
+    expect(x.credencial!.team, 'AQ');
+    expect(x.credencial!.listas.single.cupo, 5);
+    expect(x.credencial!.listas.single.entraHasta, '00:00');
+    expect(x.credencial!.listas.single.especial, isTrue);
+  });
+
+  test('credencial pausada, de otro boliche o inexistente: NO VÁLIDO', () {
+    final base = {'resultado': 'credencial', 'nombre': 'X', 'usuario': 'x', 'activo': true, 'del_boliche': true};
+    expect(ResultadoEscaneo.desdeCredencial({...base, 'activo': false}, codigo: 'A').veredicto, Veredicto.noValido);
+    expect(ResultadoEscaneo.desdeCredencial({...base, 'del_boliche': false}, codigo: 'A').veredicto, Veredicto.noValido);
+    expect(ResultadoEscaneo.desdeCredencial({'resultado': 'no_existe'}, codigo: 'A').veredicto, Veredicto.noValido);
+  });
 }

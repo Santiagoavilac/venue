@@ -476,3 +476,43 @@ html:not([data-tema="oscuro"]) :is(.kp,.ev-fila,.ev-acc-h,.mas-op,.mas-item,.sta
 .op-club span{display:flex;flex-direction:column;gap:2px}
 .op-club b{font-size:14.5px;font-weight:600}
 .op-club small{font-size:12.5px;color:var(--text-muted)}
+
+/* ---------- foto de perfil, credencial y solicitudes (db/34) ---------- */
+img.ini-foto{object-fit:cover;background:var(--surface-2);padding:0}
+.avatar.con-foto,.tb-avatar.con-foto{background-size:cover;background-position:center;color:transparent}
+.pp-foto{position:relative;border:0;background:none;padding:0;cursor:pointer;border-radius:50%}
+.pp-foto .ini{margin-bottom:8px}
+.pp-foto-ic{position:absolute;right:-2px;bottom:6px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;
+  background:var(--surface);color:var(--text-primary);box-shadow:var(--sombra-tarjeta);border:1px solid var(--border)}
+.pp-foto-ic .ic{width:15px;height:15px}
+.pp-aviso{margin-top:10px;font-size:12.5px;color:var(--warning);background:var(--warning-bg);border:1px solid var(--warning-bd);
+  border-radius:12px;padding:8px 12px}
+
+.credencial{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:18px 16px 20px;
+  border-radius:var(--radio-tarjeta);background:var(--surface);border:1px solid var(--border);box-shadow:var(--sombra-tarjeta)}
+.cred-cab{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:12px}
+.cred-cab .club-mark{width:26px;height:26px;border-radius:8px;font-size:12px}
+.cred-foto .ini{width:112px;height:112px;font-size:42px;margin:0 auto 6px}
+.cred-foto.grande .ini{width:150px;height:150px;font-size:56px;margin:4px auto 10px;border:4px solid var(--surface)}
+.cred-nm{font-size:21px;font-weight:700}
+.cred-sub{font-size:13px;color:var(--text-muted)}
+.cred-qr{margin:16px auto 8px;padding:12px;background:#fff;border-radius:14px;line-height:0}
+.cred-qr svg{width:220px;height:220px;max-width:100%}
+.cred-pie{font-size:12px;color:var(--text-muted)}
+.res-cred{text-align:center}
+.res-cred .res-top{justify-content:center}
+.cred-listas{display:grid;gap:8px;margin-top:12px;text-align:left}
+.cred-lista{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;background:var(--surface-2);font-size:13px;color:var(--text-secondary)}
+.cred-lista b{font-size:14px;color:var(--text-primary)}
+.cred-lista .pill{font-size:10px;padding:2px 8px;margin-left:4px;background:var(--success-bg);color:var(--success)}
+
+.solic{padding:14px;border-radius:var(--radio-tarjeta);background:var(--surface);border:1px solid var(--border);margin-bottom:10px}
+.solic-cab{display:flex;align-items:center;gap:10px}
+.solic-cab span{display:flex;flex-direction:column}
+.solic-cab small{font-size:12.5px;color:var(--text-muted)}
+.solic-fotos{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:12px}
+.solic-fotos figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--text-muted)}
+.solic-fotos img,.solic-vacia{width:104px;height:104px;border-radius:50%;object-fit:cover;background:var(--surface-2)}
+.solic-vacia{display:grid;place-items:center;font-size:12px}
+.solic-fl .ic{transform:rotate(-90deg);color:var(--text-muted)}
+.solic-nm{margin-top:10px;font-size:14px}

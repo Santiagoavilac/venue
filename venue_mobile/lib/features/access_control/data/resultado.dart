@@ -6,12 +6,82 @@ enum Veredicto {
   eventoIncorrecto('EVENTO INCORRECTO'),
   fueraDeHorario('FUERA DE HORARIO'),
   sinConexion('SIN CONEXIÓN'),
-  sinPermiso('SIN PERMISO');
+  sinPermiso('SIN PERMISO'),
+  credencial('CREDENCIAL');
 
   const Veredicto(this.texto);
   final String texto;
 
   bool get dejaPasar => this == pasa;
+}
+
+/// Una lista vista desde la credencial: cuánto tiene la persona esta noche.
+class ListaCredencial {
+  const ListaCredencial({
+    required this.nombre,
+    required this.anotados,
+    required this.ingresaron,
+    this.cupo,
+    this.entraHasta,
+    this.especial = false,
+  });
+
+  final String nombre;
+  final int? cupo;
+  final int anotados;
+  final int ingresaron;
+  final String? entraHasta;
+  final bool especial;
+
+  factory ListaCredencial.desde(Map<String, dynamic> j) => ListaCredencial(
+        nombre: j['nombre'] as String? ?? 'Lista',
+        cupo: (j['cupo'] as num?)?.toInt(),
+        anotados: (j['anotados'] as num?)?.toInt() ?? 0,
+        ingresaron: (j['ingresaron'] as num?)?.toInt() ?? 0,
+        entraHasta: j['entra_hasta'] as String?,
+        especial: j['especial'] == true,
+      );
+}
+
+/// La ficha que ve el portero al escanear la credencial de alguien del equipo.
+class Credencial {
+  const Credencial({
+    required this.nombre,
+    required this.usuario,
+    this.rol,
+    this.team,
+    this.fotoUrl,
+    this.activo = true,
+    this.delBoliche = true,
+    this.sinTope = false,
+    this.listas = const [],
+  });
+
+  final String nombre;
+  final String usuario;
+  final String? rol;
+  final String? team;
+  final String? fotoUrl;
+  final bool activo;
+  final bool delBoliche;
+  final bool sinTope;
+  final List<ListaCredencial> listas;
+
+  bool get valida => activo && delBoliche;
+
+  factory Credencial.desde(Map<String, dynamic> j) => Credencial(
+        nombre: j['nombre'] as String? ?? '',
+        usuario: j['usuario'] as String? ?? '',
+        rol: j['rol'] as String?,
+        team: j['team'] as String?,
+        fotoUrl: j['foto_url'] as String?,
+        activo: j['activo'] != false,
+        delBoliche: j['del_boliche'] != false,
+        sinTope: j['sin_tope'] == true,
+        listas: (j['listas'] as List? ?? const [])
+            .map((x) => ListaCredencial.desde(Map<String, dynamic>.from(x as Map)))
+            .toList(),
+      );
 }
 
 class ResultadoEscaneo {
@@ -23,9 +93,13 @@ class ResultadoEscaneo {
     this.quien,
     this.detalle,
     this.hora,
+    this.credencial,
   });
 
   final Veredicto veredicto;
+
+  /// Solo cuando se escaneó una credencial.
+  final Credencial? credencial;
   final String codigo;
   final String? nombre;
 
@@ -38,6 +112,30 @@ class ResultadoEscaneo {
 
   /// Hora del ingreso (la de ahora si pasa; la anterior si ya había entrado).
   final DateTime? hora;
+
+  /// Traduce la respuesta de `ver_credencial`.
+  factory ResultadoEscaneo.desdeCredencial(Map<String, dynamic> r, {required String codigo}) {
+    if (r['resultado'] != 'credencial') {
+      return ResultadoEscaneo(
+        veredicto: Veredicto.noValido,
+        codigo: codigo,
+        tipo: 'Credencial no válida',
+        detalle: 'Este QR ya no sirve: puede ser uno viejo. Pedile que lo genere de nuevo.',
+      );
+    }
+    final c = Credencial.desde(r);
+    return ResultadoEscaneo(
+      veredicto: c.valida ? Veredicto.credencial : Veredicto.noValido,
+      codigo: codigo,
+      nombre: c.nombre,
+      tipo: !c.activo
+          ? 'Cuenta pausada'
+          : !c.delBoliche
+              ? 'No es de este boliche'
+              : null,
+      credencial: c,
+    );
+  }
 
   /// Traduce la respuesta de `validar_entrada` / `validar_qr_lista`.
   ///

@@ -13,6 +13,7 @@ class Perfil {
     this.puedeTickear = false,
     this.adminPrincipal = false,
     this.contabilidadTotal = false,
+    this.fotoUrl,
   });
 
   final String id;
@@ -29,6 +30,9 @@ class Perfil {
   /// Puede exportar la contabilidad general del evento.
   final bool contabilidadTotal;
 
+  /// Foto de perfil (db/34). null = se ve la inicial.
+  final String? fotoUrl;
+
   String get inicial => nombre.isEmpty ? '?' : nombre[0].toUpperCase();
   String get primerNombre => nombre.split(' ').first;
 
@@ -40,6 +44,7 @@ class Perfil {
         puedeTickear: j['puede_tickear'] as bool? ?? false,
         adminPrincipal: j['admin_principal'] as bool? ?? false,
         contabilidadTotal: j['contabilidad_total'] as bool? ?? false,
+        fotoUrl: j['foto_url'] as String?,
       );
 }
 
@@ -55,7 +60,7 @@ final perfilProvider = FutureProvider<Perfil?>((ref) async {
   final fila = await ref
       .watch(supabaseProvider)
       .from('profiles')
-      .select('id, usuario, nombre, activo, puede_tickear, admin_principal, contabilidad_total')
+      .select() // todas: foto_url llega con db/34 y así no rompe sin ella
       .eq('id', uid)
       .maybeSingle();
   return fila == null ? null : Perfil.desde(fila);

@@ -8,6 +8,7 @@ import '../../../core/sync/cola_offline.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
+import '../../../core/widgets/foto_persona.dart';
 import '../../../core/widgets/patron.dart';
 import '../../../core/widgets/revolver.dart';
 import '../../authentication/data/sesion.dart';
@@ -753,7 +754,7 @@ class _BarraSuperior extends ConsumerWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: alCuenta,
-        child: Inicial(perfil?.nombre ?? '·', lado: 46),
+        child: FotoPersona(nombre: perfil?.nombre ?? '·', url: perfil?.fotoUrl, tam: 46),
       ),
     );
 

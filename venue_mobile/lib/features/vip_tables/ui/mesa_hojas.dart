@@ -183,7 +183,8 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
             (_extra.contains(x.id) ||
                 sumadas.any((s) => distanciaMesas(s, x) <= radioJuntarMesas)))
         .toList();
-    final pagada = _estado == 'pagada';
+    // una cortesía no se cobra: queda pagada, sin estado ni método que elegir
+    final pagada = _estado == 'pagada' || _cortesia;
     final transferencia = pagada && !_cortesia && _metodo == 'transferencia';
     final pideFoto = transferencia && !esAdmin;
     final incluidas = (combo?.incluyeManillas ?? 0) * _cantidad +
@@ -210,7 +211,7 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
           DatosVenta(
             cliente: cli,
             comboId: _combo,
-            estado: _estado,
+            estado: _cortesia ? 'pagada' : _estado,
             cantidad: _cantidad,
             botellas: _botellas.text
                 .split(',')
@@ -219,7 +220,7 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
                 .toList(),
             manillasExtra: int.tryParse(_manillas.text) ?? 0,
             comprobante: transferencia ? _comprobante : null,
-            efectivo: pagada && _metodo == 'efectivo',
+            efectivo: pagada && !_cortesia && _metodo == 'efectivo',
             aNombreDe: _aNombreDe,
             cortesia: _cortesia,
           ),
@@ -239,12 +240,14 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
         final extra = manillas > 0 ? ' · $manillas manilla(s) con QR' : '';
         avisar(
           context,
-          _estado == 'reservada'
+          _cortesia
+              ? '${r.etiqueta} de cortesía$extra'
+              : _estado == 'reservada'
               ? '${r.etiqueta} reservada$extra — tenés ${ev.horasReserva} h para confirmar el pago o se libera sola'
               : esAdmin
                   ? '${r.etiqueta} vendida · ${r.precio} Bs$extra'
                   : '${r.etiqueta} pagada en $_metodo · por verificar$extra',
-          tipo: _estado == 'pagada' && esAdmin ? TipoAviso.ok : TipoAviso.aviso,
+          tipo: _cortesia || (_estado == 'pagada' && esAdmin) ? TipoAviso.ok : TipoAviso.aviso,
         );
       } catch (e) {
         if (context.mounted) {
@@ -419,8 +422,9 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
             style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
           ),
         ],
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
+        if (!_cortesia) ...[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
           borderRadius: BorderRadius.circular(12),
           dropdownColor: VenueColors.superficie,
           icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
@@ -445,7 +449,8 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
             const DropdownMenuItem(value: 'pagada', child: Text('Ya pagó')),
           ],
           onChanged: (v) => setState(() => _estado = v!),
-        ),
+          ),
+        ],
         if (pagada && !_cortesia) ...[
           const SizedBox(height: 12),
           SegmentedButton<String>(
@@ -669,7 +674,7 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
                 style: TextStyle(
                     color: VenueColors.aviso, fontWeight: FontWeight.w700)),
           ),
-        if (m.estado == 'pagada' && !prim.pagoVerificado && prim.precio > 0)
+        if (m.estado == 'pagada' && !prim.pagoVerificado && !prim.cortesia && prim.precio > 0)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
@@ -677,10 +682,10 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
                 style: TextStyle(
                     color: VenueColors.aviso, fontWeight: FontWeight.w700)),
           ),
-        if (m.estado == 'pagada' && prim.pagoVerificado)
+        if (m.estado == 'pagada' && (prim.pagoVerificado || prim.cortesia))
           Padding(
             padding: EdgeInsets.only(top: 6),
-            child: Text('Pago verificado',
+            child: Text(prim.cortesia ? 'Cortesía · no se cobra' : 'Pago verificado',
                 style: TextStyle(color: VenueColors.ok, fontWeight: FontWeight.w700)),
           ),
         if (prim.comprobanteUrl != null && (gestiona || rol == Rol.jefe)) ...[
@@ -759,7 +764,7 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
               icon: const Icon(Icons.edit_outlined),
               label: const Text('Editar nombre y combo'),
             ),
-          if (m.estado != 'pagada') ...[
+          if (m.estado != 'pagada' && !prim.cortesia) ...[
             const SizedBox(height: 9),
             OutlinedButton.icon(
               onPressed: () => _hoja(context,
@@ -774,7 +779,7 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
               label: Text('Marcar pagada${esGrupo ? ' (grupo)' : ''}'),
             ),
           ],
-          if (esAdmin && m.estado == 'pagada' && !prim.pagoVerificado) ...[
+          if (esAdmin && m.estado == 'pagada' && !prim.pagoVerificado && !prim.cortesia) ...[
             const SizedBox(height: 9),
             FilledButton.icon(
               onPressed: _ocupado

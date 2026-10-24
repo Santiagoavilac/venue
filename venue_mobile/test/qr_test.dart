@@ -41,4 +41,17 @@ void main() {
     expect(QrLeido.interpretar('#'), isNull);
     expect(QrLeido.interpretar(null), isNull);
   });
+
+  test('credencial de un relacionador: no es entrada ni de otro evento', () {
+    final q = QrLeido.interpretar('CRD|bowie|7f3a9c21be')!;
+    expect(q.esCredencial, isTrue);
+    expect(q.esLista, isFalse);
+    expect(q.codigo, '7F3A9C21BE');
+    expect(q.esDeOtroEvento(ev), isFalse);
+  });
+
+  test('una entrada no se confunde con credencial', () {
+    expect(QrLeido.interpretar('EVT:$ev:CRD123')!.esCredencial, isFalse);
+    expect(QrLeido.interpretar('CRD123')!.esCredencial, isFalse);
+  });
 }

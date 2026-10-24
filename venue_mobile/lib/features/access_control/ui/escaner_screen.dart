@@ -75,7 +75,7 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
     final repo = ref.read(puertaRepositoryProvider);
     ResultadoEscaneo? r;
     final qr = QrLeido.interpretar(crudo);
-    if (_modoFiltro && qr != null && !qr.esDeOtroEvento(evento.id)) {
+    if (_modoFiltro && qr != null && !qr.esCredencial && !qr.esDeOtroEvento(evento.id)) {
       try {
         final f = await repo.marcarFiltroQr(eventoId: evento.id, qr: qr);
         if (f['resultado'] != 'protegida') {
@@ -99,7 +99,7 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
     if (!mounted) return;
     _ultimoMarcado = false;
 
-    if (res.veredicto.dejaPasar) {
+    if (res.veredicto.dejaPasar || res.veredicto == Veredicto.credencial) {
       HapticFeedback.mediumImpact();
       SystemSound.play(SystemSoundType.click);
     } else {
@@ -112,7 +112,7 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
       _historial.insert(0, _Registro(res));
       if (_historial.length > 30) _historial.removeLast();
     });
-    if (res.veredicto != Veredicto.sinConexion) {
+    if (res.veredicto != Veredicto.sinConexion && res.credencial == null) {
       ref.invalidate(aforoProvider(evento.id));
     }
   }

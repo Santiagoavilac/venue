@@ -48,6 +48,11 @@ class PuertaRepository {
       );
     }
     try {
+      if (qr.esCredencial) {
+        final r = await _sb.rpc('ver_credencial',
+            params: {'p_evento': eventoId, 'p_code': qr.codigo}).timeout(const Duration(seconds: 12));
+        return ResultadoEscaneo.desdeCredencial(Map<String, dynamic>.from(r as Map), codigo: qr.codigo);
+      }
       final r = await _sb
           .rpc(
             qr.esLista ? 'validar_qr_lista' : 'validar_entrada',
@@ -67,6 +72,13 @@ class PuertaRepository {
           codigo: qr.codigo,
           detalle:
               'No se pudo verificar el QR. No dejes pasar por QR hasta que vuelva la señal.',
+        );
+      }
+      if (qr.esCredencial && e is PostgrestException && e.code == 'PGRST202') {
+        return ResultadoEscaneo(
+          veredicto: Veredicto.noValido,
+          codigo: qr.codigo,
+          detalle: 'Falta preparar la base para las credenciales (db/34-excepciones-credencial.sql).',
         );
       }
       if (e is PostgrestException && (e.code == '42501' || e.code == '28000')) {
