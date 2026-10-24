@@ -279,11 +279,10 @@
   }
   const loginVisible = () => { const l = $1("#login"); return l && !l.classList.contains("hidden") && l.offsetParent !== null; };
   if (!quieto && loginVisible()) {
-    gsap.timeline({ defaults: { ease: "power3.out" } })
-      .from(".login .vn-l", { autoAlpha: 0, y: 18, rotationX: -70, duration: .6, stagger: .06, clearProps: LIMPIAR })
-      .from(".login .vn-sub", { autoAlpha: 0, y: 8, duration: .4, clearProps: LIMPIAR }, "-=.3")
-      .from("#loginCard", { autoAlpha: 0, y: 22, scale: .985, duration: .5, clearProps: LIMPIAR }, "-=.25")
-      .from(".login-foot", { autoAlpha: 0, duration: .4, clearProps: LIMPIAR }, "-=.2");
+    // el ingreso en dos pasos: entra el texto y el campo, después el botón
+    gsap.timeline({ defaults: { ease: "power3.out" }, delay: .75 })
+      .from("#loginCard", { autoAlpha: 0, y: 16, duration: .5, clearProps: LIMPIAR })
+      .from("#btnLogin", { autoAlpha: 0, y: 12, duration: .4, clearProps: LIMPIAR }, "-=.3");
   }
   const lErr = $1("#loginErr");
   if (lErr) new MutationObserver(() => {

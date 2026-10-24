@@ -168,6 +168,8 @@ function aplicarTemaClub(c) {
 function clubMarkHTML(id) {
   const c = clubData(id);
   const letra = esc((c?.inicial || c?.nombre || "?").slice(0, 1).toUpperCase());
+  // con logo cargado (db/32-logo-boliche.sql) se ve la imagen; si falla, la inicial
+  if (c?.logo_url) return `<img class="club-mark-img" src="${esc(c.logo_url)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'club-mark-txt',textContent:'${letra}'}))">`;
   return `<span class="club-mark-txt">${letra}</span>`;
 }
 // íconos de línea (heredan color con currentColor)
@@ -392,17 +394,47 @@ function mensajeDeError(e) {
 const fail = e => { console.error(e); toast(mensajeDeError(e), "warn"); };
 
 /* ---------- login ---------- */
-$("#btnLogin") && ($("#btnLogin").onclick = login);
+/* Ingreso en dos pasos (como Resy): primero el usuario, después la
+   contraseña. Los dos campos viven en la página todo el tiempo para que el
+   gestor de contraseñas los complete juntos. */
+let lgPaso = 0;
+function pintarLogin() {
+  const clave = lgPaso === 1;
+  $("#lgPaso0").classList.toggle("hidden", clave);
+  $("#lgPaso1").classList.toggle("hidden", !clave);
+  $("#lgMarca").classList.toggle("hidden", clave);
+  $("#lgVolver").classList.toggle("hidden", !clave);
+  $("#lgTit").textContent = clave ? "Ingresá tu contraseña" : "Ingresá tu usuario";
+  $("#lgSub").textContent = clave ? `Entrás como @${$("#lgUser").value.trim().toLowerCase()}` : "Acceso solo para personal autorizado";
+  $("#btnLogin").textContent = clave ? "Ingresar" : "Siguiente";
+  $("#btnLogin").disabled = clave ? !$("#lgPass").value : !$("#lgUser").value.trim();
+}
+function loginSiguiente() {
+  if (lgPaso === 0) {
+    if (!$("#lgUser").value.trim()) return;
+    lgPaso = 1; $("#loginErr").innerHTML = ""; pintarLogin(); $("#lgPass").focus();
+  } else login();
+}
+if ($("#lgPaso0")) {
+  $("#btnLogin").onclick = loginSiguiente;
+  $("#lgVolver").onclick = () => { lgPaso = 0; $("#loginErr").innerHTML = ""; pintarLogin(); $("#lgUser").focus(); };
+  $("#lgUser").addEventListener("input", pintarLogin);
+  $("#lgPass").addEventListener("input", pintarLogin);
+  $("#lgUser").addEventListener("keydown", e => { if (e.key === "Enter") loginSiguiente(); });
+  $("#lgPass").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+  // el gestor de contraseñas completa los dos sin disparar input: se revisa al entrar
+  setTimeout(pintarLogin, 600);
+}
 $("#lgEye") && ($("#lgEye").onclick = () => {
   const p = $("#lgPass"); const show = p.type === "password";
   p.type = show ? "text" : "password"; $("#lgEye").classList.toggle("on", show);
 });
-$("#lgPass") && $("#lgPass").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
 
 /* ---------- registro de RRPP por link de invitación (?invite=CODE) ---------- */
 const INVITE = new URLSearchParams(location.search).get("invite");
 if (INVITE && sb) {
   document.querySelector(".login-brand p").textContent = "Registro de relacionador";
+  $("#btnLogin")?.classList.add("hidden");
   $("#loginCard").innerHTML = `
     <div id="regErr"></div>
     <div class="field"><label>Tu nombre y apellido</label><input id="rgNombre" autocomplete="name"></div>
@@ -432,8 +464,15 @@ async function login() {
   const u = $("#lgUser").value.trim().toLowerCase(), p = $("#lgPass").value;
   if (!u || !p) return;
   $("#loginErr").innerHTML = "";
+  $("#btnLogin").disabled = true; $("#btnLogin").textContent = "Ingresando…";
   const { error } = await sb.auth.signInWithPassword({ email: `${u}@plataforma.local`, password: p });
-  if (error) { $("#loginErr").innerHTML = `<div class="err">Usuario o contraseña incorrectos.</div>`; return; }
+  if (error) {
+    pintarLogin();
+    $("#loginErr").textContent = /fetch|network/i.test(error.message || "")
+      ? "Sin conexión. Revisá la señal y probá de nuevo."
+      : "Usuario o contraseña incorrectos.";
+    return;
+  }
   boot();
 }
 
@@ -447,7 +486,12 @@ async function boot() {
     sb.from("clubs").select("*").eq("activo", true).order("nombre")
   ]);
   if (error || !prof) { fail(error || new Error("Perfil no encontrado")); return; }
-  if (!prof.activo) { $("#loginErr").innerHTML = `<div class="err">Usuario desactivado.</div>`; await sb.auth.signOut(); return; }
+  if (!prof.activo) {
+    await sb.auth.signOut();
+    lgPaso = 0; pintarLogin();
+    $("#loginErr").textContent = "Tu usuario está desactivado. Hablá con tu jefe de team o con el administrador.";
+    return;
+  }
   me = prof;
   clubsDisponibles = cls_ || [];
   // administración de la plataforma: crear boliches y nombrar administradores
@@ -498,7 +542,11 @@ function enterApp() {
   $("#app").classList.remove("hidden");
   buildTabbar();
   window.Motion?.entrarApp();
-  loadEventos().then(() => { header(); tab = homeTab(); setTab(); renderTab(); mostrarAvisos(); });
+  loadEventos().then(async () => {
+    header(); tab = homeTab(); setTab(); renderTab();
+    await mostrarAvisos();
+    tutorialSiCorresponde();
+  });
 }
 
 /* avisos del admin: aparecen una vez al entrar y se marcan como leídos */
@@ -583,6 +631,8 @@ async function pedirTelefono() {
   telObliga = obliga;
 }
 function showClubPicker(cls) {
+  // abierto desde adentro de la app (no al entrar): se puede volver
+  const dentro = !$("#app").classList.contains("hidden") && !!club;
   let ov = $("#clubPick");
   if (!ov) { ov = document.createElement("div"); ov.id = "clubPick"; document.body.appendChild(ov); }
   ov.className = "clubpick";
@@ -606,9 +656,11 @@ function showClubPicker(cls) {
       </div>
       ${me.plataforma ? `<button class="cp-nuevo" id="cpNuevo">${ico("mas")}Nuevo boliche</button>
       <div class="cp-form hidden" id="cpForm"></div>` : ""}
+      ${dentro ? `<button class="cp-out" id="cpVolver">Volver a ${esc(clubNombre(club))}</button>` : ""}
       <button class="cp-out" onclick="logout()">Cerrar sesión</button>
     </div>`;
   ov.classList.remove("hidden");
+  $("#cpVolver") && ($("#cpVolver").onclick = () => ov.classList.add("hidden"));
   // el superadmin puede dar de alta un boliche sin entrar a otro: el
   // formulario se abre acá mismo (la hoja vive dentro de #app, oculto)
   $("#cpNuevo") && ($("#cpNuevo").onclick = () => {
@@ -648,6 +700,11 @@ function header() {
   $("#tbClubName") && ($("#tbClubName").innerHTML = marca);
   $("#tbClubMark") && ($("#tbClubMark").innerHTML = clubMarkHTML(club));
   $("#avatarM") && ($("#avatarM").textContent = ini);
+  // la inicial con su tono por nombre, el mismo que en la app
+  [$("#avatarM"), $("#avatarIni")].forEach(a => a && a.style.setProperty("--ini", tinte(me.nombre)));
+  // flechita al lado del boliche solo si hay a dónde cambiar
+  const hayOtros = myClubs().length > 1 || me.plataforma;
+  qsa("#tbClub .chev, #clubChev").forEach(x => x.style.display = hayOtros ? "" : "none");
   pintarEvTopbar();
 }
 
@@ -661,7 +718,9 @@ function renderClubMenu(clsPermitidos) {
   cont.innerHTML = (clsPermitidos || []).map(id => {
     const c = clubData(id);
     return `<button data-loc="${id}"><span class="mk" style="--mk-p:${esc(c?.color_primario || "")};--mk-s:${esc(c?.color_secundario || "")}">${clubMarkHTML(id)}</span><span class="wm-club">${esc(c?.nombre || id)}</span><small>Eventos y planimetría</small></button>`;
-  }).join("");
+  }).join("")
+    // la pantalla con todos los boliches (y "Nuevo boliche" para el superadmin)
+    + `<button data-todos="1" class="cm-todos">${ico("tienda")}<span>Ver todos los boliches</span></button>`;
 }
 
 /* Evento activo en la topbar: es el contexto de todo lo que se ve
@@ -720,7 +779,11 @@ $("#evsel").onclick = async e => {
   renderEvsel(); renderTab();
 };
 
-const abrirClubs = () => { if (myClubs().length > 1) $("#clubMenu").classList.add("show"); };
+const abrirClubs = () => {
+  if (myClubs().length > 1) $("#clubMenu").classList.add("show");
+  // con un solo boliche, el superadmin va directo a la lista (ahí da de alta)
+  else if (me.plataforma) showClubPicker(myClubs());
+};
 $("#clubBtn").onclick = abrirClubs;
 $("#tbClub") && ($("#tbClub").onclick = abrirClubs);
 // El selector de evento de la topbar lleva a Eventos, donde se cambia.
@@ -740,6 +803,7 @@ $("#tbEv") && ($("#tbEv").onclick = () => {
   else toast(ev ? `${ev.nombre} · ${fmtF(ev.fecha)}` : "Sin evento activo");
 });
 $("#clubMenu").onclick = async e => {
+  if (e.target.closest("[data-todos]")) { $("#clubMenu").classList.remove("show"); return showClubPicker(myClubs()); }
   const b = e.target.closest("button[data-loc]");
   $("#clubMenu").classList.remove("show");
   if (b && b.dataset.loc !== club) {
@@ -834,6 +898,51 @@ function kpi({ ic, k, v, de, s = "", tono = "", cola = "", attrs = "", tag = "di
   </${tag}>`;
 }
 const pillEst = (txt, tono = "ok") => `<span class="pill-est ${tono}">${txt}</span>`;
+
+/* ---------- piezas del rediseño (las mismas que la app de iOS) ---------- */
+Object.assign(ICO_PATHS, {
+  trofeo: '<path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5v1.5A3 3 0 0 0 8 10.5M16 6h3v1.5a3 3 0 0 1-3 3M12 13v4M8.5 20h7"/>',
+  escaner: '<path d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2M16 4h2a2 2 0 012 2v2M16 20h2a2 2 0 002-2v-2M7 12h10"/>',
+  capas: '<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>',
+  basura: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
+  candado: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
+  lapiz: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
+  luna: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  birrete: '<path d="M2.5 9L12 4.5 21.5 9 12 13.5 2.5 9z"/><path d="M6.5 11v4.5c1.5 1.3 3.4 2 5.5 2s4-.7 5.5-2V11"/>',
+  paleta: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.7-.8 1.7-1.6 0-1.3-1.2-1.6-1.2-2.8 0-.9.7-1.6 1.6-1.6h2.1a4.3 4.3 0 0 0 4.3-4.3c0-3.7-3.8-6.7-8.5-6.7z"/><circle cx="7.8" cy="11" r="1"/><circle cx="10.5" cy="7.5" r="1"/><circle cx="15" cy="7.8" r="1"/>',
+  tienda: '<path d="M4 9.5L5.5 4h13L20 9.5M4 9.5h16M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0M5.5 12v8h13v-8"/>',
+  salir: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/>',
+});
+const icCh = `<svg viewBox="0 0 24 24" class="ic ch" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
+const TONO_VAR = { ok: "var(--success)", warn: "var(--warning)", info: "var(--info)", bad: "var(--danger)" };
+const primerNombre = nm => (String(nm || "").trim().split(/\s+/)[0] || "");
+/* "Hola, André" arriba del inicio */
+const saludo = (nombre, detalle) => `<div class="saludo"><h1>${nombre ? `Hola, ${esc(nombre)}` : "Hola"}</h1>${detalle ? `<p>${detalle}</p>` : ""}</div>`;
+/* título de bloque con "Ver todo" opcional (data-vertodo) */
+const tituloBloque = (t, verTodo = "") => `<div class="tit-bloque"><h2>${t}</h2>${verTodo ? `<button data-vertodo="${verTodo}">Ver todo</button>` : ""}</div>`;
+/* acceso rápido: ícono en un círculo teñido, título, una línea y la flecha */
+const accionRapida = ({ ic, t, d = "", tono = "", attrs = "" }) =>
+  `<button class="acc-rap${tono ? " t-" + tono : ""}" ${attrs}><span class="acc-rap-ic">${ico(ic)}</span>
+    <span class="acc-rap-tx"><b>${t}</b>${d ? `<small>${d}</small>` : ""}</span>${icCh}</button>`;
+const grillaAcciones = items => `<div class="grilla-acc">${items.join("")}</div>`;
+/* ficha de número: tinte, ícono en círculo, rótulo y el número grande */
+const ficha = ({ ic, k, v, tono = "", attrs = "" }) =>
+  `<button class="ficha" ${attrs} ${tono ? `style="--c:${TONO_VAR[tono]}"` : ""}><span class="ficha-ic">${ico(ic)}</span><span class="ficha-k">${k}</span><span class="ficha-v">${v}</span></button>`;
+/* avance "x de y" con su barra */
+const barraProgreso = (etq, v, de, tono = "") => {
+  const pct = de ? Math.min(100, Math.round(v / de * 100)) : 0;
+  return `<div class="barra-av" ${tono ? `style="--c:${TONO_VAR[tono]}"` : ""}>
+    <div class="barra-av-h"><span>${etq}</span><b>${v}</b><small>de ${de}${de ? ` · ${pct}%` : ""}</small></div>
+    <div class="barra-av-t"><i style="width:${pct}%"></i></div></div>`;
+};
+/* Ir a una sub-sección de Accesos (Listas, Scanner…) desde otra pantalla */
+function irAAccesos(sub) {
+  if (!tabsFor().some(([t]) => t === "accesos")) return;
+  tab = "accesos"; setTab(); cerrarNav();
+  $("#scanwrap").classList.add("hidden"); $("#main").classList.remove("hidden");
+  irASub(accSubs().some(([k]) => k === sub) ? sub : accSubs()[0][0]);
+}
 const ROL_ICO = { admin: "escudo", jefe: "grupo", rrpp: "usuario", portero: "escudo", caja: "base",
   propietario: "copa", barra: "copa", deposito: "caja" };
 const rolBadge = r => `<span class="us-rol" data-r="${r}">${ico(ROL_ICO[r] || "usuario")}${ROL_LABEL[r] || r}</span>`;
@@ -1009,6 +1118,7 @@ function skeleton(filas = 5) {
 }
 
 function renderTab() {
+  evDetalle = null;
   // Fuera de Accesos, #main vuelve a ser #main.
   if (tab !== "accesos") accRedir = false;
   const scan = tab === "escaner";
@@ -1553,9 +1663,10 @@ async function loadSinTope(forzar) {
 }
 const esInnegable = t => !!t && sinTopeIds.has(t.rrpp_id || me.id);
 
-async function ticketImage(t, oro, fase) {
-  const propio = arteDeFase(t);
-  const img = await loadImg(propio || ev.ticket_url);
+async function ticketImage(t, oro, fase, arte) {
+  // arte: {url, propio} para la vista previa de Gestionar evento
+  const propio = arte ? arte.propio : arteDeFase(t);
+  const img = await loadImg(arte ? arte.url : (propio || ev.ticket_url));
   const W = img.naturalWidth, H = img.naturalHeight;
   const cnv = document.createElement("canvas"); cnv.width = W; cnv.height = H;
   const ctx = cnv.getContext("2d");
@@ -1642,7 +1753,7 @@ async function enviarTanda(tks) {
     }
     if (!files.length) { toast("Este evento no tiene diseño de entrada cargado", "warn"); return; }
 
-    const msg = `🎟️ ${files.length} entrada${files.length === 1 ? "" : "s"} · ${clubNombre(club)} — ${ev.nombre} · ${fmtF(ev.fecha)}\n${tks.map(t => t.cliente).join("\n")}\nCada QR vale para 1 solo ingreso.`;
+    const msg = `${files.length} entrada${files.length === 1 ? "" : "s"} · ${clubNombre(club)} — ${ev.nombre} · ${fmtF(ev.fecha)}\n${tks.map(t => t.cliente).join("\n")}\nCada QR vale para 1 solo ingreso.`;
     if (navigator.canShare && navigator.canShare({ files })) {
       try {
         await navigator.share({ files, text: msg });
@@ -1893,7 +2004,7 @@ function ticketCard(t, oro) {
 window.waTk = async () => {
   const t = lastTk; if (!t) return;
   const code = t.code, cliente = t.cliente;
-  const msg = `🎟️ Entrada ${clubNombre(club)} — ${ev.nombre} · ${fmtF(ev.fecha)}\n${cliente}\nVálida para 1 solo ingreso. Presentá este QR en puerta.`;
+  const msg = `Entrada ${clubNombre(club)} — ${ev.nombre} · ${fmtF(ev.fecha)}\n${cliente}\nVálida para 1 solo ingreso. Presentá este QR en puerta.`;
   try {
     let png = lastTkPng;
     if (!png) {
@@ -2145,6 +2256,9 @@ function irASub(sub, sinHistorial) {
    usa historial y no debe verse afectado. */
 window.addEventListener("popstate", e => {
   const s = e.state;
+  // atrás desde Gestionar evento: vuelve al inicio
+  if (evDetalle && s?.tab !== "evdet") { cerrarEventoDetalle(); return; }
+  if (s?.tab === "evdet") { if (ev) { evDetalle = ev.id; conPantalla(screenEventoDetalle); } return; }
   if (!s) return;
   if (s.tab === "accesos") {
     if (tab !== "accesos") { tab = "accesos"; setTab(); }
@@ -3549,6 +3663,81 @@ async function contarPuertaIngresada(lp) {
 /* ============================================================
    STATS (rrpp propias · jefe team · admin global)
    ============================================================ */
+/* ---------- piezas del reporte ---------- */
+const aPagarDe = r => +r.comision_rrpp + +r.comision_jefe + (r.cm_r || 0) + (r.cm_j || 0) + (r.bono || 0);
+const vendidoDe = r => +r.bruto_entradas + (r.bm || 0);
+/* Dona en SVG: de dónde sale la plata. partes: [nombre, monto, color]; extras
+   van solo en la leyenda (comisiones, neto). */
+function dona(partes, extras = []) {
+  const total = partes.reduce((a, [, v]) => a + Math.max(0, +v || 0), 0);
+  const R = 52, C = 2 * Math.PI * R;
+  let acum = 0;
+  const arcos = total ? partes.map(([, v, c]) => {
+    const largo = Math.max(0, +v || 0) / total * C;
+    const a = `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${c}" stroke-width="20" stroke-dasharray="${largo} ${C - largo}" stroke-dashoffset="${-acum}" transform="rotate(-90 70 70)"/>`;
+    acum += largo; return a;
+  }).join("") : "";
+  const fila = ([n, v, c], pct) => `<div><i style="background:${c}"></i><span>${esc(n)}${pct != null ? ` · ${pct}%` : ""}</span><b>${v < 0 ? "− " : ""}${fmtBs(Math.abs(v))} Bs</b></div>`;
+  return `<div class="dona-caja">
+    <svg viewBox="0 0 140 140" aria-hidden="true"><circle r="${R}" cx="70" cy="70" fill="none" stroke="var(--surface-2)" stroke-width="20"/>${arcos}
+      <text x="70" y="66" text-anchor="middle" style="font:600 11px var(--ui);fill:var(--text-muted);stroke:none">Bruto</text>
+      <text x="70" y="84" text-anchor="middle" style="font:800 15px var(--ui);fill:var(--text-primary);stroke:none">${fmtBs(total)}</text></svg>
+    <div class="dona-ley">${partes.map(p => fila(p, total ? Math.round(Math.max(0, p[1]) / total * 100) : 0)).join("")}${extras.map(e => fila(e)).join("")}</div>
+  </div>`;
+}
+const MEDALLAS = ["#F5B400", "#98A2B3", "#CD7F32"];
+/* Top de relacionadores: entraron (lista + QR) y lo que hay que pagarle */
+function tablaTop(filas, limite) {
+  const orden = [...filas].sort((a, b) => (b.entradas_usadas + b.ingresaron + b.mv) - (a.entradas_usadas + a.ingresaron + a.mv));
+  const ver = limite ? orden.slice(0, limite) : orden;
+  if (!ver.length) return `<div class="tarjeta"><p style="text-align:center;color:var(--text-muted)">Todavía nadie vendió en este evento.</p></div>`;
+  const teamNm = id => teamsCache.find(t => t.id === id)?.nombre || "";
+  return `<div class="tarjeta sin-pad">
+    <div class="top-cab"><span style="width:26px">#</span><span style="flex:1">Persona</span><span style="width:64px;text-align:right">Entraron</span><span style="width:84px;text-align:right">A pagar</span></div>
+    ${ver.map((r, i) => `<button class="top-fila" data-rrpp="${r.rrpp_id}" data-nom="${esc(r.rrpp)}">
+      <span class="pos">${i < 3 ? `<span style="color:${MEDALLAS[i]}">${ico("trofeo")}</span>` : i + 1}</span>
+      ${inicial(r.rrpp)}
+      <span class="nm"><b>${esc(r.rrpp)}</b><small>${[teamNm(r.team_id), r.mv ? `${r.mv} mesas` : ""].filter(Boolean).join(" · ")}</small></span>
+      <span class="num" style="width:64px">${r.entradas_usadas + r.ingresaron}</span>
+      <span class="num" style="width:84px">${fmtBs(aPagarDe(r))} Bs</span>
+    </button>`).join("")}
+  </div>`;
+}
+/* Por team: sus números juntos y, al abrirlo, cada relacionador con lo que
+   vendió y lo que hay que pagarle */
+function porTeamHTML(filas) {
+  const grupos = new Map();
+  filas.forEach(r => { const k = r.team_id || ""; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(r); });
+  const suma = (l, f) => l.reduce((a, r) => a + (+f(r) || 0), 0);
+  const orden = [...grupos.entries()].sort((a, b) => suma(b[1], vendidoDe) - suma(a[1], vendidoDe));
+  if (!orden.length) return `<div class="tarjeta"><p style="text-align:center;color:var(--text-muted)">Todavía ningún team vendió en este evento.</p></div>`;
+  const mini = (k, v, c) => `<div class="mini-ficha" style="--c:${c}"><small>${k}</small><b>${v}</b></div>`;
+  return orden.map(([id, l]) => {
+    const nom = id ? (teamsCache.find(t => t.id === id)?.nombre || "Team") : "Sin team";
+    l = [...l].sort((a, b) => vendidoDe(b) - vendidoDe(a));
+    return `<div class="tarjeta sin-pad team-card">
+      <button class="team-h" data-team-h="${esc(id)}">
+        ${inicial(nom)}
+        <span class="nm"><b>${esc(nom)}</b><small>${l.length} ${l.length === 1 ? "relacionador" : "relacionadores"}</small></span>
+        <span class="tot"><b>${fmtBs(suma(l, vendidoDe))} Bs</b><small>vendido</small></span>
+        <svg viewBox="0 0 24 24" class="ic ch"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="mini-fichas">
+        ${mini("Entraron", suma(l, r => r.ingresaron + r.entradas_usadas), "var(--success)")}
+        ${mini("Listas", `${suma(l, r => r.ingresaron)}/${suma(l, r => r.anotados)}`, "var(--warning)")}
+        ${mini("QR", `${suma(l, r => r.entradas_usadas)}/${suma(l, r => r.entradas_vendidas)}`, "var(--brand-primary)")}
+        ${mini("Mesas", suma(l, r => r.mv), "var(--info)")}
+      </div>
+      <div class="team-pie">A pagar al team: <b>${fmtBs(suma(l, aPagarDe))} Bs</b></div>
+      <div class="team-cuerpo">${l.map(r => `<button class="top-fila" data-rrpp="${r.rrpp_id}" data-nom="${esc(r.rrpp)}">
+        ${inicial(r.rrpp)}
+        <span class="nm"><b>${esc(r.rrpp)}</b><small>lista ${r.ingresaron}/${r.anotados} · QR ${r.entradas_usadas}/${r.entradas_vendidas}${r.mv ? ` · ${r.mv} mesas` : ""}</small></span>
+        <span class="num">${fmtBs(vendidoDe(r))} Bs<small>a pagar ${fmtBs(aPagarDe(r))} Bs</small></span>
+      </button>`).join("")}</div>
+    </div>`;
+  }).join("");
+}
+
 async function screenStats() {
   const [{ data: rows, error }, { data: mrows }, { data: bonos }, { data: mesasAll }, { data: entRows }, { data: regsAll }] = await conDatos("reporte", () => Promise.all([
     sb.from("v_stats_rrpp").select("*").eq("evento_id", ev.id),
@@ -3594,7 +3783,7 @@ async function screenStats() {
   const visibles = all.filter(r => r.anotados > 0 || r.entradas_vendidas > 0 || r.mv > 0 || r.bono > 0);
   /* loadTeams sigue: llena teamsCache, que usan otras pantallas y el ⋯.
      La lista de teams presentes se fue con el filtro de "Por relacionador". */
-  if (me.rol === "admin") await loadTeams();
+  if (["admin", "jefe"].includes(me.rol)) await loadTeams();
   const tot = visibles.reduce((a, r) => ({
     an: a.an + +r.anotados, in: a.in + +r.ingresaron,
     ev_: a.ev_ + +r.entradas_vendidas, eu: a.eu + +r.entradas_usadas,
@@ -3623,22 +3812,28 @@ async function screenStats() {
       <section class="rp-hero" id="liqBox"><div class="sk sk-l1"></div></section>
       <aside class="rp-aj" id="liqAj"></aside>
     </div>` : ""}
-    <div class="kps">
-      ${kpi({ ic: "grupo", k: "Ingresaron de lista", v: regTot.in, de: regTot.an })}
-      ${kpi({ ic: "ticket", k: "Entradas ingresadas", v: entTot.usad, de: entTot.vend })}
-      ${esAdm ? kpi({ ic: "sofa", k: "Mesas vendidas", v: mesasTot.n }) : ""}
+    ${esAdm ? `${tituloBloque("De dónde sale la plata")}
+    <div class="tarjeta">${dona([
+      ["Entradas", entTot.bruto, "var(--brand-primary)"],
+      ["Mesas", mesasTot.bs, "var(--info)"],
+    ], [["Comisiones y bonos", -comTotal, "var(--danger)"], ["Para el boliche (neto)", neto, "var(--success)"]])}</div>` : ""}
+    ${tituloBloque("Asistencia")}
+    <div class="tarjeta" style="padding:8px 16px">
+      ${barraProgreso("Invitados de lista que entraron", regTot.in, regTot.an, "ok")}
+      ${barraProgreso("Entradas con QR usadas", entTot.usad, entTot.vend)}
+      ${esAdm ? porLista.map(l => barraProgreso(esc(l.nombre), l.ce, l.ca, "warn")).join("") : ""}
+    </div>
+    ${esAdm ? "" : `<div class="kps" style="margin-top:14px">
       ${me.rol === "rrpp" ? kpi({ ic: "sofa", k: "Mis mesas", v: tot.mv, s: `Bs ${fmtBs(tot.bm)}` })
         + kpi({ ic: "base", k: "Mi comisión total", v: `Bs ${fmtBs(tot.cr + tot.cmr + tot.bono)}`, s: "Entradas + mesas + bonos", tono: "ok" }) : ""}
       ${me.rol === "jefe" ? kpi({ ic: "grupo", k: "Comisión RRPPs", v: `Bs ${fmtBs(tot.cr + tot.cmr)}` })
         + kpi({ ic: "base", k: "Mi comisión (jefe)", v: `Bs ${fmtBs(tot.cj + tot.cmj)}`, tono: "ok" }) : ""}
-    </div>
-    ${esAdm && porLista.length ? `<div class="rp-bloque">
-      <div class="rp-bloque-h"><span class="rp-bloque-t">Por lista</span>
-        <span class="rp-bloque-s">entraron / anotados</span></div>
-      <div class="rp-listas">${porLista.map(l => `
-        <span class="rp-lp"><span class="rp-lp-n">${esc(l.nombre)}</span>
-          <span class="rp-lp-v"><b>${l.ce}</b>/${l.ca}</span></span>`).join("")}</div>
-    </div>` : ""}
+    </div>`}
+    ${esAdm || me.rol === "jefe" ? `
+    ${tituloBloque(esAdm ? "Top relacionadores" : "Mi team", visibles.length > 5 ? "top" : "")}
+    ${tablaTop(visibles, 5)}` : ""}
+    ${esAdm ? `<div class="solo-movil">${tituloBloque("Por team")}<div id="porTeam">${porTeamHTML(visibles)}</div></div>` : ""}
+    ${(esAdm || me.rol === "jefe") && innerWidth >= 1000 ? `<div id="rpEsc"></div>` : ""}
     ${esAdm ? `<div id="fasesBox"></div>` : ""}
     ${["rrpp", "jefe"].includes(me.rol) ? `<div class="pg-fila-acc">
       ${me.rol === "rrpp" ? `<button class="btn ghost2" id="btnMisNombres">${ico("usuario")}Ver mis nombres</button>` : ""}
@@ -3658,11 +3853,17 @@ async function screenStats() {
         </div>
       </div>
     </details>
-    <div class="rp-acc">
-      <button class="btn primary" id="btnCopiar">${ico("copiar")}Copiar cierre</button>
-      ${excel}
-      <button class="ghost rp-mas" id="rpMas" aria-label="Más acciones">${ico("puntos")}</button>
-    </div>` : excel ? `<div class="rp-acc">${excel}</div>` : ""}`;
+    ${tituloBloque("Acciones")}
+    ${grillaAcciones([
+      accionRapida({ ic: "copiar", t: "Copiar cierre", d: "Para WhatsApp", attrs: 'id="btnCopiar"' }),
+      puedeVerExcelContable() ? accionRapida({ ic: "archivo", t: "Excel", d: "Contabilidad", tono: "ok", attrs: 'id="btnExcel"' }) : "",
+      accionRapida({ ic: "base", t: "Comisiones", d: "Cuánto cobra cada uno", tono: "warn", attrs: 'data-rpop="comis"' }),
+      accionRapida({ ic: "trofeo", t: "Bonos", d: "Premios del evento", tono: "warn", attrs: 'data-rpop="bonos"' }),
+      accionRapida({ ic: "reloj", t: "Histórico", d: "Ranking por mes", tono: "info", attrs: 'data-rpop="hist"' }),
+      accionRapida({ ic: "telefono", t: "Teléfonos", d: "Del equipo", tono: "info", attrs: 'data-rpop="tel"' }),
+      accionRapida({ ic: "filtro", t: "Rechazados", d: "En puerta", tono: "bad", attrs: 'data-rpop="filtro"' }),
+      accionRapida({ ic: "escudo", t: "Auditoría", d: "Quién cambió qué", attrs: 'data-rpop="audit"' }),
+    ].filter(Boolean))}` : excel ? `<div class="rp-acc">${excel}</div>` : ""}`;
   /* La lista "Por relacionador" salió de esta pantalla (pedido del dueño):
      con ella se fueron su filtro por team, su buscador y el click que abría
      el detalle. El desglose nombre por nombre sigue disponible desde
@@ -3672,27 +3873,26 @@ async function screenStats() {
   if (me.rol === "admin") { pintarLiquidacion({ cant: entTot.usad, bruto: entTot.bruto }); pintarFases(); }
   /* Las secundarias van detrás del ⋯: se usan una vez, no en la mesa de
      cierre. Ninguna desaparece, sólo dejan de competir con Copiar cierre. */
-  const bmas = $("#rpMas");
-  if (bmas) bmas.onclick = () => {
-    const op = [
-      ["comis", "Comisiones", IC.tag],
-      ["bonos", "Bonos", IC.star],
-      ["hist", "Histórico", IC.clock],
-      ["usuarios", "Usuarios y teams", IC.people],
-      ["audit", "Auditoría", IC.shield],
-    ];
-    sheet(`<div class="sh-h">Reporte<span class="r-sub">${esc(ev.nombre)}</span></div>
-      <div class="mas-lista">${op.map(([k, l, ico]) =>
-        `<button class="mas-op" data-rpop="${k}">${ico}<span>${esc(l)}</span></button>`).join("")}</div>`);
-    document.querySelectorAll("#sheetBody [data-rpop]").forEach(b => b.onclick = () => {
-      const k = b.dataset.rpop;
-      if (k === "comis") return sheetComisiones();
-      if (k === "bonos") return sheetBonos();
-      if (k === "hist") return sheetHistorico("mes");
-      if (k === "usuarios") return sheetUsuarios();
-      if (k === "audit") return sheetAuditoria();
-    });
-  };
+  qsa("#main [data-rpop]").forEach(b => b.onclick = () => {
+    const k = b.dataset.rpop;
+    if (k === "comis") return sheetComisiones();
+    if (k === "bonos") return sheetBonos();
+    if (k === "hist") return sheetHistorico("mes");
+    if (k === "tel") return sheetTelefonos();
+    if (k === "filtro") return sheetFiltro();
+    if (k === "audit") return sheetAuditoria();
+  });
+  // Top: tocar a alguien abre su detalle; "Ver todo" la lista entera
+  const conectarTop = raiz => qsa(`${raiz} [data-rrpp]`).forEach(b => b.onclick = () => sheetRrppDetalle(b.dataset.rrpp, b.dataset.nom));
+  conectarTop("#main");
+  $("#main [data-vertodo='top']") && ($("#main [data-vertodo='top']").onclick = () => {
+    sheet(`<div class="sh-h">${esAdm ? "Relacionadores" : "Mi team"}<span class="r-sub">${esc(ev.nombre)}</span></div>${tablaTop(visibles)}`);
+    conectarTop("#sheetBody");
+  });
+  // en la computadora: tablas por team y relacionador, horas e invitados
+  if ($("#rpEsc")) window.pintarReporteEscritorio?.(visibles);
+  // Por team: se abre y se cierra cada uno
+  qsa("#porTeam [data-team-h]").forEach(b => b.onclick = () => b.closest(".team-card").classList.toggle("abierto"));
   /* Exportación contable a Excel · SOLO la cuenta protegida
      (admin_principal). El botón ni se pinta para los demás, y
      exportarContabilidadExcel() vuelve a chequear por si la llaman suelta.
@@ -3711,8 +3911,8 @@ async function screenStats() {
   if (bc) bc.onclick = async () => {
     const porRel = visibles.sort((a, b) => (b.entradas_usadas + b.mv) - (a.entradas_usadas + a.mv))
       .map(r => `• ${r.rrpp}: ${r.ingresaron}/${r.anotados} lista · ${r.entradas_usadas} QR · ${r.mv} mesas · a pagar ${fmtBs(+r.comision_rrpp + +r.comision_jefe + r.cm_r + r.cm_j + r.bono)} Bs`).join("\n");
-    const txt = `🍾 CIERRE ${ev.nombre.toUpperCase()} — ${clubNombre(club)} · ${fmtF(ev.fecha)}\n\n` +
-      `💰 Para el boliche: ${fmtBs(neto)} Bs\n` +
+    const txt = `CIERRE ${ev.nombre.toUpperCase()} — ${clubNombre(club)} · ${fmtF(ev.fecha)}\n\n` +
+      `Para el boliche: ${fmtBs(neto)} Bs\n` +
       `Bruto entradas: ${fmtBs(entTot.bruto)} Bs (${entTot.usad} ingresaron de ${entTot.vend} vendidas)\n` +
       `Bruto mesas: ${fmtBs(mesasTot.bs)} Bs (${mesasTot.n} mesas)\n` +
       `Comisiones + bonos: ${fmtBs(comTotal)} Bs\n` +
@@ -5026,6 +5226,8 @@ function filaEvento(e) {
   </div>`;
 }
 async function screenEventos() {
+  // lo que se edita desde Gestionar evento vuelve a pintar esa pantalla
+  if (evDetalle && ev && ev.id === evDetalle) return screenEventoDetalle();
   // arranque de cero: sin ningún boliche creado todavía, no hay nada que
   // listar — el admin crea el primero desde acá mismo
   if (!club) {
@@ -5055,39 +5257,35 @@ async function screenEventos() {
     const ca = +rs?.anotados || 0, ce = +rs?.ingresaron || 0,
           qr = +rs?.entradas || 0, mv = +rs?.mesas || 0;
     const hoyISO = new Date().toLocaleDateString("sv-SE");
+    const estado = enCurso(ev) ? ["En vivo", "ok"] : ev.fecha === hoyISO ? ["Hoy", "warn"]
+      : ev.publicado === false ? ["Borrador", "warn"] : [ESTADO_EV[ev.estado] || "Próximo", ""];
+    // como la app: la foto con el estado, el nombre y el horario; abajo los
+    // cuatro números, "Gestionar evento" y los atajos de la noche
     hero = `
-    <section class="ev-card">
-      <div class="ev-card-h">
-        <span class="ev-mk">${clubMarkHTML(club)}</span>
-        ${enCurso(ev) ? '<span class="estado-vivo">En vivo</span>'
-          : ev.fecha === hoyISO ? '<span class="estado-hoy">Hoy</span>'
-          : `<span class="tag-estado ${esc(ev.estado)}">${esc(ESTADO_EV[ev.estado] || ev.estado)}</span>`}
-        ${ev.publicado === false ? '<span class="ev-borr">Borrador · sólo lo ves vos</span>' : ""}
+    <section class="hero">
+      <div class="hero-foto">
+        ${ev.ticket_url ? `<img src="${esc(ev.ticket_url)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
+        <div class="hero-top">
+          <span class="hero-est" ${estado[1] ? `style="--c:${TONO_VAR[estado[1]]}"` : ""}>${esc(estado[0])}</span>
+          ${me.rol === "admin" ? `<button class="hero-redondo" id="evMas" title="Más acciones" aria-label="Más acciones">${ico("puntos")}</button>` : ""}
+        </div>
+        <h2 class="hero-nm">${esc(ev.nombre)}</h2>
+        <p class="hero-meta">${[fmtF(ev.fecha), `${(ev.hora_inicio || "21:00").slice(0, 5)} – ${(ev.hora_fin || "06:00").slice(0, 5)} hs`,
+          ev.precio_manilla ? `Manilla ${fmtBs(ev.precio_manilla)} Bs` : ""].filter(Boolean).join(" · ")}</p>
       </div>
-
-      <h2 class="ev-nm">${esc(ev.nombre)}</h2>
-      <p class="ev-meta">
-        <span>${fmtF(ev.fecha)}</span><span class="ev-pt"></span>
-        <span>${(ev.hora_inicio || "21:00").slice(0, 5)}–${(ev.hora_fin || "06:00").slice(0, 5)}</span>
-        ${ev.precio_manilla ? `<span class="ev-pt"></span><span>Manilla ${fmtBs(ev.precio_manilla)} Bs</span>` : ""}
-      </p>
-
-      <div class="kps kps-4 ev-kps">
-        ${kpi({ tag: "button", attrs: 'data-go="listas"', ic: "grupo", k: "Anotados en listas", v: ca })}
-        ${kpi({ tag: "button", attrs: 'data-go="entradas"', ic: "ticket", k: "Entradas", v: qr })}
-        ${kpi({ tag: "button", attrs: 'data-go="mesas"', ic: "sofa", k: "Mesas", v: mv })}
-        ${kpi({ tag: "button", attrs: 'data-go="listas"', ic: "check", k: "Ingresaron", v: ce, tono: "ok" })}
+      <div class="fichas">
+        ${ficha({ ic: "grupo", k: "Listas", v: ca, tono: "warn", attrs: 'data-go="listas"' })}
+        ${ficha({ ic: "qr", k: "QR", v: qr, attrs: 'data-go="entradas"' })}
+        ${ficha({ ic: "sofa", k: "Mesas", v: mv, tono: "info", attrs: 'data-go="mesas"' })}
+        ${ficha({ ic: "check", k: "Entraron", v: ce, tono: "ok", attrs: 'data-go="listas"' })}
       </div>
-
-      <div class="ev-acc">
-        ${ev.publicado === false && me.rol === "admin" && ev.estado !== "cerrado"
-          // el evento elegido no se repite en la lista de abajo, que era el
-          // único lugar con "Publicar": un borrador elegido quedaba sin salida
-          ? `<button class="ghost pub" data-pub="${ev.id}" data-nom="${esc(ev.nombre)}">Publicar</button>` : ""}
-        <button class="ghost" data-listas="${ev.id}">${ico("lista_")}Listas</button>
-        <button class="ghost" data-edit="${ev.id}">${ico("ajustes")}Editar</button>
-        <button class="ghost" data-dis="${ev.id}">${ico("imagen")}Diseño${ev.ticket_url ? " ✓" : ""}</button>
-        <button class="ghost ev-mas" id="evMas" title="Más acciones" aria-label="Más acciones">${ico("puntos")}</button>
+      ${ev.publicado === false && me.rol === "admin" && ev.estado !== "cerrado"
+        ? `<button class="btn-gestionar btn-publicar" data-pub="${ev.id}" data-nom="${esc(ev.nombre)}"><span>${ico("megafono")}Publicar evento</span></button>` : ""}
+      ${me.rol === "admin" ? `<button class="btn-gestionar" id="evGestionar"><span>${ico("ajustes")}Gestionar evento</span>${icCh}</button>` : ""}
+      <div class="atajos">
+        <button data-atajo="invitados">${ico("lista_")}Listas</button>
+        ${me.rol === "admin" || me.rol === "portero" ? `<button data-atajo="scanner">${ico("escaner")}Escanear QR</button>` : `<button data-atajo="entradas">${ico("ticket")}Entradas</button>`}
+        <button data-atajo="mesas">${ico("sofa")}Mesas</button>
       </div>
     </section>`;
   }
@@ -5101,12 +5299,19 @@ async function screenEventos() {
     e.id !== (ev && ev.id) && !(e.estado === "cerrado" || e.fecha < hoyStr));
 
   $("#main").innerHTML = `
-    ${pgHead({ ey: esc(clubNombre(club)), t: "Inicio", s: "Tu próximo evento y los anteriores.",
-      acc: `${me.plataforma ? `<button class="btn ghost2" id="irBoliches" title="Administrar boliches">${ico("mapa")}Boliches</button>` : ""}
-        <button class="btn primary" id="evNuevoBtn">${ico("mas")}Crear nuevo evento</button>` })}
+    ${saludo(primerNombre(me.nombre), ev ? "Gestioná tu próximo evento" : "Creá un evento para empezar")}
 
     ${hero || `<div class="empty">Todavía no hay ningún evento en este boliche.<br>
-      <span style="color:var(--text-muted);font-size:12.5px">Creá el primero con el botón de arriba.</span></div>`}
+      <span style="color:var(--text-muted);font-size:12.5px">Creá el primero con "Crear evento".</span></div>`}
+
+    ${tituloBloque("Accesos rápidos")}
+    ${grillaAcciones([
+      accionRapida({ ic: "calendario", t: "Crear evento", attrs: 'id="evNuevoBtn"' }),
+      accionRapida({ ic: "grupo", t: "Ver invitados", tono: "warn", attrs: 'data-atajo="invitados"' }),
+      accionRapida({ ic: "megafono", t: "Avisos", tono: "info", attrs: 'id="evAvisos"' }),
+      me.plataforma ? accionRapida({ ic: "tienda", t: "Boliches", tono: "ok", attrs: 'id="irBoliches"' })
+        : accionRapida({ ic: "barras", t: "Reporte", tono: "ok", attrs: 'data-go="stats"' }),
+    ])}
 
     ${otros.length ? `
     <section class="in-sec">
@@ -5146,6 +5351,13 @@ async function screenEventos() {
     </div>
     <input type="file" id="disFile" accept="image/png,image/jpeg,image/webp" class="hidden">`;
   $("#irBoliches") && ($("#irBoliches").onclick = sheetBoliches);
+  $("#evAvisos") && ($("#evAvisos").onclick = sheetAvisos);
+  $("#evGestionar") && ($("#evGestionar").onclick = () => abrirEventoDetalle(ev.id));
+  qsa("#main [data-atajo]").forEach(b => b.onclick = () => {
+    const a = b.dataset.atajo;
+    if (a === "mesas") return irATab("mesas");
+    irAAccesos(a);
+  });
   // El CTA de la cabecera abre el mismo formulario de siempre.
   $("#evNuevoBtn").onclick = () => {
     evPanelOpen = !evPanelOpen;
@@ -5240,35 +5452,7 @@ async function screenEventos() {
     await loadEventos(); screenEventos();
   });
   qsa("#main [data-del-ev]").forEach(b => b.onclick = async () => {
-    // Borrar un evento arrastra sus listas, entradas y mesas. Se cuenta
-    // qué hay dentro para que la magnitud quede a la vista antes de decidir.
-    const id = b.dataset.delEv;
-    const cnt = async (tabla) => (await sb.from(tabla)
-      .select("id", { count: "exact", head: true }).eq("evento_id", id)).count || 0;
-    const [regs, tks, mesas] = await Promise.all([cnt("registros"), cnt("entradas"), cnt("mesas")]);
-    const vendidas = mesas ? (await sb.from("mesas").select("id", { count: "exact", head: true })
-      .eq("evento_id", id).neq("estado", "disponible")).count || 0 : 0;
-
-    const detalle = [];
-    if (regs) detalle.push(`${regs} anotado${regs === 1 ? "" : "s"} en listas`);
-    if (tks) detalle.push(`${tks} entrada${tks === 1 ? "" : "s"} emitida${tks === 1 ? "" : "s"}`);
-    if (mesas) detalle.push(`${mesas} mesa${mesas === 1 ? "" : "s"}${vendidas ? ` · ${vendidas} con venta` : ""}`);
-    if (!detalle.length) detalle.push("Sin listas, entradas ni mesas cargadas");
-
-    if (!await confirmar({
-      titulo: `Eliminar evento ${b.dataset.nom}`,
-      detalle,
-      aviso: (regs || tks || vendidas)
-        ? "Se borra todo el contenido del evento, incluidas las ventas registradas. No se puede deshacer."
-        : "El evento se elimina por completo. No se puede deshacer.",
-      accion: "Eliminar evento"
-    })) return;
-
-    const { data, error: e2 } = await sb.rpc("eliminar_evento", { p_evento: b.dataset.delEv });
-    if (e2) return fail(e2);
-    toast(`Evento "${data.nombre}" eliminado`, "warn");
-    if (ev && ev.id === b.dataset.delEv) ev = null;
-    await loadEventos(); screenEventos();
+    if (await eliminarEvento(b.dataset.delEv, b.dataset.nom)) screenEventos();
   });
   let evModo = "unico";
   qsa("#main [data-evmodo]").forEach(b => b.onclick = () => {
@@ -5333,6 +5517,195 @@ async function screenEventos() {
       await loadEventos(); screenEventos();
     };
     inp.click();
+  });
+}
+
+/* Eliminar un evento. Devuelve true si se eliminó. */
+async function eliminarEvento(id, nom) {
+  // Borrar un evento arrastra sus listas, entradas y mesas. Se cuenta
+  // qué hay dentro para que la magnitud quede a la vista antes de decidir.
+  const cnt = async (tabla) => (await sb.from(tabla)
+    .select("id", { count: "exact", head: true }).eq("evento_id", id)).count || 0;
+  const [regs, tks, mesas] = await Promise.all([cnt("registros"), cnt("entradas"), cnt("mesas")]);
+  const vendidas = mesas ? (await sb.from("mesas").select("id", { count: "exact", head: true })
+    .eq("evento_id", id).neq("estado", "disponible")).count || 0 : 0;
+
+  const detalle = [];
+  if (regs) detalle.push(`${regs} anotado${regs === 1 ? "" : "s"} en listas`);
+  if (tks) detalle.push(`${tks} entrada${tks === 1 ? "" : "s"} emitida${tks === 1 ? "" : "s"}`);
+  if (mesas) detalle.push(`${mesas} mesa${mesas === 1 ? "" : "s"}${vendidas ? ` · ${vendidas} con venta` : ""}`);
+  if (!detalle.length) detalle.push("Sin listas, entradas ni mesas cargadas");
+
+  if (!await confirmar({
+    titulo: `Eliminar evento ${nom}`,
+    detalle,
+    aviso: (regs || tks || vendidas)
+      ? "Se borra todo el contenido del evento, incluidas las ventas registradas. No se puede deshacer."
+      : "El evento se elimina por completo. No se puede deshacer.",
+    accion: "Eliminar evento"
+  })) return false;
+
+  const { data, error: e2 } = await sb.rpc("eliminar_evento", { p_evento: id });
+  if (e2) { fail(e2); return false; }
+  toast(`Evento "${data.nombre}" eliminado`, "warn");
+  if (ev && ev.id === id) ev = null;
+  await loadEventos();
+  return true;
+}
+
+/* Cerrar un evento (pasa al histórico). Devuelve true si se cerró. */
+async function cerrarEvento(id, nom, fecha) {
+  if (!await confirmar({
+    titulo: `Cerrar ${nom}`,
+    detalle: fecha ? [fmtF(fecha)] : [],
+    aviso: "El evento deja de estar activo: no se podrán anotar invitados ni vender más. Los datos quedan guardados.",
+    accion: "Cerrar evento"
+  })) return false;
+  const { error } = await sb.from("eventos").update({ estado: "cerrado" }).eq("id", id);
+  if (error) { fail(error); return false; }
+  toast(`${nom} cerrado`, "warn");
+  await loadEventos();
+  return true;
+}
+
+
+/* ===================================================================
+   GESTIONAR EVENTO · pantalla propia del evento de trabajo
+   Portada, cómo se ve la entrada en cada fase (se toca una y se dibuja el
+   ticket como sale al venderlo) y todo lo que se le puede tocar.
+   =================================================================== */
+let evDetalle = null, evDetFase = null;
+function abrirEventoDetalle(id) {
+  evDetalle = id; evDetFase = null;
+  try { history.pushState({ tab: "evdet" }, "", "#evento"); } catch { /* file:// */ }
+  conPantalla(screenEventoDetalle);
+}
+function cerrarEventoDetalle() {
+  evDetalle = null;
+  tab = "eventos"; setTab(); renderTab();
+}
+async function screenEventoDetalle() {
+  if (!ev || ev.id !== evDetalle) return cerrarEventoDetalle();
+  const [{ data: fases }, { data: rs }] = await Promise.all([
+    sb.rpc("fases_evento", { p_evento: ev.id }),
+    sb.rpc("resumen_evento", { p_evento: ev.id })
+  ]);
+  const fs = ev.venta_por_fases ? (fases || []) : [];
+  fs.forEach(f => { if (f.ticket_url) fasesArte[f.id] = f.ticket_url; else delete fasesArte[f.id]; });
+  const elegida = fs.find(f => f.id === evDetFase) || fs.find(f => f.vigente) || fs[0] || null;
+  const hoyISO = new Date().toLocaleDateString("sv-SE");
+  const horario = `${(ev.hora_inicio || "21:00").slice(0, 5)} – ${(ev.hora_fin || "06:00").slice(0, 5)} hs`;
+  const datos = [fmtF(ev.fecha), horario, `Manilla ${fmtBs(ev.precio_manilla || 0)} Bs`].join(" · ");
+  const estado = enCurso(ev) ? "En vivo" : ev.fecha === hoyISO ? "Hoy" : ev.publicado === false ? "Borrador · solo lo ves vos" : "Publicado";
+  const fila = (op, ic, tono, t, d, peligro = false) => `<button class="fila-conf${peligro ? " peligro" : ""}" data-det="${op}">
+    <span class="acc-rap-ic" style="--c:${tono ? TONO_VAR[tono] : "var(--brand-primary)"}">${ico(ic)}</span>
+    <span class="tx"><b>${t}</b>${d ? `<small>${d}</small>` : ""}</span>${peligro ? "" : icCh}</button>`;
+  const opcion = f => `<button class="fase-op${f && f.id === elegida?.id || (!f && !elegida) ? " on" : ""}" ${f ? `data-fase="${f.id}"` : ""}>
+    <b>${f?.vigente ? "<i></i>" : ""}${esc(f ? f.nombre : "Precio único")} <em>${fmtBs(f ? f.precio : ev.precio_manilla || 0)} Bs</em></b>
+    <small>${!f ? (ev.venta_por_fases ? "sin fases cargadas" : "sin fases") : f.agotada ? "agotada" : f.vigente ? "a la venta"
+      : f.cupo == null ? `${f.vendidas || 0} vendidas` : `quedan ${Math.max(0, f.cupo - (f.vendidas || 0))}`}</small></button>`;
+
+  $("#main").innerHTML = `
+    <div class="ed-portada">
+      ${ev.ticket_url ? `<img src="${esc(ev.ticket_url)}" alt="" onerror="this.remove()">` : ""}
+      <div class="ed-top">
+        <button class="hero-redondo" style="margin:0" id="edVolver" aria-label="Volver">${ico("atras")}</button>
+        <button class="hero-redondo" style="margin:0" data-det="arte" aria-label="Cambiar imagen">${ico("imagen")}</button>
+      </div>
+      <span class="ed-est">${esc(estado)}</span>
+      <h1 class="ed-nm">${esc(ev.nombre)}</h1>
+      <p class="ed-meta">${esc(datos)}</p>
+    </div>
+    <div class="ed-cuerpo">
+      <div class="fichas">
+        ${ficha({ ic: "grupo", k: "Listas", v: +rs?.anotados || 0, tono: "warn", attrs: 'data-go="listas"' })}
+        ${ficha({ ic: "qr", k: "QR", v: +rs?.entradas || 0, attrs: 'data-go="entradas"' })}
+        ${ficha({ ic: "sofa", k: "Mesas", v: +rs?.mesas || 0, tono: "info", attrs: 'data-go="mesas"' })}
+        ${ficha({ ic: "check", k: "Entraron", v: +rs?.ingresaron || 0, tono: "ok", attrs: 'data-go="listas"' })}
+      </div>
+      ${ev.publicado === false && ev.estado !== "cerrado"
+        ? `<button class="btn-gestionar btn-publicar" id="edPublicar"><span>${ico("megafono")}Publicar evento</span></button>` : ""}
+
+      ${tituloBloque("Así se ve la entrada")}
+      <div class="fases-fila">${fs.length ? fs.map(opcion).join("") : opcion(null)}</div>
+      <div class="vista-entrada" id="edVista">${ev.ticket_url || elegida?.ticket_url
+        ? `<div class="sk" style="width:240px;height:320px;border-radius:12px"></div>`
+        : `<p>Subí la imagen del evento para ver cómo sale la entrada.</p>`}</div>
+      <div class="dos-bot">
+        <button class="btn ghost2" data-det="${elegida ? "artefase" : "arte"}">${ico("imagen")}${elegida ? `Arte de ${esc(elegida.nombre)}` : "Cambiar imagen"}</button>
+        <button class="btn ghost2" data-det="fases">${ico("capas")}${ev.venta_por_fases ? "Editar fases" : "Vender por fases"}</button>
+      </div>
+
+      ${tituloBloque("Configuración")}
+      <div class="tarjeta sin-pad filas-conf">
+        ${fila("editar", "lapiz", "", "Datos del evento", datos)}
+        ${fila("listas", "lista_", "warn", "Listas y cupos", "Quién anota en cada lista y cuántos")}
+        ${fila("fases", "capas", "info", "Fases de preventa", ev.venta_por_fases ? `${fs.length} fase${fs.length === 1 ? "" : "s"} · precio y stock por fase` : "Apagado: un solo precio")}
+        ${fila("horario", "reloj", "ok", "Horario de venta", ev.manilla_desde || ev.manilla_hasta_ts ? "Con límite" : "Sin límite")}
+        ${fila("arte", "imagen", "", "Imagen del evento", ev.ticket_url ? "Tocá para cambiarla" : "Sin imagen")}
+      </div>
+      <div class="tarjeta sin-pad filas-conf" style="margin-top:16px">
+        ${ev.estado !== "cerrado" ? fila("cerrar", "candado", "bad", "Cerrar evento", "Pasa al histórico; los datos se conservan", true) : ""}
+        ${fila("eliminar", "basura", "bad", "Eliminar evento", "Borra todo lo del evento", true)}
+      </div>
+      <input type="file" id="edArte" accept="image/png,image/jpeg,image/webp" class="hidden">
+    </div>`;
+
+  // la entrada de muestra, con el arte de la fase o el del evento
+  const arteFase = elegida?.ticket_url || null, arteUrl = arteFase || ev.ticket_url;
+  if (arteUrl) ticketImage(
+    { payload: `EVT:${ev.id}:VISTA-PREVIA`, code: "VISTAPREVIA", cliente: "Nombre del cliente" },
+    false, elegida?.nombre || null, { url: arteUrl, propio: arteFase })
+    .then(src => { const v = $("#edVista"); if (v && evDetalle) v.innerHTML = `<img src="${src}" alt="Vista previa de la entrada">`; })
+    .catch(() => { const v = $("#edVista"); if (v) v.innerHTML = `<p>No se pudo dibujar la vista previa.</p>`; });
+
+  const recargar = () => conPantalla(screenEventoDetalle);
+  const subir = (path, guardar, okTxt) => {
+    const inp = $("#edArte"); inp.value = "";
+    inp.onchange = async () => {
+      const file = inp.files[0]; if (!file) return;
+      toast("Subiendo imagen…");
+      try {
+        // la entrada se arma sobre 1080 px de ancho
+        const blob = await dataUrlToBlob(await comprimirImg(file, 1080, 0.88));
+        const { error: e1 } = await sb.storage.from("disenos").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+        if (e1) throw e1;
+        const { data: { publicUrl } } = sb.storage.from("disenos").getPublicUrl(path);
+        await guardar(publicUrl + "?v=" + Date.now());
+        toast(okTxt);
+        recargar();
+      } catch (err) { fail(err); }
+    };
+    inp.click();
+  };
+  $("#edVolver").onclick = () => history.back();
+  qsa("#main [data-fase]").forEach(b => b.onclick = () => { evDetFase = b.dataset.fase; recargar(); });
+  qsa("#main [data-go]").forEach(b => b.onclick = () => { evDetalle = null; tab = b.dataset.go; setTab(); renderTab(); });
+  $("#edPublicar") && ($("#edPublicar").onclick = async () => {
+    if (!await confirmar({ titulo: `Publicar ${ev.nombre}`, aviso: "El evento pasa a verse para todo el equipo. No se puede volver a borrador.", accion: "Publicar" })) return;
+    const { data, error } = await sb.rpc("publicar_evento", { p_evento: ev.id });
+    if (error) return fail(error);
+    toast(`${data.nombre} publicado · ${data.listas} lista(s) y ${data.mesas} mesa(s) ya visibles`);
+    await loadEventos(); recargar();
+  });
+  qsa("#main [data-det]").forEach(b => b.onclick = async () => {
+    const op = b.dataset.det;
+    if (op === "editar") return sheetEditarEvento(ev.id);
+    if (op === "listas") return sheetListas(ev.id);
+    if (op === "fases") return sheetFases(ev.id, ev.nombre, "entradas");
+    if (op === "horario") return sheetVentanaPrepagadas();
+    if (op === "arte") return subir(`${ev.id}.jpg`, async url => {
+      const { error } = await sb.from("eventos").update({ ticket_url: url }).eq("id", ev.id);
+      if (error) throw error;
+      await loadEventos();
+    }, "Imagen del evento actualizada");
+    if (op === "artefase" && elegida) return subir(`fase-${elegida.id}.jpg`, async url => {
+      const { error } = await sb.rpc("fase_arte", { p_fase: elegida.id, p_url: url });
+      if (error) throw error;
+      fasesArte[elegida.id] = url;
+    }, `Arte de ${elegida.nombre} actualizado`);
+    if (op === "cerrar") { if (await cerrarEvento(ev.id, ev.nombre, ev.fecha)) cerrarEventoDetalle(); return; }
+    if (op === "eliminar") { if (await eliminarEvento(ev.id, ev.nombre)) cerrarEventoDetalle(); }
   });
 }
 
@@ -7400,29 +7773,252 @@ document.addEventListener("keydown", e => {
 });
 
 /* ---------- cuenta ---------- */
-function abrirCuenta() {
-  $("#sheetBody").innerHTML = `
-    <div class="acct"><div class="avatar">${esc(me.nombre[0])}</div>
-    <div class="an">${esc(me.nombre)}</div>
-    <div class="as">@${esc(me.usuario)} · ${ROL_LABEL[me.rol]}</div></div>
-    <div class="sh-h" style="margin-top:16px">Cambiar mi contraseña</div>
-    <div class="field"><input id="pwN" type="password" placeholder="Nueva contraseña (mín. 6)" autocomplete="new-password"></div>
-    <button class="btn ghost2" id="pwGo">Cambiar contraseña</button>
-    <div style="height:10px"></div>
-    <button class="btn danger" onclick="logout()">Cerrar sesión</button>`;
-  $("#sheet").classList.add("open"); $("#scrim").classList.add("show");
-  $("#pwGo").onclick = async () => {
-    const p = $("#pwN").value;
-    if (p.length < 6) return toast("Mínimo 6 caracteres", "warn");
-    const { error } = await sb.auth.updateUser({ password: p });
-    if (error) return fail(error);
-    toast("Contraseña actualizada"); closeSheet();
+
+/* ===================================================================
+   TUTORIAL GUIADO (como el de MD Vinyl y la app): una tarjeta oscura que
+   apunta a cada botón de la barra, con qué es y "Siguiente". Sale una vez
+   por persona en este navegador; se vuelve a ver desde el panel de perfil.
+   =================================================================== */
+const claveTutorial = () => `venue.tutorial.v1.${me?.id}`;
+const QUE_ES = {
+  eventos: "Tu evento de la noche con sus números. Desde \"Gestionar evento\" lo editás, armás las listas y las fases, y creás eventos nuevos.",
+  accesos: "Anotá invitados en las listas, vendé entradas con QR y mirá quién ya entró.",
+  mesas: "El plano del boliche: qué mesas están libres, vender y reservar.",
+  stats: "El cierre del evento: la plata, la asistencia, los mejores relacionadores y cada team.",
+  team: "Tu team y lo que vendió cada uno.",
+  lista: "La lista de invitados para marcar quién entra.",
+  rrpps: "Los relacionadores de la noche y a qué team pertenecen.",
+  caja: "Lo que hay que pagarle a cada relacionador.",
+  barpos: "Cobrá en la barra.",
+  inventario: "El stock de bebidas del boliche.",
+  barcierre: "El cierre de la barra.",
+  baranalitica: "Qué se vendió y cuándo.",
+  barmov: "Entradas y salidas de stock.",
+  recepcion: "Registrá lo que llega al depósito.",
+  recepmias: "Lo que registraste vos.",
+};
+async function tutorialSiCorresponde() {
+  let visto = true;
+  try { visto = localStorage.getItem(claveTutorial()) === "1"; } catch { /* sin almacenamiento: no molestar */ }
+  if (visto) return;
+  // si quedó abierta la hoja del teléfono, se espera a que la cierren
+  while ($("#sheet").classList.contains("open")) await new Promise(r => setTimeout(r, 800));
+  tutorial();
+}
+function tutorial() {
+  cerrarPanelPerfil();
+  const celular = innerWidth < 1000;
+  const barra = celular ? "#botnav" : "#tabbar";
+  const items = tabsFor();
+  const enBarra = celular && (items.length > MAS_TABS || accionesMas().length) ? items.slice(0, MAS_TABS) : items;
+  const resto = celular ? [...items.slice(enBarra.length).map(([, l]) => l), ...accionesMas().map(([, l]) => l)] : [];
+  const enLista = l => l.length < 2 ? l.join("") : `${l.slice(0, -1).join(", ")} y ${l[l.length - 1]}`;
+  const pasos = [
+    ...enBarra.map(([t, l]) => ({ sel: `${barra} [data-t="${t}"]`, ic: TAB_ICONS[t], t: l, tx: QUE_ES[t] || `Tocá acá para abrir ${l}.`, ir: t })),
+    ...(resto.length ? [{ sel: "#botnav [data-mas]", icSvg: ICO_PATHS.puntos, t: "Más", tx: `Acá están ${enLista(resto)}.` }] : []),
+    { sel: celular ? "#avatarM" : "#avatar", icSvg: ICO_PATHS.usuario, t: "Tu perfil",
+      tx: `Tocá tu inicial para editar tu perfil, cambiar a modo oscuro${me.rol === "admin" ? ", elegir los colores y el logo del boliche" : ""} o cerrar sesión. Desde ahí también podés ver este tutorial de nuevo.`,
+      ir: homeTab() },
+  ];
+  let n = 0;
+  const capa = document.createElement("div");
+  capa.className = "tut";
+  capa.innerHTML = `<div class="tut-hueco"></div><div class="tut-pico"></div><div class="tut-card" role="dialog" aria-live="polite"></div>`;
+  document.body.appendChild(capa);
+  const terminar = () => {
+    try { localStorage.setItem(claveTutorial(), "1"); } catch { /* sin almacenamiento */ }
+    capa.remove(); removeEventListener("resize", ubicar);
+    if (tab !== homeTab()) irATab(homeTab());
   };
+  function ubicar() {
+    const p = pasos[n], el = document.querySelector(p.sel);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const hueco = capa.querySelector(".tut-hueco"), card = capa.querySelector(".tut-card"), pico = capa.querySelector(".tut-pico");
+    Object.assign(hueco.style, { left: `${r.left - 4}px`, top: `${r.top - 4}px`, width: `${r.width + 8}px`, height: `${r.height + 8}px` });
+    const abajo = r.top + r.height / 2 > innerHeight / 2;   // la tarjeta va del lado con lugar
+    const lateral = !celular && p.sel.startsWith("#tabbar");
+    card.style.top = card.style.bottom = card.style.left = "";
+    pico.style.borderColor = "transparent";
+    if (lateral) {
+      // escritorio: a la derecha de la barra lateral
+      card.style.left = `${r.right + 18}px`;
+      card.style.top = `${Math.max(16, Math.min(r.top - 20, innerHeight - card.offsetHeight - 16))}px`;
+      Object.assign(pico.style, { left: `${r.right - 2}px`, top: `${r.top + r.height / 2 - 10}px`, borderRightColor: "rgba(27,34,48,.96)" });
+    } else if (abajo) {
+      card.style.bottom = `${innerHeight - r.top + 14}px`;
+      Object.assign(pico.style, { left: `${Math.max(26, Math.min(r.left + r.width / 2 - 10, innerWidth - 46))}px`, top: `${r.top - 14}px`, borderTopColor: "rgba(27,34,48,.96)" });
+    } else {
+      card.style.top = `${r.bottom + 14}px`;
+      Object.assign(pico.style, { left: `${Math.max(26, Math.min(r.left + r.width / 2 - 10, innerWidth - 46))}px`, top: `${r.bottom - 6}px`, borderBottomColor: "rgba(27,34,48,.96)" });
+      if (!celular) { card.style.left = "auto"; card.style.right = "24px"; }
+    }
+  }
+  function pintar() {
+    const p = pasos[n], ultimo = n === pasos.length - 1;
+    if (p.ir && tab !== p.ir) irATab(p.ir);   // la sección cambia detrás
+    capa.querySelector(".tut-card").innerHTML = `
+      <div class="tut-h"><span class="acc-rap-ic"><svg viewBox="0 0 24 24" class="ic">${p.ic || p.icSvg}</svg></span><b>${esc(p.t)}</b>
+        ${ultimo ? "" : `<button class="tut-saltar" data-tut="saltar">Saltar</button>`}</div>
+      <p class="tut-tx">${esc(p.tx)}</p>
+      <div class="tut-pie"><small>${n + 1}/${pasos.length}</small>
+        ${n ? `<button class="tut-atras" data-tut="atras">Atrás</button>` : ""}
+        <button class="tut-sig" data-tut="sig">${ultimo ? "Listo" : "Siguiente"}</button></div>`;
+    requestAnimationFrame(ubicar);
+  }
+  capa.onclick = e => {
+    const k = e.target.closest("[data-tut]")?.dataset.tut;
+    if (k === "saltar") return terminar();
+    if (k === "atras") { n--; return pintar(); }
+    if (k === "sig") { if (n === pasos.length - 1) return terminar(); n++; pintar(); }
+  };
+  addEventListener("resize", ubicar);
+  pintar();
+}
+
+/* ===================================================================
+   PANEL DE PERFIL · se abre desde la inicial (arriba a la derecha en el
+   celular, abajo en la barra lateral). Cuenta, boliche, modo y salir.
+   =================================================================== */
+const temaActual = () => document.documentElement.dataset.tema === "oscuro" ? "oscuro" : "claro";
+function elegirTema(t) {
+  if (t === "oscuro") document.documentElement.dataset.tema = "oscuro";
+  else delete document.documentElement.dataset.tema;
+  try { localStorage.setItem("venue.tema", t); } catch { /* modo privado */ }
+}
+function cerrarPanelPerfil() {
+  $("#panelPerfil").classList.remove("open"); $("#ppVelo").classList.remove("show");
+}
+function abrirPanelPerfil() {
+  const c = clubData(club), varios = myClubs().length > 1 || me.plataforma;
+  const fila = (op, ic, tono, t, d = "", extra = icCh, cls = "") => `<button class="pp-fila ${cls}" data-pp="${op}">
+    <span class="acc-rap-ic" style="--c:${tono}">${ico(ic)}</span>
+    <span class="tx"><b>${t}</b>${d ? `<small>${d}</small>` : ""}</span>${extra}</button>`;
+  $("#panelPerfil").innerHTML = `
+    <div class="pp-cab">
+      ${inicial(me.nombre)}
+      <b>${esc(me.nombre)}</b>
+      <small>@${esc(me.usuario)} · ${esc(ROL_LABEL[me.rol] || me.rol)}</small>
+      <button class="btn ghost2" data-pp="editar">${ico("lapiz")}Editar perfil</button>
+    </div>
+    ${c ? `<div class="pp-rot">Boliche</div>
+    <div class="pp-grupo">
+      <button class="pp-fila" data-pp="${varios ? "boliches" : ""}" ${varios ? "" : "disabled"}>
+        <span class="club-mark sm" style="width:34px;height:34px;border-radius:10px;font-size:15px">${clubMarkHTML(club)}</span>
+        <span class="tx"><b>${esc(c.nombre)}</b><small>${varios ? "Ver todos los boliches" : esc(c.subtitulo || "")}</small></span>${varios ? icCh : ""}</button>
+      ${me.rol === "admin" ? fila("colores", "paleta", "var(--brand-primary)", "Colores de la app", "Los ve todo el equipo") : ""}
+      ${me.rol === "admin" ? fila("logo", "imagen", "var(--info)", "Logo del boliche", c.logo_url ? "Tocá para cambiarlo" : "Sin logo: se ve la inicial") : ""}
+    </div>` : ""}
+    <div class="pp-rot">Ajustes</div>
+    <div class="pp-grupo">
+      ${fila("tema", temaActual() === "oscuro" ? "luna" : "sol", "var(--warning)", "Modo oscuro", "",
+        `<span class="interruptor${temaActual() === "oscuro" ? " on" : ""}" role="switch" aria-checked="${temaActual() === "oscuro"}"></span>`)}
+      ${fila("tutorial", "birrete", "var(--success)", "Ver el tutorial", "Qué hay en cada parte de la web")}
+    </div>
+    <div class="pp-grupo" style="margin-top:24px">
+      ${fila("salir", "salir", "var(--danger)", "Cerrar sesión", "", "", "peligro")}
+    </div>
+    <input type="file" id="ppLogo" accept="image/png,image/jpeg,image/webp" class="hidden">`;
+  $("#panelPerfil").classList.add("open"); $("#ppVelo").classList.add("show");
+  qsa("#panelPerfil [data-pp]").forEach(b => b.onclick = () => {
+    const op = b.dataset.pp;
+    if (!op) return;
+    if (op === "tema") { elegirTema(temaActual() === "oscuro" ? "claro" : "oscuro"); return abrirPanelPerfil(); }
+    if (op === "logo") return subirLogoClub();
+    cerrarPanelPerfil();
+    if (op === "editar") return sheetEditarPerfil();
+    if (op === "boliches") return showClubPicker(myClubs());
+    if (op === "colores") return sheetColoresClub();
+    if (op === "tutorial") return tutorial();
+    if (op === "salir") return logout();
+  });
+}
+$("#ppVelo").onclick = cerrarPanelPerfil;
+document.addEventListener("keydown", e => { if (e.key === "Escape") cerrarPanelPerfil(); });
+
+/* Editar perfil: nombre, teléfono y contraseña. El usuario no se cambia:
+   es con lo que se entra. */
+async function sheetEditarPerfil() {
+  const { data: tel } = await sb.rpc("mi_telefono");
+  sheet(`<div class="sh-h">Editar perfil</div>
+    <div class="field"><label>Nombre y apellido</label><input id="epN" value="${esc(me.nombre)}" autocomplete="name"></div>
+    <div class="field"><label>Teléfono</label><input id="epT" value="${esc(tel || "")}" inputmode="tel" autocomplete="tel" placeholder="7xxxxxxx"></div>
+    <div class="field"><label>Nueva contraseña</label><input id="epP" type="password" placeholder="Dejala vacía para no cambiarla" autocomplete="new-password"></div>
+    <p class="hint" style="margin:-4px 0 12px">Tu usuario (@${esc(me.usuario)}) no se puede cambiar: es con lo que entrás.</p>
+    <button class="btn primary" id="epGo">Guardar</button>`);
+  $("#epGo").onclick = async () => {
+    const nombre = $("#epN").value.trim(), t = $("#epT").value.trim(), p = $("#epP").value;
+    if (!nombre) return toast("Poné tu nombre", "warn");
+    if (p && p.length < 6) return toast("La contraseña tiene que tener 6 caracteres o más", "warn");
+    const b = $("#epGo"); b.disabled = true;
+    try {
+      if (nombre !== me.nombre) {
+        const { error } = await sb.from("profiles").update({ nombre }).eq("id", me.id);
+        if (error) throw error;
+        me.nombre = nombre;
+      }
+      if (t && t !== (tel || "")) {
+        const { error } = await sb.rpc("guardar_telefono", { p_tel: t });
+        if (error) throw error;
+      }
+      if (p) {
+        const { error } = await sb.auth.updateUser({ password: p });
+        if (error) throw error;
+      }
+      toast("Perfil actualizado"); closeSheet(); header();
+    } catch (e) { b.disabled = false; fail(e); }
+  };
+}
+
+/* Colores del boliche: los mismos 20 de la app, o uno a mano */
+const COLORES_APP = ["#7C3AED", "#A855F7", "#EC4899", "#E11D48", "#EF4444", "#F97316", "#F59E0B", "#EAB308",
+  "#84CC16", "#22C55E", "#10B981", "#14B8A6", "#0D9488", "#06B6D4", "#0EA5E9", "#3B82F6", "#2563EB", "#6366F1", "#64748B", "#111827"];
+function sheetColoresClub() {
+  const c = clubData(club); if (!c) return;
+  sheet(`<div class="sh-h">Colores de la app<span class="r-sub">${esc(c.nombre)}</span></div>
+    <p class="hint" style="margin:0 0 12px">El color se ve en los botones, la barra y los números de todo el equipo.</p>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">${COLORES_APP.map(h =>
+      `<button data-col="${h}" aria-label="${h}" style="aspect-ratio:1;border-radius:14px;border:${h.toLowerCase() === (c.color_primario || "").toLowerCase() ? "3px solid var(--text-primary)" : "none"};background:${h}"></button>`).join("")}</div>
+    <div class="field" style="margin-top:14px"><label>Otro color</label><input type="color" id="colOtro" value="${esc(c.color_primario || "#7C3AED")}"></div>`);
+  const guardar = async h => {
+    // el secundario es el mismo, un poco más claro (como lo arma la app)
+    const sec = "#" + [1, 3, 5].map(i => Math.round(parseInt(h.slice(i, i + 2), 16) + (255 - parseInt(h.slice(i, i + 2), 16)) * .25).toString(16).padStart(2, "0")).join("");
+    const { error } = await sb.from("clubs").update({ color_primario: h, color_secundario: sec }).eq("id", c.id);
+    if (error) return fail(error);
+    await recargarClubs(); aplicarTemaClub(clubData(club)); header();
+    toast("Colores actualizados"); closeSheet();
+  };
+  qsa("#sheetBody [data-col]").forEach(b => b.onclick = () => guardar(b.dataset.col));
+  $("#colOtro").onchange = e => guardar(e.target.value);
+}
+
+/* Logo del boliche. Necesita la columna clubs.logo_url (db/32-logo-boliche.sql). */
+function subirLogoClub() {
+  const inp = $("#ppLogo"); inp.value = "";
+  inp.onchange = async () => {
+    const file = inp.files[0]; if (!file) return;
+    toast("Subiendo logo…");
+    try {
+      const blob = await dataUrlToBlob(await comprimirImg(file, 512, 0.9));
+      const path = `logo-${club}.jpg`;
+      const { error: e1 } = await sb.storage.from("disenos").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+      if (e1) throw e1;
+      const { data: { publicUrl } } = sb.storage.from("disenos").getPublicUrl(path);
+      const { error: e2 } = await sb.from("clubs").update({ logo_url: publicUrl + "?v=" + Date.now() }).eq("id", club);
+      if (e2) {
+        if (e2.code === "42703" || /logo_url/.test(e2.message || "")) return toast("Falta preparar la base para los logos (db/32-logo-boliche.sql)", "warn");
+        throw e2;
+      }
+      await recargarClubs(); header(); renderClubMenu(myClubs());
+      toast("Logo actualizado"); abrirPanelPerfil();
+    } catch (e) { fail(e); }
+  };
+  inp.click();
 }
 // La cuenta se abre desde la barra lateral (escritorio) y desde la
 // topbar (celular): son el mismo panel.
-$("#avatar") && ($("#avatar").onclick = abrirCuenta);
-$("#avatarM") && ($("#avatarM").onclick = abrirCuenta);
+$("#avatar") && ($("#avatar").onclick = abrirPanelPerfil);
+$("#avatarM") && ($("#avatarM").onclick = abrirPanelPerfil);
 
 /* ============================================================
    CAJA · quiénes aparecen en la lista (sólo @aqueirolo)
@@ -7649,7 +8245,20 @@ window.resetClave = async (userId, nombre) => {
 };
 
 /* ---------- arranque: sesión persistida ---------- */
-if (sb) sb.auth.getSession().then(({ data: { session } }) => { if (session) boot(); });
+/* Splash: el logo de Venue queda mientras se sabe si hay sesión, un
+   mínimo de 700 ms para que no sea un parpadeo, y se desvanece. */
+const splashMinimo = new Promise(r => setTimeout(r, 700));
+async function quitarSplash() {
+  await splashMinimo;
+  const s = $("#splash"); if (!s) return;
+  s.classList.add("fuera");
+  setTimeout(() => s.remove(), 500);
+}
+if (sb) sb.auth.getSession()
+  .then(async ({ data: { session } }) => { if (session) await boot(); })
+  .catch(console.error)
+  .finally(quitarSplash);
+else quitarSplash();
 
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js").then(reg => {

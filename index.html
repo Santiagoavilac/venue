@@ -20,6 +20,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Chakra+Petch:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="rediseno.css">
+<script>
+/* el modo se aplica antes de pintar para que no parpadee: claro salvo que
+   la persona haya elegido oscuro en su panel de perfil */
+try { if (localStorage.getItem("venue.tema") === "oscuro") document.documentElement.dataset.tema = "oscuro"; } catch (e) {}
+</script>
 <style>
 /* Ajustes propios de esta pantalla. El resto vive en styles.css:
    duplicar reglas acá las haría pisar el diseño por orden de cascada. */
@@ -28,20 +34,39 @@
 </head>
 <body>
 
-<!-- LOGIN -->
-<div class="login" id="login">
-  <div class="login-brand">
-    <h1 class="vn-logo">VENUE</h1>
-    <p class="vn-sub">Event Management Platform</p>
+<!-- SPLASH: el logo de Venue mientras arranca -->
+<div class="splash" id="splash" aria-hidden="true">
+  <div class="splash-logo">
+    <svg viewBox="132 132 248 256"><path d="M132 132h58l66 190 66-190h58L282 388h-52z"/></svg>
+    <span>venue</span>
   </div>
-  <div class="login-card" id="loginCard">
-    <div id="loginErr"></div>
-    <div class="field"><label>Usuario</label><input id="lgUser" autocomplete="username" autocapitalize="none"></div>
-    <div class="field"><label>Contraseña</label>
-      <div class="pw-wrap"><input id="lgPass" type="password" autocomplete="current-password"><button type="button" class="pw-eye" id="lgEye" aria-label="Ver contraseña"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
-    <button class="btn primary" id="btnLogin">Ingresar</button>
+</div>
+
+<!-- LOGIN: de a un dato por pantalla, como el ingreso de Resy -->
+<div class="login l2" id="login" data-paso="0">
+  <div class="l2-caja">
+    <div class="l2-top">
+      <span class="l2-marca" id="lgMarca">VENUE</span>
+      <button type="button" class="l2-volver hidden" id="lgVolver" aria-label="Volver"><svg viewBox="0 0 24 24" class="ic"><path d="M15 5l-7 7 7 7"/></svg></button>
+    </div>
+    <div class="l2-cuerpo login-brand" id="loginCard">
+      <h1 id="lgTit">Ingresá tu usuario</h1>
+      <p class="l2-sub" id="lgSub">Acceso solo para personal autorizado</p>
+      <!-- los dos campos quedan en la página para que el gestor de
+           contraseñas del navegador los complete juntos -->
+      <div id="lgPaso0">
+        <label class="l2-rot" for="lgUser">USUARIO</label>
+        <input id="lgUser" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="tu.usuario" enterkeyhint="next">
+      </div>
+      <div id="lgPaso1" class="hidden">
+        <label class="l2-rot" for="lgPass">CONTRASEÑA</label>
+        <div class="l2-campo pw-wrap"><input id="lgPass" type="password" autocomplete="current-password" enterkeyhint="go"><button type="button" class="pw-eye" id="lgEye" aria-label="Ver contraseña"><svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+        <p class="l2-nota">¿Olvidaste tu contraseña? Pedile a tu jefe de team o al administrador que te la restablezca.</p>
+      </div>
+      <div id="loginErr" class="l2-err"></div>
+    </div>
+    <button class="l2-boton" id="btnLogin" disabled>Siguiente</button>
   </div>
-  <div class="login-foot">Acceso solo para personal autorizado.</div>
 </div>
 
 <!-- APP -->
@@ -82,7 +107,7 @@
       <div class="tb-ctx">
         <button class="tb-club" id="tbClub" aria-label="Cambiar de boliche">
           <span class="club-mark sm" id="tbClubMark">·</span>
-          <span id="tbClubName">Cargando…</span>
+          <span class="tb-club-tx"><span class="tb-club-k">Club</span><span id="tbClubName">Cargando…</span></span>
           <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
         </button>
         <span class="tb-sep" aria-hidden="true"></span>
@@ -153,6 +178,10 @@
   </section>
 </div>
 
+<!-- Panel de perfil: se abre desde la inicial -->
+<div class="pp-velo" id="ppVelo"></div>
+<aside class="panel-perfil" id="panelPerfil" aria-label="Perfil y ajustes"></aside>
+
 <div class="club-menu" id="clubMenu">
   <!-- Poblado en runtime por renderClubMenu() en app.js, desde la tabla
        `clubs` — con boliches creados dinámicamente no hay una cantidad
@@ -167,6 +196,7 @@
 <script src="config.js"></script>
 <script src="contabilidad.js"></script>
 <script src="app.js"></script>
+<script src="reporte-escritorio.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
 <script src="motion.js"></script>
