@@ -67,7 +67,7 @@ Future<void> hojaMesaSeguridad(BuildContext context, Mesa m, Combo? combo) => _h
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${m.esLounge ? 'Lounge' : 'Mesa'} ${m.etiqueta}',
+            Text('${m.tipo.nombre} ${m.etiqueta}',
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 10),
             if (m.libre)
@@ -258,7 +258,7 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
-        Text('Vender ${m.etiqueta} · ${m.esLounge ? 'Lounge' : 'Mesa'}',
+        Text('Vender ${m.etiqueta} · ${m.tipo.nombre}',
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
         const SizedBox(height: 14),
         TextField(
@@ -641,7 +641,7 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
         Text(
-          esGrupo ? grupo.map((x) => x.etiqueta).join(' + ') : '${m.esLounge ? 'Lounge' : 'Mesa'} ${m.etiqueta}',
+          esGrupo ? grupo.map((x) => x.etiqueta).join(' + ') : '${m.tipo.nombre} ${m.etiqueta}',
           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 6),
@@ -949,6 +949,7 @@ class _EditarMesa extends ConsumerStatefulWidget {
 
 class _EditarMesaState extends ConsumerState<_EditarMesa> {
   late final _etiqueta = TextEditingController(text: widget.mesa.etiqueta);
+  final _pisoNuevo = TextEditingController();
   late String _cat = widget.mesa.categoria;
   late double _w = widget.mesa.w.clamp(8, 30).toDouble();
   late double _h = (widget.mesa.h ?? 21).clamp(8, 45).toDouble();
@@ -958,6 +959,7 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
   @override
   void dispose() {
     _etiqueta.dispose();
+    _pisoNuevo.dispose();
     super.dispose();
   }
 
@@ -966,7 +968,8 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
     final m = widget.mesa;
     final teams = ref.watch(teamsClubProvider).value ?? const <String, String>{};
     final repo = ref.read(mesasRepositoryProvider);
-    final pisos = {...ordenPisos.where((p) => widget.pisos.contains(p) || p == _planta), ...ordenPisos}.toList();
+    // los pisos del evento, el de la mesa y, al final, "Nuevo piso…"
+    final pisos = {...widget.pisos, _planta}.toList();
 
     Future<void> hacer(Future<void> Function() f, String ok) async {
       try {
@@ -1001,10 +1004,10 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
               icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
               menuMaxHeight: 420,
               initialValue: _cat,
-              decoration: const InputDecoration(labelText: 'Categoría'),
-              items: const [
-                DropdownMenuItem(value: 'mesa', child: Text('Mesa')),
-                DropdownMenuItem(value: 'lounge', child: Text('Lounge')),
+              decoration: const InputDecoration(labelText: 'Tipo'),
+              items: [
+                for (final t in {...tiposMesa, tipoMesa(_cat)})
+                  DropdownMenuItem(value: t.id, child: Text(t.nombre)),
               ],
               onChanged: (v) => setState(() => _cat = v!),
             ),
@@ -1046,15 +1049,24 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
               icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
               menuMaxHeight: 420,
               initialValue: _planta,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Piso'),
               items: [
                 for (final p in pisos)
-                  DropdownMenuItem(value: p, child: Text(etiquetaPiso[p] ?? p)),
+                  DropdownMenuItem(value: p, child: Text(nombrePiso(p), overflow: TextOverflow.ellipsis)),
+                const DropdownMenuItem(value: '__nuevo', child: Text('Nuevo piso…')),
               ],
               onChanged: (v) => setState(() => _planta = v!),
             ),
           ),
         ]),
+        if (_planta == '__nuevo') ...[
+          const SizedBox(height: 10),
+          TextField(
+            controller: _pisoNuevo,
+            decoration: const InputDecoration(labelText: 'Nombre del piso nuevo', hintText: 'Terraza, Piso 2…'),
+          ),
+        ],
         const SizedBox(height: 18),
         FilledButton(
           onPressed: () => hacer(
@@ -1065,7 +1077,9 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
                     w: _w.round(),
                     h: _h.round(),
                     teamId: _team,
-                    planta: _planta,
+                    planta: _planta == '__nuevo'
+                        ? (idDePiso(_pisoNuevo.text).isEmpty ? m.planta : idDePiso(_pisoNuevo.text))
+                        : _planta,
                   ),
               'Mesa actualizada'),
           child: const Text('Guardar'),
@@ -1127,7 +1141,7 @@ class _Combos extends ConsumerWidget {
               '${c.precio} Bs',
               if (c.incluyeManillas > 0) '${c.incluyeManillas} manillas',
               'comisión ${c.comisionRrpp}+${c.comisionJefe}',
-              if (c.categorias.isNotEmpty) 'solo ${c.categorias.join(', ')}',
+              if (c.categorias.isNotEmpty) 'solo ${c.categorias.map((k) => tipoMesa(k).plural.toLowerCase()).join(', ')}',
               if (!c.activo) 'inactivo',
             ].join(' · ')),
             trailing: const Icon(Icons.edit_outlined),
@@ -1214,11 +1228,11 @@ class _ComboFormState extends ConsumerState<_ComboForm> {
         const SizedBox(height: 12),
         const Text('Se vende en (sin marcar = en todas)'),
         Wrap(spacing: 8, children: [
-          for (final k in const ['mesa', 'lounge'])
+          for (final t in tiposMesa)
             FilterChip(
-              label: Text(k == 'mesa' ? 'Mesas' : 'Lounges'),
-              selected: _cats.contains(k),
-              onSelected: (v) => setState(() => v ? _cats.add(k) : _cats.remove(k)),
+              label: Text(t.plural),
+              selected: _cats.contains(t.id),
+              onSelected: (v) => setState(() => v ? _cats.add(t.id) : _cats.remove(t.id)),
             ),
         ]),
         SwitchListTile(

@@ -446,3 +446,25 @@ html:not([data-tema="oscuro"]) :is(.kp,.ev-fila,.ev-acc-h,.mas-op,.mas-item,.sta
 .re-col-b i{display:block;width:100%}
 .re-col-h{font-size:11.5px;color:var(--text-secondary)}
 .re-vacio{color:var(--text-muted);text-align:center;padding:60px 0}
+
+/* ---------- MESAS SIN PLANO: lista por tipo ---------- */
+.legend[hidden],.plano[hidden]{display:none!important}
+.ms-lista{display:flex;flex-direction:column;gap:18px;margin-bottom:14px}
+.ms-grupo-h{display:flex;align-items:baseline;gap:10px;margin:0 2px 8px}
+.ms-grupo-h b{font-size:16px;font-weight:700}
+.ms-grupo-h span{font-size:13px;color:var(--text-muted)}
+.ms-tarjetas{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.ms-tarjeta{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;min-height:92px;text-align:left;
+  border-radius:16px;background:var(--surface);border:var(--borde-tarjeta);box-shadow:var(--sombra-tarjeta);
+  font-family:var(--ui);color:var(--text-primary);border-left:4px solid var(--success)}
+.ms-tarjeta.e-reservada{border-left-color:var(--warning)}
+.ms-tarjeta.e-pagada{border-left-color:var(--brand-primary)}
+.ms-tarjeta.e-ocupada{border-left-color:var(--danger)}
+.ms-t-top{display:flex;align-items:center;gap:8px;width:100%}
+.ms-t-top b{font-size:18px;font-weight:800}
+.ms-est{margin-left:auto;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:99px;background:var(--success-bg);color:var(--success)}
+.ms-est.reservada{background:var(--warning-bg);color:var(--warning)}
+.ms-est.pagada{background:color-mix(in srgb,var(--brand-primary) 12%,transparent);color:var(--brand-primary)}
+.ms-est.ocupada{background:var(--danger-bg);color:var(--danger)}
+.ms-t-nm{font-size:14.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.ms-t-sub{font-size:12.5px;color:var(--text-muted)}

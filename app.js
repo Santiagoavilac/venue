@@ -6234,11 +6234,35 @@ const EST_LABEL = { disponible: "Libre", reservada: "Reservada", pagada: "Pagada
 /* pisos por club: los que tengan mesas; si no hay, defaults del boliche */
 const FLOOR_LABEL = { piso1: "Piso 1", piso2: "Piso 2", piso3: "Piso 3", alta: "Planta alta", baja: "Planta baja" };
 const FLOOR_ORDER = ["piso1", "piso2", "piso3", "alta", "baja"];
+/* Tipos de mesa. "forma" decide cómo se dibuja en el plano (redonda o
+   lounge); el resto es el nombre que ve la gente. La base guarda el id como
+   texto libre, así que sumar un tipo no necesita tocar la base. */
+const TIPOS_MESA = [
+  { id: "mesa", nom: "Mesa", pl: "Mesas", w: 14, forma: "m", pre: "M" },
+  { id: "mesa_alta", nom: "Mesa alta", pl: "Mesas altas", w: 11, forma: "m", pre: "MA" },
+  { id: "lounge", nom: "Lounge", pl: "Lounges", w: 18, forma: "l", pre: "L" },
+  { id: "vip", nom: "VIP", pl: "VIP", w: 18, forma: "l", pre: "VIP" },
+  { id: "box", nom: "Box", pl: "Boxes", w: 20, forma: "l", pre: "B" },
+  { id: "barra", nom: "Barra", pl: "Lugares en barra", w: 10, forma: "m", pre: "BR" },
+];
+const tipoMesa = c => TIPOS_MESA.find(t => t.id === c) || { ...TIPOS_MESA[0], id: c || "mesa", nom: c || "Mesa", pl: c || "Mesas" };
+const formaMesa = c => tipoMesa(c).forma === "l" ? "lounge" : "mesa";
+const nombrePiso = f => FLOOR_LABEL[f] || f;
+/* Pisos agregados en esta sesión que todavía no tienen mesas: el piso
+   queda guardado en cuanto se le pone la primera mesa (la base guarda el
+   piso en cada mesa, no hay una tabla de pisos). */
+const pisosNuevos = {};
 const pisosDe = () => {
-  const presentes = [...new Set(mesas.map(m => m.planta))];
-  const p = FLOOR_ORDER.filter(f => presentes.includes(f));
+  const hay = new Set([...mesas.map(m => m.planta), ...Object.keys(fondosCache).filter(k => fondosCache[k]), ...(pisosNuevos[club] || [])]);
+  const conocidos = FLOOR_ORDER.filter(f => hay.has(f));
+  const otros = [...hay].filter(f => f && !FLOOR_ORDER.includes(f)).sort((a, b) => a.localeCompare(b));
+  const p = [...conocidos, ...otros];
   return p.length ? p : ["alta", "baja"];
 };
+/* Sin imagen de fondo, las mesas se ven como lista de tarjetas por tipo
+   (boliches sin plano: mesa por mesa). Se puede cambiar a mano. */
+const vistaMesas = {};
+const enLista = () => vistaMesas[planta] ?? !fondosCache[planta];
 /* zoom del plano: null = automático (en el celular arranca acercado para
    que las mesas se lean; en escritorio, ajustado al ancho) */
 const ESTADO_EV = { proximo: "Próximo", activo: "Activo", cerrado: "Cerrado", borrador: "Borrador" };
@@ -6264,11 +6288,11 @@ async function screenMesas() {
   $("#main").innerHTML = `
     ${pgHead({ ey: "Salón", t: "Mesas",
       s: `<b>${oc.length}</b> de <b>${mesas.length}</b> ${esPortero ? "ocupadas" : "vendidas"}${
-          !esPortero && oc.length ? ` · <b>Bs ${fmtBs(oc.reduce((a, m) => a + (+m.precio || 0), 0))}</b>` : ""}${pisos.length < 2 ? ` · ${esc(FLOOR_LABEL[planta] || planta)}` : ""}`,
+          !esPortero && oc.length ? ` · <b>Bs ${fmtBs(oc.reduce((a, m) => a + (+m.precio || 0), 0))}</b>` : ""}${pisos.length < 2 ? ` · ${esc(nombrePiso(planta))}` : ""}`,
       acc: `<div class="ms-h-acc" id="msAcc"></div>` })}
     ${misRes.length ? `<div class="hint" style="color:var(--warn);margin:0 0 10px">Reservas sin pago: ${misRes.map(x => `${esc(x.etiqueta)} vence ${vence(x)}`).join(" · ")} — confirmá el pago o se liberan solas.</div>` : ""}
     <div class="floors${pisos.length < 2 ? " solo" : ""}" style="margin:0 0 12px"><span class="ind" style="width:calc(${(100 / pisos.length).toFixed(2)}% - 5px);transform:translateX(${pisos.indexOf(planta) * 100}%)"></span>
-      ${pisos.map(f => `<button data-f="${f}" class="${planta === f ? "on" : ""}">${FLOOR_LABEL[f] || f}</button>`).join("")}</div>
+      ${pisos.map(f => `<button data-f="${f}" class="${planta === f ? "on" : ""}">${esc(nombrePiso(f))}</button>`).join("")}</div>
     <div class="ms-acc">
       ${/* Afuera lo que se usa durante el evento: confirmar pagos, el
             registro de combos y guardar el plano. Adentro del ⋯ queda la
@@ -6277,22 +6301,24 @@ async function screenMesas() {
       ${!editMode && me.rol === "admin" && porVerif.length
         ? `<button class="ghost ms-urgente" id="btnConta">Confirmar pagos (${porVerif.length})</button>` : ""}
       ${!editMode && oc.length && !esPortero ? `<button class="ghost" id="btnRegM">Registro de combos</button>` : ""}
-      ${!editMode ? `<button class="ghost" id="btnPlano">Guardar imagen</button>` : ""}
+      ${!editMode && !enLista() ? `<button class="ghost" id="btnPlano">Guardar imagen</button>` : ""}
+      <button class="ghost" id="btnVista">${enLista() ? "Ver plano" : "Ver lista"}</button>
       ${me.rol === "admin" && editMode ? `
         <button class="ghost editing-on" id="btnEd">Listo</button>
         <button class="ghost${moverMesas ? " ms-mover" : ""}" id="btnLock">${moverMesas ? "Mover: activado" : "Posiciones bloqueadas"}</button>
-        <button class="ghost" id="btnAddM">Agregar mesa</button>
-        <button class="ghost" id="btnAddL">Agregar lounge</button>
-        <button class="ghost" id="btnFondo">Fondo del ${FLOOR_LABEL[planta] || planta}${fondosCache[planta] ? " ✓" : ""}</button>
+        <button class="ghost" id="btnAddM">Agregar mesas</button>
+        <button class="ghost" id="btnPiso">Agregar piso</button>
+        <button class="ghost" id="btnFondo">Fondo del ${esc(nombrePiso(planta))}${fondosCache[planta] ? " ✓" : ""}</button>
         ${!mesas.length ? `<button class="ghost" id="btnCopy">Copiar de otro evento</button>` : ""}
       ` : ""}
       ${/* Sólo el admin configura el plano: para el resto quedaría vacío. */""}
       ${!editMode && me.rol === "admin" ? `<button class="ghost ev-mas" id="msMas" title="Configuración del plano" aria-label="Configuración del plano">⋯</button>` : ""}
     </div>
-    <div class="plano">
+    ${enLista() ? listaMesasHTML(enPlanta, esPortero) : ""}
+    <div class="plano"${enLista() ? " hidden" : ""}>
     <div class="canvas-wrap" id="cvWrap">
       <div class="canvas ${editMode ? "editmode" : ""}" id="cv2" style="--z:${zoomPlano()}${propFondo[fondosCache[planta]] ? `;aspect-ratio:${propFondo[fondosCache[planta]]}` : ""}">
-        ${fondosCache[planta] ? `<img class="cv-fondo" src="${esc(fondosCache[planta])}" alt="" crossorigin="anonymous">` : `<div class="watermark">${FLOOR_LABEL[planta] || planta}</div>`}
+        ${fondosCache[planta] ? `<img class="cv-fondo" src="${esc(fondosCache[planta])}" alt="" crossorigin="anonymous">` : `<div class="watermark">${esc(nombrePiso(planta))}</div>`}
       </div>
     </div>
     <div class="zoom" role="group" aria-label="Zoom del plano">
@@ -6302,7 +6328,7 @@ async function screenMesas() {
     </div>
     </div>
     <input type="file" id="fondoFile" accept="image/*" class="hidden">
-    <div class="legend">
+    <div class="legend"${enLista() ? " hidden" : ""}>
       <span><i class="sw libre"></i>Libre</span>
       <span><i class="sw reservada"></i>Reservada</span>
       <span><i class="sw pagada"></i>Pagada</span>
@@ -6326,7 +6352,7 @@ async function screenMesas() {
     const d = document.createElement("div");
     const libre = m.estado === "disponible", narrow = m.w < 14;
     const sinVerif = m.estado === "pagada" && !m.pago_verificado;
-    d.className = "chip " + (libre ? "free " + (m.categoria === "lounge" ? "l" : "m") : m.categoria) + (narrow ? " narrow" : "") + " e-" + m.estado + (sinVerif ? " no-verif" : "");
+    d.className = "chip " + (libre ? "free " + tipoMesa(m.categoria).forma : formaMesa(m.categoria)) + (narrow ? " narrow" : "") + " e-" + m.estado + (sinVerif ? " no-verif" : "");
     d.style.cssText = `left:${m.x}%;top:${m.y}%;width:${m.w}%` + (m.h ? `;height:${m.h}%` : "");
     // nombre completo en el chip: la foto del plano se manda a planimetría
     const nm = libre ? "Libre" : (m.cliente || "").trim();
@@ -6364,6 +6390,13 @@ async function screenMesas() {
     }, { passive: true });
   }
   qsa("#main .floors button").forEach(b => b.onclick = () => { planta = b.dataset.f; screenMesas(); });
+  // vista lista: tocar una tarjeta hace lo mismo que tocar la mesa en el plano
+  qsa("#main [data-mesa]").forEach(b => b.onclick = () => {
+    const m = mesas.find(x => x.id === b.dataset.mesa); if (!m) return;
+    if (editMode && me.rol === "admin") sheetMesaEdit(m); else sheetMesa(m);
+  });
+  $("#btnVista") && ($("#btnVista").onclick = () => { vistaMesas[planta] = !enLista(); screenMesas(); });
+  $("#btnPiso") && ($("#btnPiso").onclick = () => sheetNuevoPiso());
   /* Acciones secundarias del plano. Eran hasta ocho botones al mismo
      nivel; ahora sólo queda visible lo que pide acción y el resto vive
      acá. Cada opción llama exactamente a lo mismo que antes. */
@@ -6371,10 +6404,11 @@ async function screenMesas() {
   if (bmas) bmas.onclick = () => {
     // Configuración del evento: se arma una vez, antes de la noche.
     const op = [];
-    if (me.rol === "admin") op.push(["editar", "Editar plano", IC.mesa]);
+    if (me.rol === "admin") op.push(["editar", enLista() ? "Editar mesas" : "Editar plano", IC.mesa]);
+    if (me.rol === "admin") op.push(["piso", "Agregar piso", IC.list]);
     if (me.rol === "admin") op.push(["combos", "Combos", IC.tag]);
 
-    sheet(`<div class="sh-h">Mesas<span class="r-sub">${FLOOR_LABEL[planta] || planta}</span></div>
+    sheet(`<div class="sh-h">Mesas<span class="r-sub">${esc(nombrePiso(planta))}</span></div>
       <div class="mas-lista">${op.map(([k, l, ico]) =>
         `<button class="mas-op" data-msop="${k}">${ico}<span>${esc(l)}</span></button>`).join("")}</div>`);
 
@@ -6383,13 +6417,13 @@ async function screenMesas() {
       closeSheet();
       if (k === "editar") { editMode = true; moverMesas = false; return screenMesas(); }
       if (k === "combos") return sheetCombos();
+      if (k === "piso") return sheetNuevoPiso();
     });
   };
 
   const be = $("#btnEd"); if (be) be.onclick = () => { editMode = !editMode; moverMesas = false; screenMesas(); };
   const blk = $("#btnLock"); if (blk) blk.onclick = () => { moverMesas = !moverMesas; screenMesas(); };
-  const bm = $("#btnAddM"); if (bm) bm.onclick = () => nuevaMesa("mesa");
-  const bl = $("#btnAddL"); if (bl) bl.onclick = () => nuevaMesa("lounge");
+  const bm = $("#btnAddM"); if (bm) bm.onclick = () => sheetNuevasMesas();
   const bc = $("#btnCombos"); if (bc) bc.onclick = sheetCombos;
   const brm = $("#btnRegM"); if (brm) brm.onclick = copyRegistroMesas;
   const bct = $("#btnConta"); if (bct) bct.onclick = () => sheetContabilidad(porVerif);
@@ -6408,7 +6442,7 @@ async function screenMesas() {
       const { data: { publicUrl } } = sb.storage.from("disenos").getPublicUrl(path);
       const { error: e2 } = await sb.from("plano_fondos").upsert({ club_id: club, planta, url: publicUrl + "?v=" + Date.now() });
       if (e2) { bf.disabled = false; return fail(e2); }
-      toast(`Fondo del ${FLOOR_LABEL[planta] || planta} actualizado`);
+      toast(`Fondo del ${esc(nombrePiso(planta))} actualizado`);
       invalidarCache("fondos");
       screenMesas();
     };
@@ -6456,14 +6490,114 @@ function dragMesa(el, m, cv2) {
   };
 }
 
+/* Lista de mesas por tipo, para los pisos sin plano */
+function listaMesasHTML(lista, esPortero) {
+  if (!lista.length) return `<div class="empty">No hay mesas en ${esc(nombrePiso(planta))}.${me.rol === "admin" ? " Agregalas con Editar mesas." : ""}</div>`;
+  const porTipo = new Map();
+  lista.forEach(m => { const t = tipoMesa(m.categoria).id; if (!porTipo.has(t)) porTipo.set(t, []); porTipo.get(t).push(m); });
+  const orden = [...porTipo.keys()].sort((a, b) => TIPOS_MESA.findIndex(t => t.id === a) - TIPOS_MESA.findIndex(t => t.id === b));
+  const natural = (a, b) => a.etiqueta.localeCompare(b.etiqueta, "es", { numeric: true });
+  return `<div class="ms-lista">${orden.map(t => {
+    const l = porTipo.get(t).sort(natural), libres = l.filter(m => m.estado === "disponible").length;
+    return `<section class="ms-grupo">
+      <div class="ms-grupo-h"><b>${esc(tipoMesa(t).pl)}</b><span>${libres} libre${libres === 1 ? "" : "s"} de ${l.length}</span></div>
+      <div class="ms-tarjetas">${l.map(m => {
+        const team = m.team_id ? teamsCache.find(x => x.id === m.team_id) : null;
+        const sinVerif = m.estado === "pagada" && !m.pago_verificado;
+        return `<button class="ms-tarjeta e-${m.estado}" data-mesa="${m.id}">
+          <span class="ms-t-top"><b>${esc(m.etiqueta)}</b><span class="ms-est ${m.estado}">${EST_LABEL[m.estado] || m.estado}${sinVerif ? " · sin verificar" : ""}</span></span>
+          <span class="ms-t-nm">${m.estado === "disponible" ? "Libre" : esc((m.cliente || "").trim() || "—")}</span>
+          <span class="ms-t-sub">${[team?.nombre, !esPortero && m.precio ? `${fmtBs(m.precio)} Bs` : "", m.estado !== "disponible" && m.combo_qty ? `${m.combo_qty} combo${m.combo_qty === 1 ? "" : "s"}` : ""].filter(Boolean).map(esc).join(" · ")}</span>
+        </button>`;
+      }).join("")}</div>
+    </section>`;
+  }).join("")}</div>`;
+}
+/* <option> de pisos, con "Nuevo piso…" al final */
+const opcionesPiso = sel => pisosDe().map(f => `<option value="${esc(f)}"${sel === f ? " selected" : ""}>${esc(nombrePiso(f))}</option>`).join("")
+  + `<option value="__nuevo">Nuevo piso…</option>`;
+const conectarPisoNuevo = (selId, campoId) => {
+  const sel = $("#" + selId);
+  sel.onchange = () => $("#" + campoId).classList.toggle("hidden", sel.value !== "__nuevo");
+};
+/* el piso elegido; si es nuevo, el nombre escrito (Planta alta → "alta", como los de siempre) */
+function leerPiso(selId, inpId) {
+  const v = $("#" + selId).value;
+  if (v !== "__nuevo") return v;
+  const nom = ($("#" + inpId).value || "").trim();
+  if (!nom) return "";
+  return Object.keys(FLOOR_LABEL).find(k => FLOOR_LABEL[k].toLowerCase() === nom.toLowerCase()) || nom;
+}
+/* Agregar piso: queda en la sesión hasta que tenga su primera mesa */
+function sheetNuevoPiso() {
+  const sugeridos = ["Planta baja", "Planta alta", "Piso 1", "Piso 2", "Piso 3", "Terraza", "Rooftop", "Sector VIP"]
+    .filter(n => !pisosDe().some(f => nombrePiso(f).toLowerCase() === n.toLowerCase()));
+  sheet(`<div class="sh-h">Agregar piso</div>
+    <div class="field"><label>Nombre del piso</label><input id="npN" placeholder="Terraza, Piso 2, Sector VIP…" autocomplete="off"></div>
+    <div class="chip-pick" style="margin:-2px 0 14px">${sugeridos.map(n => `<button type="button" class="mchip" data-np="${esc(n)}">${esc(n)}</button>`).join("")}</div>
+    <p class="hint" style="margin:0 0 12px">El piso queda guardado cuando le agregás la primera mesa. Si tenés el dibujo del piso, subilo con "Fondo" y se ve como plano; si no, las mesas se ven como lista.</p>
+    <button class="btn primary" id="npGo">Agregar piso</button>`);
+  qsa("#sheetBody [data-np]").forEach(b => b.onclick = () => { $("#npN").value = b.dataset.np; });
+  $("#npN").focus();
+  $("#npGo").onclick = () => {
+    const nom = $("#npN").value.trim();
+    if (!nom) return toast("Poné el nombre del piso", "warn");
+    const id = Object.keys(FLOOR_LABEL).find(k => FLOOR_LABEL[k].toLowerCase() === nom.toLowerCase()) || nom;
+    (pisosNuevos[club] = pisosNuevos[club] || []).includes(id) || pisosNuevos[club].push(id);
+    planta = id; editMode = true;
+    closeSheet(); toast(`${nombrePiso(id)} agregado · sumale mesas`);
+    screenMesas();
+  };
+}
+/* Agregar una o varias mesas de un tipo, en el piso que se elija */
+function sheetNuevasMesas() {
+  let tipo = "mesa";
+  sheet(`<div class="sh-h">Agregar mesas</div>
+    <div class="field"><label>Tipo</label>
+      <div class="chip-pick">${TIPOS_MESA.map(t => `<button type="button" class="mchip${t.id === tipo ? " on" : ""}" data-nt="${t.id}">${t.nom}</button>`).join("")}</div></div>
+    <div class="row2">
+      <div class="field"><label>Cuántas</label><input id="nmN" type="number" min="1" max="40" value="1"></div>
+      <div class="field"><label>Piso</label><select id="nmPl">${opcionesPiso(planta)}</select></div>
+    </div>
+    <div class="field hidden" id="nmPlNuevoF"><label>Nombre del piso nuevo</label><input id="nmPlNuevo" placeholder="Terraza, Piso 2, VIP…"></div>
+    <p class="hint" style="margin:0 0 12px" id="nmHint"></p>
+    <button class="btn primary" id="nmGo">Agregar</button>`);
+  const existentes = t => mesas.filter(m => tipoMesa(m.categoria).id === t).length;
+  const pista = () => { const t = tipoMesa(tipo), n = Math.max(1, Math.min(40, +$("#nmN").value || 1)), d = existentes(tipo) + 1;
+    $("#nmHint").textContent = `Se crean ${n === 1 ? `${t.pre}${d}` : `${t.pre}${d} a ${t.pre}${d + n - 1}`}. Después podés cambiarles el nombre.`; };
+  qsa("#sheetBody [data-nt]").forEach(b => b.onclick = () => {
+    tipo = b.dataset.nt; qsa("#sheetBody [data-nt]").forEach(o => o.classList.toggle("on", o === b)); pista();
+  });
+  $("#nmN").oninput = pista; pista();
+  conectarPisoNuevo("nmPl", "nmPlNuevoF");
+  $("#nmGo").onclick = async () => {
+    const pl = leerPiso("nmPl", "nmPlNuevo");
+    if (!pl) return toast("Poné el nombre del piso", "warn");
+    const t = tipoMesa(tipo), n = Math.max(1, Math.min(40, +$("#nmN").value || 1)), desde = existentes(tipo) + 1;
+    const ya = mesas.filter(m => m.planta === pl).length;
+    // en el plano quedan en una grilla, sin encimarse, para acomodarlas después
+    const filas = Array.from({ length: n }, (_, i) => {
+      const k = ya + i;
+      return { evento_id: ev.id, planta: pl, etiqueta: `${t.pre}${desde + i}`, categoria: t.id,
+        x: 4 + (k % 6) * 16, y: 6 + (Math.floor(k / 6) % 4) * 23, w: t.w };
+    });
+    const b = $("#nmGo"); b.disabled = true;
+    const { error } = await sb.from("mesas").insert(filas);
+    if (error) { b.disabled = false; return fail(error); }
+    planta = pl;
+    toast(n === 1 ? `${t.nom} agregada` : `${n} ${t.pl.toLowerCase()} agregadas`);
+    closeSheet(); screenMesas();
+  };
+}
+
 async function nuevaMesa(cat) {
   const n = mesas.length + 1;
   const { error } = await sb.from("mesas").insert({
     evento_id: ev.id, planta, etiqueta: "M" + n, categoria: cat,
-    x: 42, y: 45, w: cat === "lounge" ? 18 : 14
+    x: 42, y: 45, w: tipoMesa(cat).w
   });
   if (error) return fail(error);
-  toast((cat === "lounge" ? "Lounge" : "Mesa") + " agregada");
+  toast(tipoMesa(cat).nom + " agregada");
   screenMesas();
 }
 
@@ -6689,8 +6823,8 @@ function pintarBusqueda(q, regs, tks, mesas) {
     return `<button class="bsc-item" data-ir-mesa="${m.id}">
       <span class="code-chip">${esc(m.etiqueta)}</span>
       <span class="bsc-body">
-        <span class="bsc-nm">${esc(m.cliente || (m.categoria === "lounge" ? "Lounge libre" : "Mesa libre"))}</span>
-        <span class="bsc-sub">${esc(FLOOR_LABEL[m.planta] || m.planta || "")}${m.combo_qty ? ` · ${m.combo_qty} combo${m.combo_qty === 1 ? "" : "s"}` : ""}${m.precio ? ` · ${fmtBs(m.precio)} Bs` : ""}</span>
+        <span class="bsc-nm">${esc(m.cliente || (tipoMesa(m.categoria).nom + " libre"))}</span>
+        <span class="bsc-sub">${esc(nombrePiso(m.planta || ""))}${m.combo_qty ? ` · ${m.combo_qty} combo${m.combo_qty === 1 ? "" : "s"}` : ""}${m.precio ? ` · ${fmtBs(m.precio)} Bs` : ""}</span>
       </span>
       <span class="bsc-est ${cls}">${libre ? "Libre" : esc(m.estado)}${!libre && m.pago_verificado === false ? " ·  sin verificar" : ""}</span>
     </button>`;
@@ -6776,7 +6910,7 @@ function confirmar({ titulo, detalle = [], aviso = "", accion = "Eliminar", canc
 
 /* seguridad (portero): solo nombre del cliente y su combo — nada de plata */
 async function sheetMesaSeguridad(m) {
-  const tag = m.categoria === "lounge" ? "Lounge" : "Mesa";
+  const tag = tipoMesa(m.categoria).nom;
   if (m.estado === "disponible") return sheet(`<div class="sh-h">${esc(m.etiqueta)} · ${tag}</div><div class="empty">Libre</div>`);
   let prim = m;
   if (m.grupo_id) {
@@ -6793,7 +6927,7 @@ async function sheetMesaSeguridad(m) {
 /* venta / info de mesa */
 async function sheetMesa(m) {
   if (me.rol === "portero") return sheetMesaSeguridad(m);
-  const tag = m.categoria === "lounge" ? "Lounge" : "Mesa";
+  const tag = tipoMesa(m.categoria).nom;
   if (m.estado === "disponible") {
     if (!["rrpp", "jefe", "admin"].includes(me.rol)) return;   // jefe también vende
     if (!combosCache.filter(c => c.activo).length) return toast("El admin debe crear combos primero", "warn");
@@ -7418,9 +7552,8 @@ function sheetMesaEdit(m) {
     <div class="sh-h">Editar ${esc(m.etiqueta)}</div>
     <div class="row2">
       <div class="field"><label>Etiqueta</label><input id="emEt" value="${esc(m.etiqueta)}"></div>
-      <div class="field"><label>Categoría</label><select id="emCat">
-        <option value="mesa"${m.categoria === "mesa" ? " selected" : ""}>Mesa</option>
-        <option value="lounge"${m.categoria === "lounge" ? " selected" : ""}>Lounge</option></select></div>
+      <div class="field"><label>Tipo</label><select id="emCat">${TIPOS_MESA.map(t =>
+        `<option value="${t.id}"${tipoMesa(m.categoria).id === t.id ? " selected" : ""}>${t.nom}</option>`).join("")}</select></div>
     </div>
     <div class="row2">
       <div class="field"><label>Ancho %</label><input id="emW" type="number" min="8" max="30" value="${m.w}"></div>
@@ -7429,24 +7562,27 @@ function sheetMesaEdit(m) {
     <div class="row2">
       <div class="field"><label>Team asignado</label><select id="emTeam"><option value="">— libre —</option>${teamsDelClub().map(t =>
         `<option value="${t.id}"${m.team_id === t.id ? " selected" : ""}>${esc(t.nombre)}</option>`).join("")}</select></div>
-      <div class="field"><label>Piso</label><select id="emPl">${pisosDe().map(f =>
-        `<option value="${f}"${m.planta === f ? " selected" : ""}>${FLOOR_LABEL[f] || f}</option>`).join("")}</select></div>
+      <div class="field"><label>Piso</label><select id="emPl">${opcionesPiso(m.planta)}</select></div>
     </div>
+    <div class="field hidden" id="emPlNuevoF"><label>Nombre del piso nuevo</label><input id="emPlNuevo" placeholder="Terraza, Piso 2, VIP…"></div>
     <button class="btn primary" id="emGo">Guardar</button>
     <div style="height:9px"></div>
     <button class="btn danger" id="emDel">Eliminar mesa</button>`);
+  conectarPisoNuevo("emPl", "emPlNuevoF");
   $("#emGo").onclick = async () => {
+    const pl = leerPiso("emPl", "emPlNuevo");
+    if (!pl) return toast("Poné el nombre del piso", "warn");
     const { error } = await sb.from("mesas").update({
       etiqueta: $("#emEt").value.trim() || m.etiqueta, categoria: $("#emCat").value,
       w: +$("#emW").value || m.w, h: +$("#emH").value || null,
-      team_id: $("#emTeam").value || null, planta: $("#emPl").value
+      team_id: $("#emTeam").value || null, planta: pl
     }).eq("id", m.id);
     if (error) return fail(error);
     toast("Mesa actualizada"); closeSheet(); screenMesas();
   };
   $("#emDel").onclick = async () => {
     const vendida = m.estado && m.estado !== "disponible";
-    const detalle = [m.categoria === "lounge" ? "Lounge" : "Mesa"];
+    const detalle = [tipoMesa(m.categoria).nom];
     if (m.cliente) detalle.push(`Cliente: ${m.cliente}`);
     if (m.combo) detalle.push(`Combo: ${m.combo}`);
     if (vendida) detalle.push(`Estado: ${m.estado}`);
@@ -7468,7 +7604,7 @@ function sheetMesaEdit(m) {
 
 /* En qué tipos de mesa se puede vender cada combo.
    Sin ninguno marcado (o los dos) el combo sirve para todas. */
-const CATS_MESA = [{ id: "lounge", nom: "Lounges" }, { id: "mesa", nom: "Mesas (redondas)" }];
+const CATS_MESA = TIPOS_MESA.map(t => ({ id: t.id, nom: t.pl }));
 const catsChips = (id, sel) => `
   <div class="chip-pick">${CATS_MESA.map(k =>
     `<button type="button" class="mchip${(sel || []).includes(k.id) ? " on" : ""}" data-${id}="${k.id}">${k.nom}</button>`).join("")}</div>`;

@@ -98,7 +98,7 @@ class _PlanoState extends State<Plano> {
                 else
                   Center(
                     child: Text(
-                      (etiquetaPiso[widget.planta] ?? widget.planta).toUpperCase(),
+                      nombrePiso(widget.planta).toUpperCase(),
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: .06),
                         fontSize: alto * .22,
@@ -160,7 +160,7 @@ class _PlanoState extends State<Plano> {
       top: alto * pos.dy / 100,
       child: Semantics(
         button: true,
-        label: '${m.esLounge ? 'Lounge' : 'Mesa'} ${m.etiqueta}, '
+        label: '${m.tipo.nombre} ${m.etiqueta}, '
             '${etiquetaEstado[m.estado] ?? m.estado}'
             '${nombre.isEmpty || m.libre ? '' : ', $nombre'}',
         child: GestureDetector(

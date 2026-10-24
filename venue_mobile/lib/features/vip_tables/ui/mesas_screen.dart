@@ -37,6 +37,26 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
   String? _planta;
   bool _editando = false, _mover = false, _barrido = false, _ocupado = false;
 
+  /// Pisos agregados a mano que todavía no tienen mesas: quedan guardados
+  /// cuando se les pone la primera (la base guarda el piso en cada mesa).
+  final _pisosNuevos = <String>{};
+
+  /// Plano o lista, elegido a mano por piso. Sin elegir: lista si el piso no
+  /// tiene fondo (boliches sin plano, mesa por mesa).
+  final _vista = <String, bool>{};
+
+  Future<void> _agregarPiso(List<String> pisos) async {
+    final nombre = await _pedirPiso(context, pisos);
+    if (nombre == null || !mounted) return;
+    final id = idDePiso(nombre);
+    setState(() {
+      _pisosNuevos.add(id);
+      _planta = id;
+      _editando = true;
+    });
+    avisar(context, '${nombrePiso(id)} agregado: sumale mesas');
+  }
+
   Future<void> _hacer(Future<void> Function() f, {String? ok}) async {
     setState(() => _ocupado = true);
     try {
@@ -143,11 +163,9 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
       datos: (todas) {
         // Los pisos con mesas, más el que se eligió a mano: un piso nuevo
         // todavía no tiene mesas y aun así hay que poder pararse en él.
-        final conMesas = pisosDe(todas);
-        final pisos = ordenPisos
-            .where((p) => conMesas.contains(p) || p == _planta)
-            .toList();
+        final pisos = pisosDe(todas, extra: [...fondos.keys, ..._pisosNuevos, ?_planta]);
         final planta = pisos.contains(_planta) ? _planta! : pisos.first;
+        final enLista = _vista[planta] ?? fondos[planta] == null;
         final enPlanta = todas.where((m) => m.planta == planta).toList();
         final vendidas = todas.where((m) => !m.libre).toList();
         final porVerif = todas.where((m) => m.porVerificar).toList();
@@ -197,14 +215,20 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                 ),
               const SizedBox(height: 10),
               if (pisos.length > 1)
-                SegmentedButton<String>(
-                  showSelectedIcon: false,
-                  segments: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(children: [
                     for (final p in pisos)
-                      ButtonSegment(value: p, label: Text(etiquetaPiso[p] ?? p)),
-                  ],
-                  selected: {planta},
-                  onSelectionChanged: (s) => setState(() => _planta = s.first),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(nombrePiso(p)),
+                          selected: p == planta,
+                          showCheckmark: false,
+                          onSelected: (_) => setState(() => _planta = p),
+                        ),
+                      ),
+                  ]),
                 ),
               const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 6, children: [
@@ -225,11 +249,14 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                       avisar(context, 'Registro copiado — precios ya sin comisión');
                     }
                   }),
-                if (!_editando)
+                if (!_editando && !enLista)
                   _Accion('Guardar imagen', Icons.image_outlined,
                       () => _guardarImagen(ev, planta)),
+                _Accion(enLista ? 'Ver plano' : 'Ver lista',
+                    enLista ? Icons.map_outlined : Icons.view_list_rounded,
+                    () => setState(() => _vista[planta] = !enLista)),
                 if (esAdmin && !_editando) ...[
-                  _Accion('Editar plano', Icons.edit_location_alt_outlined,
+                  _Accion(enLista ? 'Editar mesas' : 'Editar plano', Icons.edit_location_alt_outlined,
                       () => setState(() {
                             _editando = true;
                             _mover = false;
@@ -251,10 +278,22 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                     selected: _mover,
                     onSelected: (v) => setState(() => _mover = v),
                   ),
-                  _Accion('Mesa', Icons.add_rounded,
-                      _ocupado ? null : () => _hacer(() => repo.crear(ev.id, planta, 'mesa', todas.length + 1), ok: 'Mesa agregada')),
-                  _Accion('Lounge', Icons.add_rounded,
-                      _ocupado ? null : () => _hacer(() => repo.crear(ev.id, planta, 'lounge', todas.length + 1), ok: 'Lounge agregado')),
+                  _Accion('Agregar mesas', Icons.add_rounded,
+                      _ocupado
+                          ? null
+                          : () async {
+                              final r = await _hojaNuevasMesas(context, pisos, planta, todas);
+                              if (r == null) return;
+                              final yaHay = todas.where((m) => m.tipo.id == r.tipo.id).length;
+                              await _hacer(
+                                  () => repo.crearVarias(ev.id, r.planta, r.tipo, r.cantidad,
+                                      desde: yaHay + 1,
+                                      ya: todas.where((m) => m.planta == r.planta).length),
+                                  ok: r.cantidad == 1
+                                      ? '${r.tipo.nombre} agregada'
+                                      : '${r.cantidad} ${r.tipo.plural.toLowerCase()} agregadas');
+                              if (mounted) setState(() => _planta = r.planta);
+                            }),
                   _Accion(
                       'Fondo${fondos[planta] != null ? ' ✓' : ''}',
                       Icons.wallpaper_rounded,
@@ -269,31 +308,27 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                                     .subirDiseno(b, 'fondo-$club-$planta.jpg');
                                 await repo.guardarFondo(club, planta, url);
                                 ref.invalidate(fondosProvider);
-                              }, ok: 'Fondo de ${etiquetaPiso[planta] ?? planta} actualizado');
+                              }, ok: 'Fondo de ${nombrePiso(planta)} actualizado');
                             }),
                   if (todas.isEmpty)
                     _Accion('Copiar de otro evento', Icons.content_copy_rounded,
                         () => _copiarDeOtro(ev, club)),
-                  if (ordenPisos.any((p) => !pisos.contains(p)))
-                    PopupMenuButton<String>(
-                      tooltip: 'Agregar un piso',
-                      onSelected: (p) {
-                        setState(() => _planta = p);
-                        avisar(context,
-                            '${etiquetaPiso[p]} agregado: sumale mesas o un fondo');
-                      },
-                      itemBuilder: (_) => [
-                        for (final p in ordenPisos.where((p) => !pisos.contains(p)))
-                          PopupMenuItem(value: p, child: Text(etiquetaPiso[p] ?? p)),
-                      ],
-                      child: const _Etiqueta('Agregar piso', Icons.layers_outlined),
-                    ),
+                  _Accion('Agregar piso', Icons.layers_outlined, () => _agregarPiso(pisos)),
                 ],
               ]),
               const SizedBox(height: 12),
+              if (enLista)
+                _ListaMesas(
+                  mesas: enPlanta,
+                  teams: teams,
+                  conPlata: !esPortero,
+                  alTocar: tocar,
+                  vacio: 'No hay mesas en ${nombrePiso(planta)}.'
+                      '${esAdmin ? ' Agregalas con "Editar mesas".' : ''}',
+                ),
               // El plano se puede ampliar y desplazar con dos dedos. En modo
               // mover, un dedo arrastra la mesa y el plano queda quieto.
-              Builder(builder: (context) {
+              if (!enLista) Builder(builder: (context) {
                 // El visor necesita un alto propio: dentro de una lista no
                 // tiene de dónde sacarlo y el plano quedaba invisible.
                 final visible = MediaQuery.of(context).size.width - 32;
@@ -338,7 +373,7 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                   ),
                 );
               }),
-              if ((MediaQuery.of(context).size.width - 32) < 640)
+              if (!enLista && (MediaQuery.of(context).size.width - 32) < 640)
                 Padding(
                   padding: EdgeInsets.only(top: 6),
                   child: Text('← deslizá el plano de lado →',
@@ -346,9 +381,9 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                       style: TextStyle(color: VenueColors.textoSuave, fontSize: 12)),
                 ),
               const SizedBox(height: 10),
-              const LeyendaPlano(),
+              if (!enLista) const LeyendaPlano(),
               const SizedBox(height: 6),
-              Text(
+              if (!enLista) Text(
                 _editando
                     ? (_mover
                         ? 'Arrastrá una mesa para acomodarla · tocá para editarla'
@@ -365,7 +400,7 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                     icono: Icons.table_bar_outlined,
                     titulo: 'Este evento todavía no tiene mesas',
                     detalle: esAdmin
-                        ? 'Tocá "Editar plano" para agregarlas o copiarlas de otro evento.'
+                        ? 'Tocá "Editar ${enLista ? 'mesas' : 'plano'}" para agregarlas o copiarlas de otro evento.'
                         : 'Las carga el administrador del boliche.',
                   ),
                 ),
@@ -375,27 +410,6 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
       },
     );
   }
-}
-
-class _Etiqueta extends StatelessWidget {
-  const _Etiqueta(this.texto, this.icono);
-  final String texto;
-  final IconData icono;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: VenueColors.linea),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icono, size: 18),
-          const SizedBox(width: 8),
-          Text(texto, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        ]),
-      );
 }
 
 class _Accion extends StatelessWidget {
@@ -414,4 +428,257 @@ class _Accion extends StatelessWidget {
         icon: Icon(icono, size: 18),
         label: Text(texto),
       );
+}
+
+
+/// Pedir el nombre de un piso nuevo, con sugerencias.
+Future<String?> _pedirPiso(BuildContext context, List<String> yaHay) {
+  final c = TextEditingController();
+  final sugeridos = ['Planta baja', 'Planta alta', 'Piso 1', 'Piso 2', 'Piso 3', 'Terraza', 'Rooftop', 'Sector VIP']
+      .where((n) => !yaHay.any((p) => nombrePiso(p).toLowerCase() == n.toLowerCase()))
+      .toList();
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: VenueColors.superficie,
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + MediaQuery.of(ctx).viewInsets.bottom),
+      child: StatefulBuilder(
+        builder: (ctx, set) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Agregar piso', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: c,
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(labelText: 'Nombre del piso', hintText: 'Terraza, Piso 2, Sector VIP…'),
+            onChanged: (_) => set(() {}),
+          ),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            for (final n in sugeridos)
+              ActionChip(label: Text(n), onPressed: () => set(() => c.text = n)),
+          ]),
+          const SizedBox(height: 10),
+          Text(
+            'El piso queda guardado cuando le agregás la primera mesa. Con el dibujo del piso '
+            '(Fondo) se ve como plano; sin dibujo, las mesas se ven como lista.',
+            style: TextStyle(color: VenueColors.textoSuave, fontSize: 13, height: 1.35),
+          ),
+          const SizedBox(height: 14),
+          FilledButton(
+            onPressed: c.text.trim().isEmpty ? null : () => Navigator.pop(ctx, c.text.trim()),
+            child: const Text('Agregar piso'),
+          ),
+        ]),
+      ),
+    ),
+  );
+}
+
+/// Agregar una o varias mesas de un tipo, en el piso que se elija.
+Future<({TipoMesa tipo, int cantidad, String planta})?> _hojaNuevasMesas(
+    BuildContext context, List<String> pisos, String planta, List<Mesa> todas) {
+  var tipo = tiposMesa.first;
+  var cantidad = 1;
+  var piso = planta;
+  final nuevo = TextEditingController();
+  const otro = '__nuevo';
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: VenueColors.superficie,
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + MediaQuery.of(ctx).viewInsets.bottom),
+      child: StatefulBuilder(builder: (ctx, set) {
+        final desde = todas.where((m) => m.tipo.id == tipo.id).length + 1;
+        final destino = piso == otro ? idDePiso(nuevo.text) : piso;
+        return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Agregar mesas', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          const Text('Tipo', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            for (final t in tiposMesa)
+              ChoiceChip(
+                label: Text(t.nombre),
+                selected: t.id == tipo.id,
+                showCheckmark: false,
+                onSelected: (_) => set(() => tipo = t),
+              ),
+          ]),
+          const SizedBox(height: 14),
+          Row(children: [
+            const Expanded(child: Text('Cuántas', style: TextStyle(fontWeight: FontWeight.w600))),
+            IconButton.outlined(
+                onPressed: cantidad > 1 ? () => set(() => cantidad--) : null,
+                icon: const Icon(Icons.remove_rounded)),
+            SizedBox(
+                width: 44,
+                child: Text('$cantidad',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
+            IconButton.outlined(
+                onPressed: cantidad < 40 ? () => set(() => cantidad++) : null,
+                icon: const Icon(Icons.add_rounded)),
+          ]),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            borderRadius: BorderRadius.circular(12),
+            dropdownColor: VenueColors.superficie,
+            icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+            initialValue: piso,
+            decoration: const InputDecoration(labelText: 'Piso'),
+            items: [
+              for (final p in pisos) DropdownMenuItem(value: p, child: Text(nombrePiso(p))),
+              const DropdownMenuItem(value: otro, child: Text('Nuevo piso…')),
+            ],
+            onChanged: (v) => set(() => piso = v!),
+          ),
+          if (piso == otro) ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: nuevo,
+              decoration: const InputDecoration(labelText: 'Nombre del piso nuevo', hintText: 'Terraza, Piso 2…'),
+              onChanged: (_) => set(() {}),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            cantidad == 1
+                ? 'Se crea ${tipo.prefijo}$desde. Después le podés cambiar el nombre.'
+                : 'Se crean ${tipo.prefijo}$desde a ${tipo.prefijo}${desde + cantidad - 1}. Después les podés cambiar el nombre.',
+            style: TextStyle(color: VenueColors.textoSuave, fontSize: 13),
+          ),
+          const SizedBox(height: 14),
+          FilledButton(
+            onPressed: destino.isEmpty
+                ? null
+                : () => Navigator.pop(ctx, (tipo: tipo, cantidad: cantidad, planta: destino)),
+            child: const Text('Agregar'),
+          ),
+        ]);
+      }),
+    ),
+  );
+}
+
+/// Mesas de un piso sin plano: tarjetas agrupadas por tipo.
+class _ListaMesas extends StatelessWidget {
+  const _ListaMesas({
+    required this.mesas,
+    required this.teams,
+    required this.conPlata,
+    required this.alTocar,
+    required this.vacio,
+  });
+  final List<Mesa> mesas;
+  final Map<String, String> teams;
+  final bool conPlata;
+  final ValueChanged<Mesa> alTocar;
+  final String vacio;
+
+  Color _color(BuildContext context, String estado) => switch (estado) {
+        'reservada' => VenueColors.aviso,
+        'pagada' => VenueColors.ok,
+        'ocupada' => Theme.of(context).colorScheme.primary,
+        _ => VenueColors.textoSuave,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    if (mesas.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        child: Text(vacio, textAlign: TextAlign.center, style: TextStyle(color: VenueColors.textoSuave)),
+      );
+    }
+    final porTipo = <String, List<Mesa>>{};
+    for (final m in mesas) {
+      porTipo.putIfAbsent(m.tipo.id, () => []).add(m);
+    }
+    int pos(String id) {
+      final i = tiposMesa.indexWhere((t) => t.id == id);
+      return i < 0 ? tiposMesa.length : i;
+    }
+    final orden = porTipo.keys.toList()..sort((a, b) => pos(a).compareTo(pos(b)));
+    int natural(Mesa a, Mesa b) {
+      final na = int.tryParse(a.etiqueta.replaceAll(RegExp(r'\D'), ''));
+      final nb = int.tryParse(b.etiqueta.replaceAll(RegExp(r'\D'), ''));
+      return na != null && nb != null && na != nb ? na.compareTo(nb) : a.etiqueta.compareTo(b.etiqueta);
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final t in orden) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 6, 2, 8),
+          child: Row(children: [
+            Text(tipoMesa(t).plural, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(width: 8),
+            Text('${porTipo[t]!.where((m) => m.libre).length} libres de ${porTipo[t]!.length}',
+                style: TextStyle(fontSize: 13, color: VenueColors.textoSuave)),
+          ]),
+        ),
+        LayoutBuilder(builder: (context, c) {
+          final cols = c.maxWidth >= 700 ? 4 : c.maxWidth >= 460 ? 3 : 2;
+          const gap = 10.0;
+          final ancho = (c.maxWidth - gap * (cols - 1)) / cols;
+          return Wrap(spacing: gap, runSpacing: gap, children: [
+            for (final m in porTipo[t]!..sort(natural))
+              SizedBox(
+                width: ancho,
+                child: Material(
+                  color: VenueColors.superficie,
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
+                  elevation: 0,
+                  child: InkWell(
+                    onTap: () => alTocar(m),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                      decoration: BoxDecoration(
+                        border: Border(left: BorderSide(color: _color(context, m.estado), width: 4)),
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Text(m.etiqueta, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _color(context, m.estado).withValues(alpha: .14),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Text(etiquetaEstado[m.estado] ?? m.estado,
+                                style: TextStyle(
+                                    fontSize: 11.5, fontWeight: FontWeight.w600, color: _color(context, m.estado))),
+                          ),
+                        ]),
+                        const SizedBox(height: 4),
+                        Text(m.libre ? 'Libre' : ((m.cliente ?? '').trim().isEmpty ? '—' : m.cliente!.trim()),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+                        Text(
+                          [
+                            if (m.teamId != null && teams[m.teamId] != null) teams[m.teamId]!,
+                            if (conPlata && m.precio > 0) '${m.precio} Bs',
+                          ].join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12.5, color: VenueColors.textoSuave),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+          ]);
+        }),
+        const SizedBox(height: 8),
+      ],
+    ]);
+  }
 }

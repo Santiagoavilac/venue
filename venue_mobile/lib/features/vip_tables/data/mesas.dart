@@ -16,12 +16,52 @@ const etiquetaEstado = {
   'disponible': 'Libre', 'reservada': 'Reservada', 'pagada': 'Pagada', 'ocupada': 'Ocupada',
 };
 
-/// Pisos que tienen mesas, en orden. Sin mesas: planta alta y baja.
-List<String> pisosDe(Iterable<Mesa> mesas) {
-  final hay = mesas.map((m) => m.planta).toSet();
-  final p = ordenPisos.where(hay.contains).toList();
+/// Nombre de un piso: los de siempre tienen su etiqueta; uno agregado a
+/// mano ("Terraza") se guarda con su nombre y se muestra tal cual.
+String nombrePiso(String p) => etiquetaPiso[p] ?? p;
+
+/// Lo que se escribió como piso nuevo: "Planta alta" vuelve a ser "alta",
+/// como los de siempre; cualquier otro nombre queda como está.
+String idDePiso(String nombre) {
+  final n = nombre.trim();
+  for (final e in etiquetaPiso.entries) {
+    if (e.value.toLowerCase() == n.toLowerCase()) return e.key;
+  }
+  return n;
+}
+
+/// Pisos que tienen mesas o fondo (más los que se agregaron a mano), en
+/// orden: primero los de siempre y después los propios por nombre. Sin nada:
+/// planta alta y baja.
+List<String> pisosDe(Iterable<Mesa> mesas, {Iterable<String> extra = const []}) {
+  final hay = {...mesas.map((m) => m.planta), ...extra}..removeWhere((p) => p.isEmpty);
+  final conocidos = ordenPisos.where(hay.contains);
+  final otros = hay.where((p) => !ordenPisos.contains(p)).toList()..sort();
+  final p = [...conocidos, ...otros];
   return p.isEmpty ? ['alta', 'baja'] : p;
 }
+
+/// Un tipo de mesa. [lounge] decide cómo se dibuja (redonda o lounge); la
+/// base guarda el id como texto libre, así que sumar tipos no toca la base.
+class TipoMesa {
+  const TipoMesa(this.id, this.nombre, this.plural, this.ancho, this.prefijo, {this.lounge = false});
+  final String id, nombre, plural, prefijo;
+  final int ancho;
+  final bool lounge;
+}
+
+/// Los mismos tipos que la web (TIPOS_MESA en app.js).
+const tiposMesa = [
+  TipoMesa('mesa', 'Mesa', 'Mesas', 14, 'M'),
+  TipoMesa('mesa_alta', 'Mesa alta', 'Mesas altas', 11, 'MA'),
+  TipoMesa('lounge', 'Lounge', 'Lounges', 18, 'L', lounge: true),
+  TipoMesa('vip', 'VIP', 'VIP', 18, 'VIP', lounge: true),
+  TipoMesa('box', 'Box', 'Boxes', 20, 'B', lounge: true),
+  TipoMesa('barra', 'Barra', 'Lugares en barra', 10, 'BR'),
+];
+
+TipoMesa tipoMesa(String id) =>
+    tiposMesa.where((t) => t.id == id).firstOrNull ?? TipoMesa(id, id, id, 14, 'M');
 
 /// Radio para juntar mesas, en unidades del plano (el ancho mide 1000).
 /// 70 deja sumar las que están una al lado de la otra (4, 3 y 2 de SitRoom,
@@ -95,7 +135,7 @@ class Mesa {
   final String planta;
   final String etiqueta;
 
-  /// mesa | lounge
+  /// Tipo de mesa ([tiposMesa]): mesa, mesa_alta, lounge, vip, box, barra.
   final String categoria;
 
   /// Posición y tamaño en PORCENTAJE del plano (igual que la web).
@@ -119,7 +159,9 @@ class Mesa {
   final bool cortesia;
 
   bool get libre => estado == 'disponible';
-  bool get esLounge => categoria == 'lounge';
+  /// Se dibuja como lounge (lounge, VIP, box).
+  bool get esLounge => tipoMesa(categoria).lounge;
+  TipoMesa get tipo => tipoMesa(categoria);
   bool get porVerificar => estado == 'pagada' && !pagoVerificado && precio > 0;
 
   /// Cuándo vence la reserva. El vencimiento viaja en la mesa; el respaldo
@@ -335,7 +377,10 @@ class MesasRepository {
   /// Fondo del plano por planta.
   Future<Map<String, String>> fondos(String clubId) async {
     final r = await _sb.from('plano_fondos').select('planta, url').eq('club_id', clubId);
-    return {for (final x in r) x['planta'] as String: x['url'] as String};
+    return {
+      for (final x in r)
+        if ((x['url'] as String?)?.isNotEmpty ?? false) x['planta'] as String: x['url'] as String,
+    };
   }
 
   /// Teams que operan en el boliche (para asignarle una mesa a un team).
@@ -402,6 +447,22 @@ class MesasRepository {
       _sb.rpc('verificar_mesa', params: {'p_mesa': mesaId, 'p_ok': ok});
 
   // ── editor de plano (admin) ───────────────────────────────────────
+  /// Varias mesas de un tipo de una vez ([desde] es el primer número). En el
+  /// plano quedan en grilla para que no se encimen; [ya] son las que ya hay
+  /// en ese piso.
+  Future<void> crearVarias(String eventoId, String planta, TipoMesa t, int cantidad,
+          {required int desde, required int ya}) =>
+      _sb.from('mesas').insert([
+        for (var i = 0; i < cantidad; i++)
+          {
+            'evento_id': eventoId, 'planta': planta, 'etiqueta': '${t.prefijo}${desde + i}',
+            'categoria': t.id, 'x': 4 + ((ya + i) % 6) * 16, 'y': 6 + (((ya + i) ~/ 6) % 4) * 23,
+            'w': t.ancho, 'estado': 'disponible', 'botellas': <String>[], 'manillas': 0,
+            'combo_qty': 1, 'pago_verificado': false, 'cortesia': false,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          },
+      ]);
+
   Future<void> crear(String eventoId, String planta, String categoria, int n) =>
       _sb.from('mesas').insert({
         'evento_id': eventoId, 'planta': planta, 'etiqueta': 'M$n',
