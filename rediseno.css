@@ -468,3 +468,11 @@ html:not([data-tema="oscuro"]) :is(.kp,.ev-fila,.ev-acc-h,.mas-op,.mas-item,.sta
 .ms-est.ocupada{background:var(--danger-bg);color:var(--danger)}
 .ms-t-nm{font-size:14.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .ms-t-sub{font-size:12.5px;color:var(--text-muted)}
+
+/* ---------- CÓMO TRABAJA EL BOLICHE ---------- */
+.ops-club{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.op-club{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:14px;background:var(--surface-2);cursor:pointer}
+.op-club input{width:20px;height:20px;margin-top:2px;accent-color:var(--brand-primary);flex-shrink:0}
+.op-club span{display:flex;flex-direction:column;gap:2px}
+.op-club b{font-size:14.5px;font-weight:600}
+.op-club small{font-size:12.5px;color:var(--text-muted)}

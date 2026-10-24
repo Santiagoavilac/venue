@@ -139,7 +139,8 @@ class ReporteScreen extends ConsumerWidget {
                   ],
                 ]),
               ],
-              if (esAdmin || rol == Rol.jefe) ...[
+              // sin relacionadores en el boliche no hay ranking ni teams
+              if ((esAdmin || rol == Rol.jefe) && club.usaRelacionadores) ...[
                 TituloBloque(
                   esAdmin ? 'Top relacionadores' : 'Mi team',
                   verTodo: mias.length > 5
@@ -148,7 +149,7 @@ class ReporteScreen extends ConsumerWidget {
                 ),
                 _TablaTop(personas: mias, equipo: equipo, evento: ev, limite: 5),
               ],
-              if (esAdmin) ...[
+              if (esAdmin && club.usaRelacionadores && club.usaTeams) ...[
                 const TituloBloque('Por team'),
                 _PorTeam(personas: mias, equipo: equipo, evento: ev),
               ],
@@ -180,7 +181,7 @@ class ReporteScreen extends ConsumerWidget {
                     color: VenueColors.ok,
                     alTocar: () => exportarContabilidad(context, ref),
                   ),
-                if (esAdmin) ...[
+                if (esAdmin && club.usaRelacionadores) ...[
                   AccionRapida(
                     icono: Icons.handshake_outlined,
                     titulo: 'Comisiones',

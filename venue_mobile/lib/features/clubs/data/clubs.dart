@@ -15,6 +15,10 @@ class Club {
     this.primario,
     this.secundario,
     this.logoUrl,
+    this.usaRelacionadores = true,
+    this.usaTeams = true,
+    this.comisionManillas = true,
+    this.comisionCombos = true,
   });
 
   final String id;
@@ -26,6 +30,12 @@ class Club {
 
   /// Logo cargado por el admin (null: se muestra la inicial).
   final String? logoUrl;
+
+  /// Cómo trabaja con relacionadores (db/33). Sin tocar: como siempre.
+  final bool usaRelacionadores, usaTeams, comisionManillas, comisionCombos;
+
+  /// Opciones que cambia el admin, como las guarda la base.
+  static const opciones = ['usa_relacionadores', 'usa_teams', 'comision_manillas', 'comision_combos'];
 
   String get inicial {
     final t = (inicialTexto?.isNotEmpty ?? false) ? inicialTexto! : nombre;
@@ -40,6 +50,10 @@ class Club {
         primario: colorDesdeHex(j['color_primario'] as String?),
         secundario: colorDesdeHex(j['color_secundario'] as String?),
         logoUrl: j['logo_url'] as String?,
+        usaRelacionadores: j['usa_relacionadores'] as bool? ?? true,
+        usaTeams: j['usa_teams'] as bool? ?? true,
+        comisionManillas: j['comision_manillas'] as bool? ?? true,
+        comisionCombos: j['comision_combos'] as bool? ?? true,
       );
 }
 
@@ -84,13 +98,16 @@ final clubsProvider = FutureProvider<List<Club>>((ref) async {
       .eq('activo', true)
       .order('nombre', ascending: true);
   const cols = 'id, nombre, subtitulo, inicial, color_primario, color_secundario';
-  try {
-    return (await traer('$cols, logo_url')).map(Club.desde).toList();
-  } on PostgrestException catch (e) {
-    // base sin db/32-logo-boliche.sql todavía: anda igual, sin logos
-    if (e.code != '42703') rethrow;
-    return (await traer(cols)).map(Club.desde).toList();
+  // la base puede no tener todavía db/33 (opciones) ni db/32 (logo): se pide
+  // lo más completo y se va soltando lo que falte
+  for (final extra in ['logo_url, ${Club.opciones.join(', ')}', 'logo_url', '']) {
+    try {
+      return (await traer(extra.isEmpty ? cols : '$cols, $extra')).map(Club.desde).toList();
+    } on PostgrestException catch (e) {
+      if (e.code != '42703' || extra.isEmpty) rethrow;
+    }
   }
+  return const [];
 });
 
 /// Boliche en el que se está trabajando. Se reinicia al cambiar de cuenta.

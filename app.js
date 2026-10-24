@@ -3829,11 +3829,11 @@ async function screenStats() {
       ${me.rol === "jefe" ? kpi({ ic: "grupo", k: "Comisión RRPPs", v: `Bs ${fmtBs(tot.cr + tot.cmr)}` })
         + kpi({ ic: "base", k: "Mi comisión (jefe)", v: `Bs ${fmtBs(tot.cj + tot.cmj)}`, tono: "ok" }) : ""}
     </div>`}
-    ${esAdm || me.rol === "jefe" ? `
+    ${(esAdm || me.rol === "jefe") && cfgClub().rel ? `
     ${tituloBloque(esAdm ? "Top relacionadores" : "Mi team", visibles.length > 5 ? "top" : "")}
     ${tablaTop(visibles, 5)}` : ""}
-    ${esAdm ? `<div class="solo-movil">${tituloBloque("Por team")}<div id="porTeam">${porTeamHTML(visibles)}</div></div>` : ""}
-    ${(esAdm || me.rol === "jefe") && innerWidth >= 1000 ? `<div id="rpEsc"></div>` : ""}
+    ${esAdm && cfgClub().rel && cfgClub().teams ? `<div class="solo-movil">${tituloBloque("Por team")}<div id="porTeam">${porTeamHTML(visibles)}</div></div>` : ""}
+    ${(esAdm || me.rol === "jefe") && innerWidth >= 1000 && cfgClub().rel ? `<div id="rpEsc"></div>` : ""}
     ${esAdm ? `<div id="fasesBox"></div>` : ""}
     ${["rrpp", "jefe"].includes(me.rol) ? `<div class="pg-fila-acc">
       ${me.rol === "rrpp" ? `<button class="btn ghost2" id="btnMisNombres">${ico("usuario")}Ver mis nombres</button>` : ""}
@@ -3857,8 +3857,8 @@ async function screenStats() {
     ${grillaAcciones([
       accionRapida({ ic: "copiar", t: "Copiar cierre", d: "Para WhatsApp", attrs: 'id="btnCopiar"' }),
       puedeVerExcelContable() ? accionRapida({ ic: "archivo", t: "Excel", d: "Contabilidad", tono: "ok", attrs: 'id="btnExcel"' }) : "",
-      accionRapida({ ic: "base", t: "Comisiones", d: "Cuánto cobra cada uno", tono: "warn", attrs: 'data-rpop="comis"' }),
-      accionRapida({ ic: "trofeo", t: "Bonos", d: "Premios del evento", tono: "warn", attrs: 'data-rpop="bonos"' }),
+      cfgClub().rel ? accionRapida({ ic: "base", t: "Comisiones", d: "Cuánto cobra cada uno", tono: "warn", attrs: 'data-rpop="comis"' }) : "",
+      cfgClub().rel ? accionRapida({ ic: "trofeo", t: "Bonos", d: "Premios del evento", tono: "warn", attrs: 'data-rpop="bonos"' }) : "",
       accionRapida({ ic: "reloj", t: "Histórico", d: "Ranking por mes", tono: "info", attrs: 'data-rpop="hist"' }),
       accionRapida({ ic: "telefono", t: "Teléfonos", d: "Del equipo", tono: "info", attrs: 'data-rpop="tel"' }),
       accionRapida({ ic: "filtro", t: "Rechazados", d: "En puerta", tono: "bad", attrs: 'data-rpop="filtro"' }),
@@ -4056,6 +4056,44 @@ async function sheetHistorico(rango) {
     </div>`);
   $("#rkMes").onclick = () => sheetHistorico("mes");
   $("#rkTodo").onclick = () => sheetHistorico("todo");
+}
+
+/* Reparto del jefe: de la comisión del team por manilla (lo que no es del
+   boliche) y por combo, cuánto va a cada relacionador. El resto es del
+   jefe; lo que vende el jefe es todo suyo. Vacío = la regla de siempre. */
+async function pintarReparto(teamId) {
+  const box = $("#repartoBox"); if (!box) return;
+  const { data: t, error } = await sb.from("teams").select("rrpp_por_manilla, rrpp_por_combo").eq("id", teamId).single();
+  if (error) { box.innerHTML = ""; return; }   // base sin db/33: no se muestra
+  const cfg = cfgClub();
+  const porTeam = ev ? (+ev.precio_manilla || 0) * (1 - (+ev.pct_boliche || 0) / 100) : null;
+  const pinta = () => {
+    const vm = $("#rpMan")?.value, vc = $("#rpCombo")?.value;
+    const n = v => v === "" || v == null ? null : Math.max(0, +v);
+    const man = n(vm);
+    $("#rpManRes") && ($("#rpManRes").innerHTML = porTeam == null ? "" : man == null
+      ? `Sin fijar: corre la regla de siempre.`
+      : `Cada relacionador cobra <b>${fmtBs(Math.min(man, porTeam))} Bs</b> · vos te quedás con <b>${fmtBs(Math.max(0, porTeam - man))} Bs</b> por manilla. Lo que vendés vos: ${fmtBs(porTeam)} Bs.`);
+  };
+  box.innerHTML = `<div class="tarjeta" style="margin-bottom:16px">
+    <div style="font-weight:700;font-size:16px;margin-bottom:4px">Reparto de comisiones del team</div>
+    <p class="hint" style="margin:0 0 12px">${porTeam == null ? "" : `En ${esc(ev.nombre)} tu team gana <b>${fmtBs(porTeam)} Bs</b> por manilla (manilla de ${fmtBs(ev.precio_manilla)} Bs, ${100 - (+ev.pct_boliche || 0)}% de comisión). `}Elegí cuánto de eso le das a cada relacionador; el resto es tuyo.</p>
+    <div class="row2">
+      ${cfg.man ? `<div class="field"><label>Por manilla, a cada relacionador (Bs)</label><input id="rpMan" type="number" min="0" step="0.5" placeholder="Sin fijar" value="${t.rrpp_por_manilla ?? ""}"></div>` : ""}
+      ${cfg.combos ? `<div class="field"><label>Por combo, a cada relacionador (Bs)</label><input id="rpCombo" type="number" min="0" step="1" placeholder="Sin fijar" value="${t.rrpp_por_combo ?? ""}"></div>` : ""}
+    </div>
+    <p class="hint" id="rpManRes" style="margin:-4px 0 12px"></p>
+    <button class="btn primary" id="rpGo" style="width:auto;padding:0 20px">Guardar reparto</button>
+  </div>`;
+  pinta();
+  $("#rpMan") && ($("#rpMan").oninput = pinta);
+  $("#rpGo").onclick = async () => {
+    const n = id => { const v = $(id)?.value; return v === "" || v == null ? null : Math.max(0, +v); };
+    const { error: e2 } = await sb.rpc("fijar_reparto_team", { p_team: teamId, p_por_manilla: n("#rpMan"), p_por_combo: n("#rpCombo") });
+    if (e2) return fail(e2);
+    dataCache.clear();   // el reporte se vuelve a pedir con el reparto nuevo
+    toast("Reparto guardado: ya se ve en las comisiones");
+  };
 }
 
 /* comisiones por team con cut editable por relacionador (admin)
@@ -4838,6 +4876,7 @@ function formClubHTML() {
       <div class="field"><label>Color secundario</label><input type="color" id="clS" value="#A855F7"></div>
     </div>
     <div class="field"><label>Color de acento</label><input type="color" id="clA" value="#22D3EE"></div>
+    ${opcionesClubHTML({}, "cl")}
     <button class="btn primary" id="clGo">Crear boliche</button>`;
 }
 function bindFormClub(alCrear) {
@@ -4854,15 +4893,59 @@ function bindFormClub(alCrear) {
     if (!nombre || !id) return toast("Completá nombre y slug", "warn");
     if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(id)) return toast("Slug inválido: minúsculas, números y guiones", "warn");
     $("#clGo").disabled = true;
-    const { error } = await sb.from("clubs").insert({
+    const fila = {
       id, nombre, subtitulo: $("#clSub").value.trim() || null,
       color_primario: $("#clP").value, color_secundario: $("#clS").value, color_accent: $("#clA").value,
       inicial: nombre.slice(0, 1).toUpperCase()
-    });
+    };
+    let { error } = await sb.from("clubs").insert({ ...fila, ...leerOpcionesClub("cl") });
+    // base sin db/33 todavía: se crea igual, con la configuración de siempre
+    if (error && (error.code === "42703" || error.code === "PGRST204")) {
+      ({ error } = await sb.from("clubs").insert(fila));
+      if (!error) toast("Boliche creado. Para guardar cómo trabaja con relacionadores falta preparar la base (db/33).", "warn");
+    }
     $("#clGo").disabled = false;
     if (error) return toast(error.code === "23505" ? `Ya existe un boliche con el slug "${id}"` : error.message, "warn");
     await recargarClubs();
     alCrear(id, nombre);
+  };
+}
+
+/* Cómo trabaja el boliche con relacionadores y comisiones (db/33). Todo
+   opcional: sin tocar nada queda como siempre. */
+const cfgClub = (id = club) => {
+  const c = clubData(id) || {};
+  return { rel: c.usa_relacionadores !== false, teams: c.usa_teams !== false,
+    man: c.comision_manillas !== false, combos: c.comision_combos !== false };
+};
+function opcionesClubHTML(c, pre) {
+  const v = k => c[k] !== false;
+  const op = (k, t, d) => `<label class="op-club"><input type="checkbox" id="${pre}_${k}" ${v(k) ? "checked" : ""}>
+    <span><b>${t}</b><small>${d}</small></span></label>`;
+  return `<div class="sh-h" style="margin-top:6px;font-size:14px">Cómo trabaja</div>
+    <div class="ops-club">
+      ${op("usa_relacionadores", "Trabaja con relacionadores", "Si no, venden el admin y el personal, sin comisiones")}
+      ${op("usa_teams", "Con teams y jefes", "Sin teams, cada relacionador cobra su comisión entera")}
+      ${op("comision_manillas", "Comisión por manilla", "Lo que no es del boliche de cada manilla")}
+      ${op("comision_combos", "Comisión por combo", "La comisión de cada combo de mesa")}
+    </div>`;
+}
+const leerOpcionesClub = pre => Object.fromEntries(["usa_relacionadores", "usa_teams", "comision_manillas", "comision_combos"]
+  .map(k => [k, !!$(`#${pre}_${k}`)?.checked]));
+function sheetAjustesClub() {
+  const c = clubData(club); if (!c) return;
+  sheet(`<div class="sh-h">Relacionadores y comisiones<span class="r-sub">${esc(c.nombre)}</span></div>
+    ${opcionesClubHTML(c, "aj")}
+    <p class="hint" style="margin:4px 0 12px">Con teams, cada jefe decide en "Mi team" cuánto le da a cada relacionador de la comisión de su team; lo que vende el jefe es todo suyo.</p>
+    <button class="btn primary" id="ajGo">Guardar</button>`);
+  $("#ajGo").onclick = async () => {
+    const { error } = await sb.from("clubs").update(leerOpcionesClub("aj")).eq("id", club);
+    if (error) {
+      if (error.code === "42703" || error.code === "PGRST204") return toast("Falta preparar la base para esto (db/33-comisiones-configurables.sql)", "warn");
+      return fail(error);
+    }
+    await recargarClubs(); buildTabbar();
+    toast("Configuración guardada"); closeSheet(); renderTab();
   };
 }
 
@@ -4974,6 +5057,7 @@ async function screenTeam() {
   const inviteUrl = myTeam?.invite_code ? `${location.origin}${location.pathname}?invite=${myTeam.invite_code}` : null;
   $("#main").innerHTML = `
     ${pgHead({ ey: "Team", t: "Mi team", s: `${gente.length} relacionadores` })}
+    ${cfgClub().rel && cfgClub().teams && me.team_id ? `<div id="repartoBox"></div>` : ""}
     ${inviteUrl ? `<div class="assigned" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
       <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Link de registro: ${inviteUrl}</span>
       <button class="checkin" id="btnInv" style="flex-shrink:0">Copiar</button></div>` : ""}
@@ -4997,6 +5081,7 @@ async function screenTeam() {
         </div>
       </div>`).join("") || `<div class="empty">Todavía no creaste relacionadores.</div>`}
     </div>`;
+  if ($("#repartoBox")) pintarReparto(me.team_id);
   const bi = $("#btnInv");
   if (bi) bi.onclick = async () => {
     try { await navigator.clipboard.writeText(inviteUrl); } catch (e) {
@@ -8044,6 +8129,8 @@ function abrirPanelPerfil() {
         <span class="tx"><b>${esc(c.nombre)}</b><small>${varios ? "Ver todos los boliches" : esc(c.subtitulo || "")}</small></span>${varios ? icCh : ""}</button>
       ${me.rol === "admin" ? fila("colores", "paleta", "var(--brand-primary)", "Colores de la app", "Los ve todo el equipo") : ""}
       ${me.rol === "admin" ? fila("logo", "imagen", "var(--info)", "Logo del boliche", c.logo_url ? "Tocá para cambiarlo" : "Sin logo: se ve la inicial") : ""}
+      ${me.rol === "admin" ? fila("ajclub", "base", "var(--success)", "Relacionadores y comisiones",
+        !cfgClub().rel ? "Sin relacionadores" : !cfgClub().teams ? "Sin teams" : "Con teams y jefes") : ""}
     </div>` : ""}
     <div class="pp-rot">Ajustes</div>
     <div class="pp-grupo">
@@ -8065,6 +8152,7 @@ function abrirPanelPerfil() {
     if (op === "editar") return sheetEditarPerfil();
     if (op === "boliches") return showClubPicker(myClubs());
     if (op === "colores") return sheetColoresClub();
+    if (op === "ajclub") return sheetAjustesClub();
     if (op === "tutorial") return tutorial();
     if (op === "salir") return logout();
   });

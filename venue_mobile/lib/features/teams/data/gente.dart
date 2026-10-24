@@ -219,15 +219,43 @@ class GenteRepository {
   }
 
   // ── boliches (plataforma) ──
-  Future<void> crearClub({
+  /// Crea el boliche con cómo trabaja ([opciones]). Si la base todavía no
+  /// tiene db/33, se crea igual con la configuración de siempre y devuelve
+  /// false para avisar.
+  Future<bool> crearClub({
     required String id, required String nombre, String? subtitulo,
     required String primario, required String secundario, required String acento,
-  }) =>
-      _sb.from('clubs').insert({
-        'id': id, 'nombre': nombre, 'subtitulo': subtitulo, 'color_primario': primario,
-        'color_secundario': secundario, 'color_accent': acento,
-        'inicial': nombre.isEmpty ? null : nombre[0].toUpperCase(),
-      });
+    Map<String, bool> opciones = const {},
+  }) async {
+    final fila = {
+      'id': id, 'nombre': nombre, 'subtitulo': subtitulo, 'color_primario': primario,
+      'color_secundario': secundario, 'color_accent': acento,
+      'inicial': nombre.isEmpty ? null : nombre[0].toUpperCase(),
+    };
+    try {
+      await _sb.from('clubs').insert({...fila, ...opciones});
+      return true;
+    } on PostgrestException catch (e) {
+      if (e.code != '42703' && e.code != 'PGRST204') rethrow;
+      await _sb.from('clubs').insert(fila);
+      return false;
+    }
+  }
+
+  /// Cómo trabaja el boliche con relacionadores y comisiones (db/33).
+  Future<void> fijarOpciones(String clubId, Map<String, bool> opciones) =>
+      _sb.from('clubs').update(opciones).eq('id', clubId);
+
+  /// Lo que el jefe le da a cada relacionador por manilla y por combo
+  /// (null = la regla de siempre). Tira si la base no tiene db/33.
+  Future<({num? porManilla, num? porCombo})> reparto(String teamId) async {
+    final r = await _sb.from('teams').select('rrpp_por_manilla, rrpp_por_combo').eq('id', teamId).single();
+    return (porManilla: r['rrpp_por_manilla'] as num?, porCombo: r['rrpp_por_combo'] as num?);
+  }
+
+  Future<void> fijarReparto(String teamId, {num? porManilla, num? porCombo}) =>
+      _sb.rpc('fijar_reparto_team',
+          params: {'p_team': teamId, 'p_por_manilla': porManilla, 'p_por_combo': porCombo});
 
   Future<void> editarClub(String id, {
     required String nombre, String? subtitulo, required String primario,

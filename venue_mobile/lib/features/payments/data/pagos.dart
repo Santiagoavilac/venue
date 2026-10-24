@@ -177,6 +177,15 @@ class PagosRepository {
 
   /// Datos del evento y de la persona para calcular la comisión.
   Future<num> miComision(String eventoId, String usuarioId) async {
+    // la cuenta la hace la base (db/33: configuración del boliche y reparto
+    // del jefe); sin esa migración, la de siempre acá
+    try {
+      final r = await _sb.rpc('mi_comision', params: {'p_evento': eventoId});
+      final v = (r as Map?)?['por_manilla'] as num?;
+      if (v != null) return v;
+    } on PostgrestException catch (e) {
+      if (e.code != 'PGRST202' && e.code != '42883') rethrow;
+    }
     final e = await _sb
         .from('eventos')
         .select('precio_manilla, pct_boliche, pct_rrpp, cut_rrpp')

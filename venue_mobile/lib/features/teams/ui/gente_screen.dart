@@ -93,6 +93,10 @@ class MiTeamScreen extends ConsumerWidget {
             Text('${equipo[yo]?.team ?? 'Mi team'} · ${lista.length} relacionadores',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
             const SizedBox(height: 10),
+            if (teamId != null && club.usaRelacionadores && club.usaTeams) ...[
+              _RepartoTeam(teamId: teamId, club: club, evento: ev),
+              const SizedBox(height: 10),
+            ],
             if (teamId != null)
               FutureBuilder(
                 future: repo.team(teamId),
@@ -1234,6 +1238,12 @@ class _BolicheFormState extends ConsumerState<_BolicheForm> {
   final _a = TextEditingController(text: '#22D3EE');
   bool _ocupado = false;
   bool _idTocado = false;
+  late final _opciones = {
+    'usa_relacionadores': c?.usaRelacionadores ?? true,
+    'usa_teams': c?.usaTeams ?? true,
+    'comision_manillas': c?.comisionManillas ?? true,
+    'comision_combos': c?.comisionCombos ?? true,
+  };
 
   @override
   void initState() {
@@ -1332,6 +1342,14 @@ class _BolicheFormState extends ConsumerState<_BolicheForm> {
         const SizedBox(height: 10),
         Row(children: [color('Acento', _a), const Spacer()]),
         const SizedBox(height: 16),
+        if (c == null) ...[
+          const Text('Cómo trabaja', style: TextStyle(fontWeight: FontWeight.w700)),
+          OpcionesBoliche(
+            valores: _opciones,
+            alCambiar: (k, v) => setState(() => _opciones[k] = v),
+          ),
+          const SizedBox(height: 10),
+        ],
         FilledButton(
           onPressed: _ocupado
               ? null
@@ -1349,9 +1367,17 @@ class _BolicheFormState extends ConsumerState<_BolicheForm> {
                   final sub = _sub.text.trim().isEmpty ? null : _sub.text.trim();
                   hacer(
                       () => c == null
-                          ? repo.crearClub(
-                              id: id, nombre: nombre, subtitulo: sub, primario: _p.text.trim(),
-                              secundario: _s.text.trim(), acento: _a.text.trim())
+                          ? repo
+                              .crearClub(
+                                  id: id, nombre: nombre, subtitulo: sub, primario: _p.text.trim(),
+                                  secundario: _s.text.trim(), acento: _a.text.trim(),
+                                  opciones: _opciones)
+                              .then((completo) {
+                              if (!completo && context.mounted) {
+                                avisar(context, 'Se creó con la configuración de siempre: falta db/33 en la base',
+                                    tipo: TipoAviso.aviso);
+                              }
+                            })
                           : repo.editarClub(c!.id,
                               nombre: nombre, subtitulo: sub, primario: _p.text.trim(),
                               secundario: _s.text.trim(), acento: _a.text.trim()),
@@ -1370,6 +1396,152 @@ class _BolicheFormState extends ConsumerState<_BolicheForm> {
           ),
         ],
       ],
+    );
+  }
+}
+
+
+/// Las cuatro opciones de cómo trabaja un boliche con relacionadores.
+class OpcionesBoliche extends StatelessWidget {
+  const OpcionesBoliche({super.key, required this.valores, required this.alCambiar});
+  final Map<String, bool> valores;
+  final void Function(String clave, bool valor) alCambiar;
+
+  static const textos = {
+    'usa_relacionadores': ('Trabaja con relacionadores', 'Si no, venden el admin y el personal, sin comisiones'),
+    'usa_teams': ('Con teams y jefes', 'Sin teams, cada relacionador cobra su comisión entera'),
+    'comision_manillas': ('Comisión por manilla', 'Lo que no es del boliche de cada manilla'),
+    'comision_combos': ('Comisión por combo', 'La comisión de cada combo de mesa'),
+  };
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        for (final e in textos.entries)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(e.value.$1, style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(e.value.$2, style: TextStyle(color: VenueColors.textoSuave, fontSize: 13)),
+            value: valores[e.key] ?? true,
+            // sin relacionadores, lo demás no aplica
+            onChanged: e.key != 'usa_relacionadores' && !(valores['usa_relacionadores'] ?? true)
+                ? null
+                : (v) => alCambiar(e.key, v),
+          ),
+      ]);
+}
+
+
+/// Reparto del jefe: de la comisión del team por manilla (lo que no es del
+/// boliche) y por combo, cuánto va a cada relacionador. El resto es del
+/// jefe; lo que vende el jefe es todo suyo. Vacío = la regla de siempre.
+class _RepartoTeam extends ConsumerStatefulWidget {
+  const _RepartoTeam({required this.teamId, required this.club, required this.evento});
+  final String teamId;
+  final Club club;
+  final Evento? evento;
+
+  @override
+  ConsumerState<_RepartoTeam> createState() => _RepartoTeamState();
+}
+
+class _RepartoTeamState extends ConsumerState<_RepartoTeam> {
+  final _man = TextEditingController();
+  final _combo = TextEditingController();
+  bool _cargado = false, _sinBase = false, _ocupado = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(genteRepositoryProvider).reparto(widget.teamId).then((r) {
+      if (!mounted) return;
+      setState(() {
+        _man.text = r.porManilla == null ? '' : _num(r.porManilla!);
+        _combo.text = r.porCombo == null ? '' : _num(r.porCombo!);
+        _cargado = true;
+      });
+    }).catchError((_) {
+      // base sin db/33: la tarjeta no se muestra
+      if (mounted) setState(() => _sinBase = true);
+    });
+  }
+
+  static String _num(num v) => v == v.roundToDouble() ? '${v.round()}' : '$v';
+  static num? _leer(TextEditingController c) {
+    final v = num.tryParse(c.text.trim().replaceAll(',', '.'));
+    return v == null ? null : (v < 0 ? 0 : v);
+  }
+
+  @override
+  void dispose() {
+    _man.dispose();
+    _combo.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_sinBase || !_cargado) return const SizedBox.shrink();
+    final ev = widget.evento;
+    final porTeam = ev == null ? null : ev.precioManilla * (1 - ev.pctBoliche / 100);
+    final man = _leer(_man);
+    return Tarjeta(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Reparto de comisiones del team', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 4),
+        Text(
+          '${porTeam == null ? '' : 'En ${ev!.nombre} tu team gana ${_num(porTeam)} Bs por manilla. '}'
+          'Elegí cuánto de eso le das a cada relacionador; el resto es tuyo.',
+          style: TextStyle(color: VenueColors.textoSuave, fontSize: 13.5, height: 1.35),
+        ),
+        const SizedBox(height: 12),
+        Row(children: [
+          if (widget.club.comisionManillas)
+            Expanded(
+              child: TextField(
+                controller: _man,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(labelText: 'Por manilla (Bs)', hintText: 'Sin fijar'),
+              ),
+            ),
+          if (widget.club.comisionManillas && widget.club.comisionCombos) const SizedBox(width: 10),
+          if (widget.club.comisionCombos)
+            Expanded(
+              child: TextField(
+                controller: _combo,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Por combo (Bs)', hintText: 'Sin fijar'),
+              ),
+            ),
+        ]),
+        if (porTeam != null && widget.club.comisionManillas) ...[
+          const SizedBox(height: 8),
+          Text(
+            man == null
+                ? 'Sin fijar: corre la regla de siempre.'
+                : 'Cada relacionador cobra ${_num(man > porTeam ? porTeam : man)} Bs y vos '
+                    '${_num(porTeam - man < 0 ? 0 : porTeam - man)} Bs por manilla. Lo que vendés vos: ${_num(porTeam)} Bs.',
+            style: TextStyle(fontSize: 13, color: VenueColors.textoSuave),
+          ),
+        ],
+        const SizedBox(height: 12),
+        FilledButton(
+          onPressed: _ocupado
+              ? null
+              : () async {
+                  setState(() => _ocupado = true);
+                  try {
+                    await ref.read(genteRepositoryProvider).fijarReparto(widget.teamId,
+                        porManilla: _leer(_man), porCombo: _leer(_combo));
+                    if (context.mounted) avisar(context, 'Reparto guardado: ya se ve en las comisiones');
+                  } catch (e) {
+                    if (context.mounted) avisar(context, _error(e), tipo: TipoAviso.aviso);
+                  }
+                  if (mounted) setState(() => _ocupado = false);
+                },
+          child: const Text('Guardar reparto'),
+        ),
+      ]),
     );
   }
 }

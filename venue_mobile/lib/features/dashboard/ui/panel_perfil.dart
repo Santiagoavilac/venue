@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show UserAttributes;
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException, UserAttributes;
 
 import '../../../core/media/imagenes.dart';
 import '../../../core/networking/supabase.dart';
@@ -13,6 +13,7 @@ import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../../clubs/ui/selector_club_screen.dart';
 import '../../teams/data/gente.dart';
+import '../../teams/ui/gente_screen.dart' show OpcionesBoliche;
 import 'tutorial.dart';
 
 /// Panel de perfil: se abre desde la inicial de arriba a la derecha. Tiene
@@ -97,6 +98,17 @@ class PanelPerfil extends ConsumerWidget {
                     titulo: 'Colores de la app',
                     detalle: 'Los ve todo el equipo',
                     alTocar: () => cerrarYHacer(() => _cambiarColores(context, ref, club)),
+                  ),
+                if (rol == Rol.admin)
+                  _Fila(
+                    inicio: _Circulo(Icons.payments_outlined, VenueColors.ok),
+                    titulo: 'Relacionadores y comisiones',
+                    detalle: !club.usaRelacionadores
+                        ? 'Sin relacionadores'
+                        : !club.usaTeams
+                            ? 'Sin teams'
+                            : 'Con teams y jefes',
+                    alTocar: () => cerrarYHacer(() => _opcionesBoliche(context, ref, club)),
                   ),
                 if (rol == Rol.admin)
                   _Fila(
@@ -523,4 +535,52 @@ class _Fila extends StatelessWidget {
           ]),
         ),
       );
+}
+
+
+/// Cómo trabaja el boliche con relacionadores y comisiones (admin).
+Future<void> _opcionesBoliche(BuildContext context, WidgetRef ref, Club club) async {
+  final valores = {
+    'usa_relacionadores': club.usaRelacionadores,
+    'usa_teams': club.usaTeams,
+    'comision_manillas': club.comisionManillas,
+    'comision_combos': club.comisionCombos,
+  };
+  final ok = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: VenueColors.superficie,
+    builder: (c) => StatefulBuilder(
+      builder: (c, set) => ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        children: [
+          Text('Relacionadores y comisiones', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          Text(club.nombre, style: TextStyle(color: VenueColors.textoSuave)),
+          const SizedBox(height: 8),
+          OpcionesBoliche(valores: valores, alCambiar: (k, v) => set(() => valores[k] = v)),
+          const SizedBox(height: 6),
+          Text(
+            'Con teams, cada jefe decide en "Mi team" cuánto le da a cada relacionador de la comisión de su team; '
+            'lo que vende el jefe es todo suyo.',
+            style: TextStyle(color: VenueColors.textoSuave, fontSize: 13, height: 1.35),
+          ),
+          const SizedBox(height: 14),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Guardar')),
+        ],
+      ),
+    ),
+  );
+  if (ok != true || !context.mounted) return;
+  try {
+    await ref.read(genteRepositoryProvider).fijarOpciones(club.id, valores);
+    ref.invalidate(clubsProvider);
+    if (context.mounted) avisar(context, 'Configuración guardada');
+  } catch (e) {
+    if (!context.mounted) return;
+    final falta = e is PostgrestException && (e.code == '42703' || e.code == 'PGRST204');
+    avisar(context, falta ? 'Falta preparar la base para esto (db/33-comisiones-configurables.sql)' : mensajeDeError(e),
+        tipo: TipoAviso.aviso);
+  }
 }

@@ -13,6 +13,7 @@ class Evento {
     required this.estado,
     this.ticketUrl,
     this.precioManilla = 0,
+    this.pctBoliche = 0,
     this.ventaPorFases = false,
     this.permiteReserva = true,
     this.horasReserva = 3,
@@ -31,6 +32,9 @@ class Evento {
   /// Arte sobre el que se imprime el QR de las entradas.
   final String? ticketUrl;
   final num precioManilla;
+
+  /// Parte del boliche en cada manilla (%); el resto es la comisión del team.
+  final num pctBoliche;
   final bool ventaPorFases;
 
   // reglas de venta de mesas del evento
@@ -49,6 +53,7 @@ class Evento {
         estado: j['estado'] as String? ?? '',
         ticketUrl: j['ticket_url'] as String?,
         precioManilla: j['precio_manilla'] as num? ?? 0,
+        pctBoliche: j['pct_boliche'] as num? ?? 0,
         ventaPorFases: j['venta_por_fases'] == true,
         permiteReserva: j['permite_reserva'] != false,
         horasReserva: (j['horas_reserva'] as num?)?.toInt() ?? 3,
@@ -93,7 +98,7 @@ final eventosProvider = FutureProvider<List<Evento>>((ref) async {
   final filas = await ref
       .watch(supabaseProvider)
       .from('eventos')
-      .select('id, nombre, fecha, hora_inicio, hora_fin, estado, ticket_url, precio_manilla, venta_por_fases, permite_reserva, horas_reserva, permite_agrupar, combo_obligatorio, combo_por_mesa')
+      .select('id, nombre, fecha, hora_inicio, hora_fin, estado, ticket_url, precio_manilla, pct_boliche, venta_por_fases, permite_reserva, horas_reserva, permite_agrupar, combo_obligatorio, combo_por_mesa')
       .eq('club_id', club)
       .neq('estado', 'cerrado')
       .order('fecha', ascending: true);
