@@ -1,10 +1,13 @@
 # credenciales y configuración local
 config.js
+aftr_web/config.js
 dev-login.js
 .env
 .env.local
 venue_mobile/env/*.json
 !venue_mobile/env/example.json
+aftr_mobile/env/*.json
+!aftr_mobile/env/example.json
 
 # sistema / editores
 .DS_Store
@@ -20,6 +23,9 @@ venue_mobile/.dart_tool/
 venue_mobile/ios/Pods/
 venue_mobile/android/.gradle/
 venue_mobile/android/local.properties
+aftr_mobile/build/
+aftr_mobile/.dart_tool/
+aftr_mobile/ios/Pods/
 *.jks
 *.keystore
 key.properties

@@ -275,6 +275,13 @@ class GenteRepository {
   Future<void> fijarLogo(String clubId, String? url) =>
       _sb.from('clubs').update({'logo_url': url}).eq('id', clubId);
 
+  /// Dónde queda el boliche (db/35). Con esto aparece en el mapa de AFTR.
+  Future<void> fijarUbicacion(String clubId,
+          {required double lat, required double lng, String? direccion, String? zona, String? ciudad}) =>
+      _sb.from('clubs').update({
+        'lat': lat, 'lng': lng, 'direccion': direccion, 'zona': zona, 'ciudad': ciudad,
+      }).eq('id', clubId);
+
   Future<void> desactivarClub(String id) =>
       _sb.from('clubs').update({'activo': false}).eq('id', id);
 

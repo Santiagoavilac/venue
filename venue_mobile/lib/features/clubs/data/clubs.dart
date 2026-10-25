@@ -19,6 +19,9 @@ class Club {
     this.usaTeams = true,
     this.comisionManillas = true,
     this.comisionCombos = true,
+    this.lat,
+    this.lng,
+    this.direccion,
   });
 
   final String id;
@@ -33,6 +36,12 @@ class Club {
 
   /// Cómo trabaja con relacionadores (db/33). Sin tocar: como siempre.
   final bool usaRelacionadores, usaTeams, comisionManillas, comisionCombos;
+
+  /// Dónde queda (db/35): con esto sale en el mapa de AFTR.
+  final double? lat, lng;
+  final String? direccion;
+
+  bool get ubicado => lat != null && lng != null;
 
   /// Opciones que cambia el admin, como las guarda la base.
   static const opciones = ['usa_relacionadores', 'usa_teams', 'comision_manillas', 'comision_combos'];
@@ -54,6 +63,9 @@ class Club {
         usaTeams: j['usa_teams'] as bool? ?? true,
         comisionManillas: j['comision_manillas'] as bool? ?? true,
         comisionCombos: j['comision_combos'] as bool? ?? true,
+        lat: (j['lat'] as num?)?.toDouble(),
+        lng: (j['lng'] as num?)?.toDouble(),
+        direccion: j['direccion'] as String?,
       );
 }
 
@@ -98,9 +110,14 @@ final clubsProvider = FutureProvider<List<Club>>((ref) async {
       .eq('activo', true)
       .order('nombre', ascending: true);
   const cols = 'id, nombre, subtitulo, inicial, color_primario, color_secundario';
-  // la base puede no tener todavía db/33 (opciones) ni db/32 (logo): se pide
-  // lo más completo y se va soltando lo que falte
-  for (final extra in ['logo_url, ${Club.opciones.join(', ')}', 'logo_url', '']) {
+  // la base puede no tener todavía db/35 (ubicación), db/33 (opciones) ni
+  // db/32 (logo): se pide lo más completo y se va soltando lo que falte
+  for (final extra in [
+    'logo_url, ${Club.opciones.join(', ')}, lat, lng, direccion',
+    'logo_url, ${Club.opciones.join(', ')}',
+    'logo_url',
+    '',
+  ]) {
     try {
       return (await traer(extra.isEmpty ? cols : '$cols, $extra')).map(Club.desde).toList();
     } on PostgrestException catch (e) {

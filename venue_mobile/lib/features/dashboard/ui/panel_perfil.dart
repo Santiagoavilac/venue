@@ -13,6 +13,7 @@ import '../../../core/widgets/patron.dart' hide MarcaClub;
 import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../../clubs/ui/selector_club_screen.dart';
+import '../../clubs/ui/ubicacion_screen.dart';
 import '../../teams/data/gente.dart';
 import '../../teams/ui/gente_screen.dart' show OpcionesBoliche;
 import '../data/perfil_cambios.dart';
@@ -163,6 +164,18 @@ class PanelPerfil extends ConsumerWidget {
                     titulo: 'Logo del boliche',
                     detalle: club.logoUrl == null ? 'Sin logo: se ve la inicial' : 'Tocá para cambiarlo',
                     alTocar: () => cerrarYHacer(() => _cambiarLogo(context, ref, club)),
+                  ),
+                // dónde queda: con esto sale en el mapa de AFTR
+                if (rol == Rol.admin)
+                  _Fila(
+                    inicio: _Circulo(Icons.place_outlined, VenueColors.aviso),
+                    titulo: 'Ubicación del boliche',
+                    detalle: club.ubicado
+                        ? (club.direccion ?? 'Cargada · tocá para cambiarla')
+                        : 'Sin cargar: no sale en el mapa de AFTR',
+                    alTocar: () => cerrarYHacer(() => Navigator.of(context).push(
+                          MaterialPageRoute<void>(builder: (_) => UbicacionClubScreen(club: club)),
+                        )),
                   ),
               ]),
             ],
