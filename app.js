@@ -3787,6 +3787,13 @@ function porTeamHTML(filas) {
   }).join("");
 }
 
+/* Un jefe ve solo a su team. v_stats_rrpp trae a todos los del evento, así
+   que se filtra por el team efectivo del jefe en ese boliche (el de su propia fila). */
+function soloMiTeam(filas) {
+  if (me.rol !== "jefe") return filas;
+  const t = filas.find(r => r.rrpp_id === me.id)?.team_id ?? me.team_id;
+  return filas.filter(r => t && r.team_id === t);
+}
 async function screenStats() {
   const [{ data: rows, error }, { data: mrows }, { data: bonos }, { data: mesasAll }, { data: entRows }, { data: regsAll }] = await conDatos("reporte", () => Promise.all([
     sb.from("v_stats_rrpp").select("*").eq("evento_id", ev.id),
@@ -3821,7 +3828,7 @@ async function screenStats() {
     (regsAll || []).forEach(r => { const o = g[r.lista_tipo_id] = g[r.lista_tipo_id] || { ca: 0, ce: 0 }; o.ca++; if (r.ingreso_at) o.ce++; });
     porLista = listaTipos.map(l => ({ nombre: l.nombre, ...(g[l.id] || { ca: 0, ce: 0 }) })).filter(l => l.ca);
   }
-  const all = rows.map(r => {
+  const all = soloMiTeam(rows).map(r => {
     const m = mesasBy[r.rrpp_id] || {};
     return {
       ...r, mv: +(m.mesas_vendidas || 0), bm: +(m.bruto_mesas || 0),
@@ -4037,7 +4044,7 @@ async function sheetHistTeam(evObj) {
     sb.from("v_stats_mesas").select("*").eq("evento_id", evObj.id)
   ]);
   const mesasBy = {}; (mrows || []).forEach(m => mesasBy[m.rrpp_id] = m);
-  const all = (rows || []).map(r => {
+  const all = soloMiTeam(rows || []).map(r => {
     const m = mesasBy[r.rrpp_id] || {};
     return { ...r, mv: +(m.mesas_vendidas || 0), cm_r: +(m.comision_rrpp_mesas || 0), cm_j: +(m.comision_jefe_mesas || 0) };
   });
