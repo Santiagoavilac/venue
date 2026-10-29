@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,8 +39,9 @@ final proporcionPlanoProvider =
 /// misma convención de la web: x, y, w, h), sobre la proporción del fondo o,
 /// sin fondo, 1000:420.
 ///
-/// En modo [mover], cada mesa se arrastra; al soltar se informa la posición
-/// nueva ya acotada y ajustada a medios puntos.
+/// En modo [mover], cada mesa se arrastra sola (solo se redibuja esa mesa) y
+/// al soltar queda en su lugar nuevo enseguida, ajustada a medios puntos; si
+/// [alMover] devuelve false, vuelve a donde estaba.
 class Plano extends StatefulWidget {
   const Plano({
     super.key,
@@ -58,7 +60,7 @@ class Plano extends StatefulWidget {
   final String? fondoUrl;
   final bool mover;
   final ValueChanged<Mesa> alTocar;
-  final void Function(Mesa mesa, double x, double y)? alMover;
+  final Future<bool> Function(Mesa mesa, double x, double y)? alMover;
   final Map<String, String> teams;
   final double aspecto;
 
@@ -69,45 +71,86 @@ class Plano extends StatefulWidget {
 }
 
 class _PlanoState extends State<Plano> {
-  /// Posiciones en curso mientras se arrastra (id → x,y en %).
-  final _arrastre = <String, Offset>{};
+  /// Posición nueva de las mesas recién soltadas, hasta que llegue del
+  /// servidor (id → x,y en %). Evita que la mesa vuelva un instante a su
+  /// lugar viejo mientras se recargan los datos.
+  final _soltadas = <String, Offset>{};
+
+  @override
+  void didUpdateWidget(Plano viejo) {
+    super.didUpdateWidget(viejo);
+    // ya llegó la posición nueva: se suelta la provisoria
+    _soltadas.removeWhere((id, p) {
+      final m = widget.mesas.where((x) => x.id == id).firstOrNull;
+      return m == null || (m.x == p.dx && m.y == p.dy);
+    });
+  }
+
+  Future<void> _soltar(Mesa m, double x, double y) async {
+    setState(() => _soltadas[m.id] = Offset(x, y));
+    final ok = await widget.alMover?.call(m, x, y) ?? false;
+    if (!ok && mounted) setState(() => _soltadas.remove(m.id));
+  }
 
   @override
   Widget build(BuildContext context) {
     final marca = Theme.of(context).colorScheme.primary;
+    final oscuro = Theme.of(context).brightness == Brightness.dark;
     return AspectRatio(
       aspectRatio: widget.aspecto,
       child: LayoutBuilder(builder: (context, c) {
         final ancho = c.maxWidth, alto = c.maxHeight;
         return DecoratedBox(
           decoration: BoxDecoration(
-            color: const Color(0xFF14141E),
+            color: oscuro ? VenueColors.superficie2 : const Color(0xFFF2F4F7),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: VenueColors.linea, width: 2),
+            border: Border.all(color: VenueColors.lineaSuave),
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(15),
             child: Stack(
               children: [
                 if (widget.fondoUrl != null)
+                  // el dibujo del local es claro con líneas oscuras: en modo
+                  // claro queda tenue; en oscuro se invierte
                   Positioned.fill(
-                    child: Image.network(widget.fondoUrl!,
-                        fit: BoxFit.fill,
-                        errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                    child: RepaintBoundary(
+                      child: Opacity(
+                        opacity: oscuro ? .35 : .55,
+                        child: ColorFiltered(
+                          colorFilter: oscuro ? _invertirGris : _gris,
+                          child: Image.network(widget.fondoUrl!,
+                              fit: BoxFit.fill,
+                              gaplessPlayback: true,
+                              errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                        ),
+                      ),
+                    ),
                   )
                 else
                   Center(
                     child: Text(
                       nombrePiso(widget.planta).toUpperCase(),
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: .06),
+                        color: VenueColors.texto.withValues(alpha: .05),
                         fontSize: alto * .22,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
                 for (final m in widget.mesas)
-                  _chip(m, ancho, alto, marca),
+                  _MesaEnPlano(
+                    key: ValueKey(m.id),
+                    mesa: m,
+                    posicion: _soltadas[m.id] ?? Offset(m.x, m.y),
+                    ancho: ancho,
+                    alto: alto,
+                    marca: marca,
+                    team: widget.teams[m.teamId],
+                    mover: widget.mover,
+                    alTocar: widget.alTocar,
+                    alSoltar: _soltar,
+                  ),
               ],
             ),
           ),
@@ -115,26 +158,93 @@ class _PlanoState extends State<Plano> {
       }),
     );
   }
+}
 
-  Widget _chip(Mesa m, double ancho, double alto, Color marca) {
-    final pos = _arrastre[m.id] ?? Offset(m.x, m.y);
-    final w = ancho * m.w / 100;
-    final h = alto * (m.h ?? 21) / 100;
-    final color = colorDeMesa(m, marca);
+const _gris = ColorFilter.matrix(<double>[
+  .33, .33, .33, 0, 0, //
+  .33, .33, .33, 0, 0, //
+  .33, .33, .33, 0, 0, //
+  0, 0, 0, 1, 0,
+]);
+const _invertirGris = ColorFilter.matrix(<double>[
+  -.33, -.33, -.33, 0, 255, //
+  -.33, -.33, -.33, 0, 255, //
+  -.33, -.33, -.33, 0, 255, //
+  0, 0, 0, 1, 0,
+]);
+
+/// Una mesa del plano. Mientras se arrastra solo se mueve ella (con
+/// Transform, sin recalcular el resto) y sigue al dedo sin saltos; el ajuste
+/// a la grilla se hace al soltar.
+class _MesaEnPlano extends StatefulWidget {
+  const _MesaEnPlano({
+    super.key,
+    required this.mesa,
+    required this.posicion,
+    required this.ancho,
+    required this.alto,
+    required this.marca,
+    required this.mover,
+    required this.alTocar,
+    required this.alSoltar,
+    this.team,
+  });
+
+  final Mesa mesa;
+  final Offset posicion;
+  final double ancho, alto;
+  final Color marca;
+  final String? team;
+  final bool mover;
+  final ValueChanged<Mesa> alTocar;
+  final void Function(Mesa mesa, double x, double y) alSoltar;
+
+  @override
+  State<_MesaEnPlano> createState() => _MesaEnPlanoState();
+}
+
+class _MesaEnPlanoState extends State<_MesaEnPlano> {
+  Offset _d = Offset.zero; // desplazamiento en píxeles mientras se arrastra
+  bool _arrastrando = false;
+
+  Offset _acotar(Offset d) {
+    final m = widget.mesa, p = widget.posicion;
+    final minX = (0.5 - p.dx) / 100 * widget.ancho, maxX = (99 - m.w - p.dx) / 100 * widget.ancho;
+    final minY = (0.5 - p.dy) / 100 * widget.alto, maxY = (86 - p.dy) / 100 * widget.alto;
+    return Offset(d.dx.clamp(minX, maxX < minX ? minX : maxX), d.dy.clamp(minY, maxY < minY ? minY : maxY));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.mesa;
+    final w = widget.ancho * m.w / 100;
+    final h = widget.alto * (m.h ?? 21) / 100;
+    final estado = m.libre ? null : colorDeMesa(m, widget.marca);
     final nombre = m.libre ? 'Libre' : (m.cliente ?? '').trim();
-    final team = widget.teams[m.teamId];
+    final team = widget.team;
 
-    final cuerpo = Container(
+    final cuerpo = AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
       width: w,
       height: h,
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
-        color: m.libre ? const Color(0xFF1F1F2B) : color.withValues(alpha: .38),
-        borderRadius: BorderRadius.circular(m.esLounge ? 14 : 9),
+        color: estado == null
+            ? VenueColors.superficie.withValues(alpha: .9)
+            : Color.alphaBlend(estado.withValues(alpha: .15), VenueColors.superficie),
+        borderRadius: BorderRadius.circular(m.esLounge ? 14 : 10),
         border: Border.all(
-          color: m.porVerificar ? VenueColors.aviso : color.withValues(alpha: m.libre ? .5 : 1),
-          width: m.porVerificar ? 2.2 : 1.4,
+          color: m.porVerificar ? VenueColors.aviso : estado ?? VenueColors.linea,
+          width: estado == null ? 1.2 : 1.6,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: _arrastrando ? .28 : .10),
+            blurRadius: _arrastrando ? 22 : 8,
+            offset: Offset(0, _arrastrando ? 10 : 3),
+          ),
+          if (_arrastrando) BoxShadow(color: widget.marca, spreadRadius: 2),
+        ],
       ),
       child: FittedBox(
         fit: BoxFit.scaleDown,
@@ -142,13 +252,14 @@ class _PlanoState extends State<Plano> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(m.etiqueta,
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+                style: TextStyle(
+                    color: VenueColors.texto, fontWeight: FontWeight.w800, fontSize: 15, height: 1.1)),
             if (nombre.isNotEmpty)
               Text(nombre,
                   maxLines: 1,
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: m.libre ? .5 : .95),
+                      color: m.libre ? VenueColors.textoSuave : VenueColors.texto,
+                      fontWeight: m.libre ? FontWeight.w500 : FontWeight.w600,
                       fontSize: 10.5)),
           ],
         ),
@@ -156,48 +267,58 @@ class _PlanoState extends State<Plano> {
     );
 
     return Positioned(
-      left: ancho * pos.dx / 100,
-      top: alto * pos.dy / 100,
-      child: Semantics(
-        button: true,
-        label: '${m.tipo.nombre} ${m.etiqueta}, '
-            '${etiquetaEstado[m.estado] ?? m.estado}'
-            '${nombre.isEmpty || m.libre ? '' : ', $nombre'}',
-        child: GestureDetector(
-          onTap: () => widget.alTocar(m),
-          onPanUpdate: widget.mover
-              ? (d) => setState(() {
-                    final a = _arrastre[m.id] ?? Offset(m.x, m.y);
-                    final p = acotarPosicion(a.dx + d.delta.dx / ancho * 100,
-                        a.dy + d.delta.dy / alto * 100, m.w);
-                    _arrastre[m.id] = Offset(p.x, p.y);
-                  })
-              : null,
-          onPanEnd: widget.mover
-              ? (_) {
-                  final p = _arrastre.remove(m.id);
-                  if (p != null && (p.dx != m.x || p.dy != m.y)) {
-                    widget.alMover?.call(m, p.dx, p.dy);
+      left: widget.ancho * widget.posicion.dx / 100,
+      top: widget.alto * widget.posicion.dy / 100,
+      child: Transform.translate(
+        offset: _d,
+        child: Semantics(
+          button: true,
+          label: '${m.tipo.nombre} ${m.etiqueta}, '
+              '${etiquetaEstado[m.estado] ?? m.estado}'
+              '${nombre.isEmpty || m.libre ? '' : ', $nombre'}',
+          child: GestureDetector(
+            // cuenta desde donde se apoyó el dedo: si no, la mesa queda atrás
+            // del dedo lo que tarda en reconocerse el arrastre
+            dragStartBehavior: DragStartBehavior.down,
+            onTap: () => widget.alTocar(m),
+            onPanStart: widget.mover ? (_) => setState(() => _arrastrando = true) : null,
+            onPanUpdate: widget.mover ? (d) => setState(() => _d = _acotar(_d + d.delta)) : null,
+            onPanEnd: widget.mover
+                ? (_) {
+                    final d = _d;
+                    setState(() {
+                      _d = Offset.zero;
+                      _arrastrando = false;
+                    });
+                    if (d == Offset.zero) return;
+                    final p = acotarPosicion(widget.posicion.dx + d.dx / widget.ancho * 100,
+                        widget.posicion.dy + d.dy / widget.alto * 100, m.w);
+                    if (p.x != m.x || p.y != m.y) widget.alSoltar(m, p.x, p.y);
                   }
-                }
-              : null,
-          child: Stack(clipBehavior: Clip.none, children: [
-            cuerpo,
-            if (team != null)
-              Positioned(
-                top: -7,
-                left: -6,
-                child: CircleAvatar(
-                  radius: 9,
-                  backgroundColor: VenueColors.aviso,
-                  child: Text(
-                    team.replaceFirst('Team ', '').characters.first.toUpperCase(),
-                    style: const TextStyle(
-                        fontSize: 9.5, color: Colors.black, fontWeight: FontWeight.w800),
+                : null,
+            onPanCancel: widget.mover
+                ? () => setState(() {
+                      _d = Offset.zero;
+                      _arrastrando = false;
+                    })
+                : null,
+            child: Stack(clipBehavior: Clip.none, children: [
+              RepaintBoundary(child: cuerpo),
+              if (team != null)
+                Positioned(
+                  top: -7,
+                  left: -6,
+                  child: CircleAvatar(
+                    radius: 9,
+                    backgroundColor: VenueColors.aviso,
+                    child: Text(
+                      team.replaceFirst('Team ', '').characters.first.toUpperCase(),
+                      style: const TextStyle(fontSize: 9.5, color: Colors.black, fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ),
-              ),
-          ]),
+            ]),
+          ),
         ),
       ),
     );

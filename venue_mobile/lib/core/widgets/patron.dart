@@ -583,7 +583,8 @@ class FichaDato extends StatelessWidget {
   final String etiqueta;
   final String valor;
 
-  /// null: el de la marca del boliche.
+  /// Sin efecto: las fichas son neutras (el color queda para los estados).
+  /// Se mantiene para no tocar a quien lo pasa.
   final Color? color;
 
   /// Va encima de una foto: fondo oscuro translúcido y texto blanco.
@@ -592,14 +593,13 @@ class FichaDato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? Theme.of(context).colorScheme.primary;
-    final base = sobreImagen ? Colors.black.withValues(alpha: .45) : VenueColors.superficie;
-    // el número va en el color, aclarado si el fondo es oscuro para que se lea
-    final oscuro = sobreImagen || Theme.of(context).brightness == Brightness.dark;
-    final tinta = oscuro ? Color.lerp(c, Colors.white, .25)! : c;
+    final tinta = sobreImagen ? Colors.white : VenueColors.texto;
+    final suave = sobreImagen ? Colors.white70 : VenueColors.textoSuave;
     return Material(
-      color: Color.alphaBlend(c.withValues(alpha: oscuro ? .16 : .09), base),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: sobreImagen ? Colors.black.withValues(alpha: .45) : VenueColors.superficie,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: sobreImagen ? BorderSide.none : BorderSide(color: VenueColors.lineaSuave)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: alTocar,
@@ -609,14 +609,16 @@ class FichaDato extends StatelessWidget {
             Container(
               width: 42,
               height: 42,
-              decoration: BoxDecoration(color: c.withValues(alpha: .16), shape: BoxShape.circle),
-              child: Icon(icono, size: 21, color: tinta),
+              decoration: BoxDecoration(
+                  color: sobreImagen ? Colors.white.withValues(alpha: .14) : VenueColors.superficie2,
+                  shape: BoxShape.circle),
+              child: Icon(icono, size: 21, color: suave),
             ),
             const SizedBox(height: 8),
             Text(etiqueta,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: tinta)),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: suave)),
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(valor,
@@ -670,8 +672,9 @@ class Saludo extends StatelessWidget {
       );
 }
 
-/// Acceso rápido: ícono en un círculo teñido, título, una línea de qué
-/// hace y la flecha a la derecha. Es para ACCIONES (no para números).
+/// Acceso rápido: ícono en un círculo gris, título, una línea de qué hace y
+/// la flecha a la derecha. Es para ACCIONES (no para números). Neutro: el
+/// color queda para los estados.
 class AccionRapida extends StatelessWidget {
   const AccionRapida({
     super.key,
@@ -690,12 +693,9 @@ class AccionRapida extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? Theme.of(context).colorScheme.primary;
-    final claro = Theme.of(context).brightness == Brightness.light;
     return Container(
       decoration: BoxDecoration(
-        // un tinte muy suave del color, como las tarjetas de "Quick Access"
-        color: Color.alphaBlend(c.withValues(alpha: claro ? .07 : .12), VenueColors.superficie),
+        color: VenueColors.superficie,
         borderRadius: BorderRadius.circular(radioTarjeta),
         border: bordeTarjeta,
         boxShadow: sombraTarjeta,
@@ -711,8 +711,8 @@ class AccionRapida extends StatelessWidget {
               Container(
                 width: 44,
                 height: 44,
-                decoration: BoxDecoration(color: c.withValues(alpha: .16), shape: BoxShape.circle),
-                child: Icon(icono, size: 22, color: c),
+                decoration: BoxDecoration(color: VenueColors.superficie2, shape: BoxShape.circle),
+                child: Icon(icono, size: 22, color: VenueColors.textoSuave),
               ),
               const SizedBox(width: 12),
               Expanded(

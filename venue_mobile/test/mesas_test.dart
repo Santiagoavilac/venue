@@ -87,6 +87,10 @@ void main() {
   });
 
   testWidgets('en modo mover, arrastrar informa la posición nueva', (t) async {
+    // pantalla de 1200 px para que el plano mida de verdad 1000 px
+    t.view.physicalSize = const Size(1200, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
     (Mesa, double, double)? movida;
     await t.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -97,15 +101,46 @@ void main() {
             mover: true,
             mesas: [mesa('A1', x: 10, y: 20)],
             alTocar: (_) {},
-            alMover: (m, x, y) => movida = (m, x, y),
+            alMover: (m, x, y) async {
+              movida = (m, x, y);
+              return true;
+            },
           ),
         ),
       ),
     ));
+    final antes = t.getTopLeft(find.text('A1'));
     await t.drag(find.text('A1'), const Offset(200, 42));
     await t.pump();
     expect(movida, isNotNull);
     expect(movida!.$2, closeTo(30, 2.5));
     expect(movida!.$3, closeTo(30, 2.5));
+    // queda donde se soltó sin esperar al servidor (no vuelve a su lugar)
+    final despues = t.getTopLeft(find.text('A1'));
+    expect(despues.dx - antes.dx, closeTo(200, 6));
+  });
+
+  testWidgets('si no se pudo guardar, la mesa vuelve a su lugar', (t) async {
+    t.view.physicalSize = const Size(1200, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 1000,
+          child: Plano(
+            planta: 'alta',
+            mover: true,
+            mesas: [mesa('A1', x: 10, y: 20)],
+            alTocar: (_) {},
+            alMover: (m, x, y) async => false,
+          ),
+        ),
+      ),
+    ));
+    final antes = t.getTopLeft(find.text('A1'));
+    await t.drag(find.text('A1'), const Offset(200, 42));
+    await t.pumpAndSettle();
+    expect(t.getTopLeft(find.text('A1')).dx, closeTo(antes.dx, 1));
   });
 }

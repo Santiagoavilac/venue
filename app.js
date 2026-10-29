@@ -6707,28 +6707,49 @@ async function guardarPlano() {
   } catch (e) { fail(e); }
 }
 
+/* Arrastrar una mesa en el plano. Durante el arrastre la mesa se mueve con
+   transform (un cuadro por frame, sin recalcular el plano) y recién al
+   soltar se fija en la grilla de 0,5% y se guarda. Si el guardado falla,
+   vuelve a su lugar. */
 function dragMesa(el, m, cv2) {
   el.onpointerdown = e => {
+    if (e.button !== 0) return;
     e.preventDefault();
-    try { el.setPointerCapture(e.pointerId); } catch (err) { }
+    try { el.setPointerCapture(e.pointerId); } catch (err) { /* sin captura: igual anda */ }
     const rect = cv2.getBoundingClientRect();
     const sx = e.clientX, sy = e.clientY, ox = +m.x, oy = +m.y;
-    let moved = false;
+    // límites del plano, en píxeles desde la posición original
+    const minX = (0.5 - ox) / 100 * rect.width, maxX = (99 - (+m.w || 0) - ox) / 100 * rect.width;
+    const minY = (0.5 - oy) / 100 * rect.height, maxY = (86 - oy) / 100 * rect.height;
+    let dx = 0, dy = 0, moved = false, cuadro = 0;
+    const pintar = () => { cuadro = 0; el.style.transform = `translate3d(${dx}px,${dy}px,0)`; };
     const mv = evp => {
-      const dx = (evp.clientX - sx) / rect.width * 100, dy = (evp.clientY - sy) / rect.height * 100;
-      if (Math.abs(dx) + Math.abs(dy) > 0.6) moved = true;
-      m.x = Math.round(Math.min(Math.max(ox + dx, 0.5), 99 - m.w) * 2) / 2;
-      m.y = Math.round(Math.min(Math.max(oy + dy, 0.5), 86) * 2) / 2;
-      el.style.left = m.x + "%"; el.style.top = m.y + "%";
+      const rx = evp.clientX - sx, ry = evp.clientY - sy;
+      if (!moved) {
+        if (Math.hypot(rx, ry) < 4) return;   // un toque no es un arrastre
+        moved = true; el.classList.add("arrastrando");
+      }
+      dx = Math.min(Math.max(rx, minX), maxX);
+      dy = Math.min(Math.max(ry, minY), maxY);
+      if (!cuadro) cuadro = requestAnimationFrame(pintar);
     };
-    const up = async () => {
-      window.removeEventListener("pointermove", mv);
-      window.removeEventListener("pointerup", up);
-      if (moved) await sb.from("mesas").update({ x: m.x, y: m.y }).eq("id", m.id);
-      else sheetMesaEdit(m);
+    const fin = async () => {
+      el.removeEventListener("pointermove", mv);
+      el.removeEventListener("pointerup", fin);
+      el.removeEventListener("pointercancel", fin);
+      if (cuadro) cancelAnimationFrame(cuadro);
+      el.classList.remove("arrastrando");
+      el.style.transform = "";
+      if (!moved) return sheetMesaEdit(m);
+      const nx = Math.round((ox + dx / rect.width * 100) * 2) / 2;
+      const ny = Math.round((oy + dy / rect.height * 100) * 2) / 2;
+      m.x = nx; m.y = ny; el.style.left = nx + "%"; el.style.top = ny + "%";
+      const { error } = await sb.from("mesas").update({ x: nx, y: ny }).eq("id", m.id);
+      if (error) { m.x = ox; m.y = oy; el.style.left = ox + "%"; el.style.top = oy + "%"; fail(error); }
     };
-    window.addEventListener("pointermove", mv);
-    window.addEventListener("pointerup", up);
+    el.addEventListener("pointermove", mv);
+    el.addEventListener("pointerup", fin);
+    el.addEventListener("pointercancel", fin);
   };
 }
 

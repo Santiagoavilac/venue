@@ -360,10 +360,12 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                               try {
                                 await repo.mover(m.id, x, y);
                                 ref.invalidate(mesasProvider);
+                                return true;
                               } catch (e) {
                                 if (context.mounted) {
                                   avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
                                 }
+                                return false;
                               }
                             },
                           ),
