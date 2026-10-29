@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")/../.."
 D="$(mktemp -d)/venue-web"; mkdir -p "$D"
-cp index.html app.js relacionador.js motion.js styles.css rediseno.css reporte-escritorio.js contabilidad.js config.js sw.js \
+cp index.html privacidad.html app.js relacionador.js motion.js styles.css rediseno.css reporte-escritorio.js contabilidad.js config.js sw.js \
    icon-512.png icon.svg manifest.webmanifest tools/web/vercel.json "$D/"
 if grep -qi 'service_role' "$D"/*; then echo "Hay una clave privilegiada en los archivos: no se publica." >&2; exit 1; fi
 python3 - "$D/config.js" <<'PY'
