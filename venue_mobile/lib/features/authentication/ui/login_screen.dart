@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/networking/supabase.dart';
+import '../../../core/routing/router.dart';
 import '../data/sesion.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -41,6 +42,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       await ref.read(authRepositoryProvider).ingresar(u, c);
+    } on OtraPuerta catch (e) {
+      _error = e.mensaje;
     } on CuentaDesactivada {
       _error = 'Tu usuario está desactivado. Hablá con tu jefe de team o con el administrador.';
     } on AuthException catch (e) {
@@ -64,10 +67,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _foco.requestFocus();
   }
 
-  void _atras() => setState(() {
-        _paso = 0;
-        _error = null;
-      });
+  /// Del primer paso se vuelve a la bienvenida (elegir Boliches o
+  /// Relacionadores); del segundo, al usuario.
+  void _atras() {
+    if (_paso == 0) return context.go(Rutas.login);
+    setState(() {
+      _paso = 0;
+      _error = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +102,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
 
     return PopScope(
-      canPop: !clave,
+      canPop: false,
       onPopInvokedWithResult: (hecho, _) {
         if (!hecho) _atras();
       },
@@ -121,21 +129,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         height: 48,
                         child: Align(
                           alignment: Alignment.centerLeft,
-                          child: clave
-                              ? IconButton(
-                                  tooltip: 'Volver',
-                                  onPressed: _atras,
-                                  padding: EdgeInsets.zero,
-                                  alignment: Alignment.centerLeft,
-                                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                                      color: Colors.white, size: 20),
-                                )
-                              : const Text('VENUE',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 5)),
+                          child: IconButton(
+                            tooltip: 'Volver',
+                            onPressed: _atras,
+                            padding: EdgeInsets.zero,
+                            alignment: Alignment.centerLeft,
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                                color: Colors.white, size: 20),
+                          ),
                         ),
                       ),
                       Expanded(
@@ -218,10 +219,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               Align(
                                 alignment: Alignment.centerLeft,
                                 child: TextButton(
-                                  onPressed: () => context.go('/registro'),
+                                  onPressed: () => context.go(Rutas.relacionadores),
                                   style: TextButton.styleFrom(
                                       foregroundColor: Colors.white, padding: EdgeInsets.zero),
-                                  child: const Text('Tengo un link de invitación',
+                                  child: const Text('¿Sos relacionador? Entrá por Relacionadores',
                                       style: TextStyle(decoration: TextDecoration.underline)),
                                 ),
                               ),

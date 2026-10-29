@@ -12,6 +12,7 @@ import '../../../core/widgets/patron.dart';
 import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/data/eventos.dart';
+import '../../rrpp/ui/gestion_solicitudes.dart';
 import '../data/equipo.dart';
 import '../data/gente.dart';
 import 'team_detalle_screen.dart';
@@ -241,6 +242,12 @@ class _CabeceraGente extends ConsumerWidget {
         titulo: 'Usuarios',
         contexto: '${club?.nombre ?? ''} · ${pl(usuarios.length, 'usuario')} · ${pl(teams.length, 'team')}',
         acciones: [
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 50)),
+            onPressed: () => abrirGestionSolicitudes(context, ref),
+            icon: const Icon(Icons.person_add_alt_outlined, size: 20),
+            label: const Text('Solicitudes'),
+          ),
           FilledButton.icon(
             style: FilledButton.styleFrom(minimumSize: const Size(0, 50)),
             onPressed: () async {

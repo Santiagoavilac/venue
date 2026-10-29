@@ -10,6 +10,7 @@ class Perfil {
     required this.usuario,
     required this.nombre,
     required this.activo,
+    this.rol = '',
     this.puedeTickear = false,
     this.adminPrincipal = false,
     this.contabilidadTotal = false,
@@ -20,6 +21,13 @@ class Perfil {
   final String usuario;
   final String nombre;
   final bool activo;
+
+  /// Rol base de la cuenta (el de cada boliche lo da rol_en_club).
+  final String rol;
+
+  /// Relacionadores y jefes entran por "Relacionadores" y usan su espacio
+  /// personal; el resto del personal entra por "Boliches".
+  bool get esRelacionador => (rol == 'rrpp' || rol == 'jefe') && !adminPrincipal;
 
   /// Puede marcar ingresos a mano desde Listas.
   final bool puedeTickear;
@@ -41,6 +49,7 @@ class Perfil {
         usuario: j['usuario'] as String? ?? '',
         nombre: j['nombre'] as String? ?? '',
         activo: j['activo'] as bool? ?? false,
+        rol: j['rol'] as String? ?? '',
         puedeTickear: j['puede_tickear'] as bool? ?? false,
         adminPrincipal: j['admin_principal'] as bool? ?? false,
         contabilidadTotal: j['contabilidad_total'] as bool? ?? false,
@@ -70,6 +79,18 @@ class CuentaDesactivada implements Exception {
   const CuentaDesactivada();
 }
 
+/// La cuenta existe pero entra por la otra opción de la bienvenida.
+class OtraPuerta implements Exception {
+  const OtraPuerta({required this.esRelacionador});
+  final bool esRelacionador;
+  String get mensaje => esRelacionador
+      ? 'Esta cuenta es de relacionador: entrá por Relacionadores.'
+      : 'Esta cuenta es del personal de un boliche: entrá por Boliches.';
+}
+
+/// Vuelta de los enlaces de correo y de Google/Apple a la app.
+const redireccionApp = 'venue://login-callback';
+
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepository(ref.watch(supabaseProvider)),
 );
@@ -81,24 +102,70 @@ class AuthRepository {
   static String emailDe(String usuario) =>
       '${usuario.trim().toLowerCase()}@${Env.dominioUsuarios}';
 
-  /// Inicia sesión. Una cuenta desactivada no queda con sesión abierta.
+  /// Ingreso por "Boliches" (usuario + contraseña). Una cuenta
+  /// desactivada o de relacionador no queda con sesión abierta.
   Future<void> ingresar(String usuario, String clave) async {
     final r = await _sb.auth.signInWithPassword(
       email: emailDe(usuario),
       password: clave,
     );
-    final uid = r.user?.id;
+    await _revisar(r.user?.id, relacionador: false);
+  }
+
+  /// Ingreso por "Relacionadores": correo, o el usuario de siempre para
+  /// los que ya trabajaban en VENUE.
+  Future<void> ingresarRelacionador(String correoOUsuario, String clave) async {
+    final t = correoOUsuario.trim().toLowerCase();
+    final r = await _sb.auth.signInWithPassword(
+      email: t.contains('@') ? t : emailDe(t),
+      password: clave,
+    );
+    await _revisar(r.user?.id, relacionador: true);
+  }
+
+  Future<void> _revisar(String? uid, {required bool relacionador}) async {
     if (uid == null) return;
     final p = await _sb
         .from('profiles')
-        .select('activo')
+        .select('activo, rol, admin_principal')
         .eq('id', uid)
         .maybeSingle();
+    // relacionador nuevo sin perfil: completa el nombre después
+    if (p == null && relacionador) return;
     if (p == null || p['activo'] != true) {
       await _sb.auth.signOut();
       throw const CuentaDesactivada();
     }
+    final esRel = (p['rol'] == 'rrpp' || p['rol'] == 'jefe') && p['admin_principal'] != true;
+    if (esRel != relacionador) {
+      await _sb.auth.signOut();
+      throw OtraPuerta(esRelacionador: esRel);
+    }
   }
+
+  /// Cuenta nueva de relacionador. Devuelve true si ya quedó con sesión
+  /// (false: tiene que confirmar el correo primero).
+  Future<bool> crearCuenta({required String nombre, required String correo, required String clave}) async {
+    final r = await _sb.auth.signUp(
+      email: correo.trim().toLowerCase(),
+      password: clave,
+      emailRedirectTo: redireccionApp,
+      data: {'nombre': nombre.trim()},
+    );
+    return r.session != null;
+  }
+
+  Future<void> recuperar(String correo) =>
+      _sb.auth.resetPasswordForEmail(correo.trim().toLowerCase(), redirectTo: redireccionApp);
+
+  /// Google o Apple: se abre el navegador y la sesión vuelve por el enlace
+  /// venue://login-callback.
+  Future<void> conProveedor(OAuthProvider p) =>
+      _sb.auth.signInWithOAuth(p, redirectTo: redireccionApp);
+
+  /// Crea el perfil de relacionador (sin boliches: no da acceso a nada).
+  Future<void> completarCuenta(String nombre) =>
+      _sb.rpc('rrpp_crear_cuenta', params: {'p_nombre': nombre.trim()});
 
   Future<void> salir() => _sb.auth.signOut();
 

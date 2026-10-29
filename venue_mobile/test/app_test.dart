@@ -20,6 +20,21 @@ void main() {
     expect(destinoPara(conSesion: true, conClub: true), Rutas.inicio);
   });
 
+  test('ruta: relacionadores a su espacio, cuenta nueva a completar', () {
+    expect(destinoPara(conSesion: true, conClub: false, sinPerfil: true), Rutas.completar);
+    expect(destinoPara(conSesion: true, conClub: false, esRelacionador: true), Rutas.rel);
+    expect(destinoPara(conSesion: true, conClub: true, esRelacionador: true), Rutas.rel);
+    expect(destinoPara(conSesion: false, conClub: false, esRelacionador: true), Rutas.login);
+  });
+
+  test('quién es relacionador', () {
+    expect(const Perfil(id: '1', usuario: 'a', nombre: 'A', activo: true, rol: 'rrpp').esRelacionador, isTrue);
+    expect(const Perfil(id: '1', usuario: 'a', nombre: 'A', activo: true, rol: 'jefe').esRelacionador, isTrue);
+    expect(const Perfil(id: '1', usuario: 'a', nombre: 'A', activo: true, rol: 'admin').esRelacionador, isFalse);
+    expect(const Perfil(id: '1', usuario: 'a', nombre: 'A', activo: true, rol: 'jefe', adminPrincipal: true)
+        .esRelacionador, isFalse);
+  });
+
   test('email interno del usuario', () {
     expect(AuthRepository.emailDe('  Mateo.R '), 'mateo.r@plataforma.local');
   });
