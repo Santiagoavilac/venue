@@ -37,6 +37,12 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
   AppleMapController? _mapa;
   Pines? _pines;
   final _iconos = <String, BitmapDescriptor>{};
+
+  /// El mapa se arma una sola vez por cambio de datos (pines, calor). Al
+  /// deslizar la hoja la pantalla se redibuja cuadro a cuadro y antes le
+  /// volvía a mandar los marcadores al mapa en cada cuadro.
+  Widget? _mapaArmado;
+  String? _claveMapa;
   final _filtros = <FiltroMapa>{};
   int _elegido = 0;
   double _extension = _peek;
@@ -113,35 +119,47 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
     final arriba = MediaQuery.paddingOf(context).top;
     final oscurecer = ((_extension - _medio) / (_lleno - _medio)).clamp(0.0, 1.0);
 
-    final anotaciones = <Annotation>{
+    final calor = ref.watch(calorProvider).value ?? const <String, double>{};
+    final iconosDe = [
       for (var i = 0; i < pines.length; i++)
-        if (_iconos['${pines[i].lugar.id}|${pines[i].esHoy(ahora)}|${i == _elegido}|${pines[i].evento == null}']
-            case final icono?)
-          Annotation(
-            annotationId: AnnotationId(pines[i].lugar.id),
-            position: LatLng(pines[i].lugar.lat!, pines[i].lugar.lng!),
-            anchor: const Offset(0.5, 0.5),
-            icon: icono,
-            zIndex: i == _elegido ? 10 : (pines[i].esHoy(ahora) ? 5 : 1),
-            onTap: () => _elegir(i, pines, desdePin: true),
-          ),
-    };
+        _iconos['${pines[i].lugar.id}|${pines[i].esHoy(ahora)}|${i == _elegido}|${pines[i].evento == null}'],
+    ];
+    final clave = [
+      for (var i = 0; i < pines.length; i++) '${pines[i].lugar.id}:${iconosDe[i] != null}:${i == _elegido}',
+      for (final e in calor.entries) '${e.key}=${e.value}',
+    ].join('|');
+    if (clave != _claveMapa || _mapaArmado == null) {
+      _claveMapa = clave;
+      final anotaciones = <Annotation>{
+        for (var i = 0; i < pines.length; i++)
+          if (iconosDe[i] case final icono?)
+            Annotation(
+              annotationId: AnnotationId(pines[i].lugar.id),
+              position: LatLng(pines[i].lugar.lat!, pines[i].lugar.lng!),
+              anchor: const Offset(0.5, 0.5),
+              icon: icono,
+              zIndex: i == _elegido ? 10 : (pines[i].esHoy(ahora) ? 5 : 1),
+              onTap: () => _elegir(i, pines, desdePin: true),
+            ),
+      };
+      _mapaArmado = AppleMap(
+        initialCameraPosition: CameraPosition(target: LatLng(c.lat - 0.004, c.lng), zoom: c.zoom),
+        onMapCreated: (m) => _mapa = m,
+        annotations: anotaciones,
+        circles: circulosDeCalor(lugares, calor),
+        myLocationEnabled: true,
+        compassEnabled: false,
+        pitchGesturesEnabled: false,
+        insetsLayoutMarginsFromSafeArea: false,
+        onTap: (_) => FocusScope.of(context).unfocus(),
+      );
+    }
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Stack(children: [
-        Positioned.fill(
-          child: AppleMap(
-            initialCameraPosition: CameraPosition(target: LatLng(c.lat - 0.004, c.lng), zoom: c.zoom),
-            onMapCreated: (m) => _mapa = m,
-            annotations: anotaciones,
-            myLocationEnabled: true,
-            compassEnabled: false,
-            pitchGesturesEnabled: false,
-            insetsLayoutMarginsFromSafeArea: false,
-            onTap: (_) => FocusScope.of(context).unfocus(),
-          ),
-        ),
+        // el mismo widget mientras no cambien los datos: el mapa no se toca
+        Positioned.fill(child: _mapaArmado!),
         // al subir la hoja el mapa se apaga
         IgnorePointer(child: Container(color: Aftr.fondo.withValues(alpha: 0.7 * oscurecer))),
         // búsqueda y filtros
@@ -401,4 +419,30 @@ class _TarjetaPin extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Calor de ventas como círculos nativos del mapa: van pegados a la dirección
+/// del boliche y se mueven con el mapa (no se dibujan encima). Tres anillos
+/// que se desvanecen hacia afuera, de ámbar a rojo según la intensidad.
+Set<Circle> circulosDeCalor(List<Lugar> lugares, Map<String, double> calor) {
+  const ambar = Color(0xFFFFB020), rojo = Color(0xFFFF3B30);
+  final circulos = <Circle>{};
+  for (final l in lugares) {
+    final i = calor[l.id];
+    if (i == null || i <= 0 || l.lat == null || l.lng == null) continue;
+    final color = Color.lerp(ambar, rojo, i)!;
+    final radio = 160 + 380 * i; // metros
+    for (final (k, factor, alfa) in [(0, 1.0, .10), (1, .64, .16), (2, .34, .26)]) {
+      circulos.add(Circle(
+        circleId: CircleId('calor-${l.id}-$k'),
+        center: LatLng(l.lat!, l.lng!),
+        radius: radio * factor,
+        fillColor: color.withValues(alpha: alfa),
+        strokeColor: Colors.transparent,
+        strokeWidth: 0,
+        zIndex: k,
+      ));
+    }
+  }
+  return circulos;
 }

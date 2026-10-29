@@ -35,6 +35,16 @@ class AftrRepo {
     return [for (final x in (r as List? ?? const [])) Lugar.desde(Map<String, dynamic>.from(x as Map))];
   }
 
+  /// Dónde se están vendiendo entradas: boliche → intensidad de 0 a 1
+  /// (relativa al que más vendió). La base nunca manda el número de entradas.
+  Future<Map<String, double>> calor() async {
+    final r = await _rpc('aftr_calor');
+    return {
+      for (final x in (r as List? ?? const []))
+        (x as Map)['club_id'] as String: ((x['intensidad'] as num?) ?? 0).toDouble(),
+    };
+  }
+
   Future<Lugar?> lugar(String id) async {
     final r = await _rpc('aftr_lugar', {'p_id': id});
     return r is Map ? Lugar.desde(Map<String, dynamic>.from(r)) : null;
@@ -116,6 +126,8 @@ enum Cuando { hoy, manana, finde, todo }
 final eventosProvider = FutureProvider<List<Evento>>((ref) => ref.watch(repoProvider).eventos());
 
 final lugaresProvider = FutureProvider<List<Lugar>>((ref) => ref.watch(repoProvider).lugares());
+
+final calorProvider = FutureProvider.autoDispose<Map<String, double>>((ref) => ref.watch(repoProvider).calor());
 
 final eventoProvider = FutureProvider.autoDispose.family<EventoDetalle?, String>((ref, id) {
   ref.watch(usuarioIdProvider); // "guardado" depende de quién mira
