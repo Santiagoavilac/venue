@@ -411,7 +411,18 @@ async function pintarDescubrir() {
 }
 
 /* ── evento ─────────────────────────────────────────────────────────── */
+/* Enlace personal de un relacionador (?r=código): se guarda para la sesión
+   y cada evento que se abre con él suma una visita a su nombre. No cambia
+   precios ni comisiones: solo mide cuánta gente llega por su enlace. */
+const REF = (() => {
+  try {
+    const r = new URLSearchParams(location.search).get("r");
+    if (r && /^[a-z0-9]{6,12}$/i.test(r)) sessionStorage.setItem("aftr.ref", r.toLowerCase());
+    return sessionStorage.getItem("aftr.ref");
+  } catch { return null; }
+})();
 async function pintarEvento(id) {
+  if (REF) sb.rpc("aftr_visita_ref", { p_evento: id, p_ref: REF }).then(() => {}, () => {});
   const previo = (E.eventos || []).find((e) => e.id === id);
   if (previo) vista.innerHTML = cabeceraEvento(previo) + `<div class="det"><div class="esq" style="height:120px;border-radius:18px;margin-top:20px"></div></div>`;
   const d = await rpc("aftr_evento", { p_id: id });

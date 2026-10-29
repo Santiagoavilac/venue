@@ -403,8 +403,8 @@ function pintarLogin() {
   const clave = lgPaso === 1;
   $("#lgPaso0").classList.toggle("hidden", clave);
   $("#lgPaso1").classList.toggle("hidden", !clave);
-  $("#lgMarca").classList.toggle("hidden", clave);
-  $("#lgVolver").classList.toggle("hidden", !clave);
+  $("#lgMarca").classList.toggle("hidden", true);
+  $("#lgVolver").classList.toggle("hidden", false);
   $("#lgTit").textContent = clave ? "Ingresá tu contraseña" : "Ingresá tu usuario";
   $("#lgSub").textContent = clave ? `Entrás como @${$("#lgUser").value.trim().toLowerCase()}` : "Acceso solo para personal autorizado";
   $("#btnLogin").textContent = clave ? "Ingresar" : "Siguiente";
@@ -418,7 +418,11 @@ function loginSiguiente() {
 }
 if ($("#lgPaso0")) {
   $("#btnLogin").onclick = loginSiguiente;
-  $("#lgVolver").onclick = () => { lgPaso = 0; $("#loginErr").innerHTML = ""; pintarLogin(); $("#lgUser").focus(); };
+  $("#lgVolver").onclick = () => {
+    $("#loginErr").innerHTML = "";
+    if (lgPaso === 0) return mostrarAcceso("inicio");
+    lgPaso = 0; pintarLogin(); $("#lgUser").focus();
+  };
   $("#lgUser").addEventListener("input", pintarLogin);
   $("#lgPass").addEventListener("input", pintarLogin);
   $("#lgUser").addEventListener("keydown", e => { if (e.key === "Enter") loginSiguiente(); });
@@ -431,35 +435,34 @@ $("#lgEye") && ($("#lgEye").onclick = () => {
   p.type = show ? "text" : "password"; $("#lgEye").classList.toggle("on", show);
 });
 
-/* ---------- registro de RRPP por link de invitación (?invite=CODE) ---------- */
-const INVITE = new URLSearchParams(location.search).get("invite");
-if (INVITE && sb) {
-  document.querySelector(".login-brand p").textContent = "Registro de relacionador";
-  $("#btnLogin")?.classList.add("hidden");
-  $("#loginCard").innerHTML = `
-    <div id="regErr"></div>
-    <div class="field"><label>Tu nombre y apellido</label><input id="rgNombre" autocomplete="name"></div>
-    <div class="field"><label>Usuario (corto, sin espacios)</label><input id="rgUser" autocapitalize="none" autocomplete="off"></div>
-    <div class="field"><label>Contraseña (mín. 6)</label><input id="rgPass" type="password" autocomplete="new-password"></div>
-    <button class="btn primary" id="btnReg2">Registrarme</button>
-    <p style="font-size:12px;color:var(--text-3);margin-top:12px;text-align:center">Al registrarte quedás en el team de quien te pasó este link.</p>`;
-  $("#btnReg2").onclick = async () => {
-    const nombre = $("#rgNombre").value.trim(), usuario = $("#rgUser").value.trim().toLowerCase().replace(/\s/g, ""), clave = $("#rgPass").value;
-    $("#regErr").innerHTML = "";
-    if (!nombre || !usuario || clave.length < 6) { $("#regErr").innerHTML = `<div class="err">Completá todo (clave 6+).</div>`; return; }
-    const b = $("#btnReg2"); b.disabled = true; b.textContent = "Registrando…";
-    const res = await fetch(`${CFG.SUPABASE_URL}/functions/v1/crear-usuario`, {
-      method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.SUPABASE_ANON_KEY, Authorization: `Bearer ${CFG.SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ action: "registro", invite: INVITE, nombre, usuario, clave })
-    });
-    const out = await res.json();
-    if (!res.ok) { b.disabled = false; b.textContent = "Registrarme"; $("#regErr").innerHTML = `<div class="err">${out.error || "Error"}</div>`; return; }
-    toast(`Bienvenido al ${out.team}`);
-    history.replaceState(null, "", location.pathname);
-    const { error } = await sb.auth.signInWithPassword({ email: `${usuario}@plataforma.local`, password: clave });
-    if (!error) boot(); else location.reload();
-  };
+/* ---------- acceso: boliche o relacionador ----------
+   La pantalla de bienvenida separa los dos ingresos. El de boliches es el
+   usuario + contraseña de siempre; el de relacionadores (correo, Google o
+   Apple, con registro abierto) vive en relacionador.js. El modo elegido
+   queda en la sesión del navegador para que boot() no deje entrar a una
+   cuenta por la puerta equivocada. */
+const MODO_ACCESO = "venue.acceso";
+const modoAcceso = () => { try { return sessionStorage.getItem(MODO_ACCESO); } catch { return null; } };
+function mostrarAcceso(modo) {
+  $("#login").dataset.modo = modo;
+  $("#lgInicio").classList.toggle("hidden", modo !== "inicio");
+  $("#lgBoliche").classList.toggle("hidden", modo !== "boliche");
+  $("#lgRel").classList.toggle("hidden", modo !== "rel");
+  try { modo === "inicio" ? sessionStorage.removeItem(MODO_ACCESO) : sessionStorage.setItem(MODO_ACCESO, modo); } catch { /* sin storage */ }
+  if (modo === "boliche") { lgPaso = 0; pintarLogin(); setTimeout(() => $("#lgUser").focus(), 60); }
+  if (modo === "rel") window.Rel?.pintarAcceso();
 }
+document.querySelectorAll("#lgInicio [data-modo]").forEach(b => b.onclick = () => mostrarAcceso(b.dataset.modo));
+
+/* Link de invitación (?unirse=CODE, o el ?invite=CODE viejo de los teams):
+   ya no crea la cuenta. Se guarda el código, la persona entra por
+   Relacionadores y, una vez adentro, manda la solicitud para sumarse. */
+const INVITE = new URLSearchParams(location.search).get("unirse") || new URLSearchParams(location.search).get("invite");
+if (INVITE) {
+  try { sessionStorage.setItem("venue.unirse", INVITE); } catch { /* sin storage */ }
+  history.replaceState(null, "", location.pathname + location.hash);
+}
+const unirsePendiente = () => { try { return sessionStorage.getItem("venue.unirse"); } catch { return null; } };
 
 async function login() {
   const u = $("#lgUser").value.trim().toLowerCase(), p = $("#lgPass").value;
@@ -483,13 +486,29 @@ async function boot() {
   // perfil y catálogo de boliches en paralelo. El rol por boliche ya no se
   // calcula acá con las membresías: lo resuelve el servidor (rol_en_club).
   const [{ data: prof, error }, { data: cls_ }] = await Promise.all([
-    sb.from("profiles").select("*").eq("id", user.id).single(),
+    sb.from("profiles").select("*").eq("id", user.id).maybeSingle(),
     sb.from("clubs").select("*").eq("activo", true).order("nombre")
   ]);
-  if (error || !prof) { fail(error || new Error("Perfil no encontrado")); return; }
+  if (error) { fail(error); return; }
+  // cuenta nueva de relacionador (correo, Google o Apple): falta el perfil
+  if (!prof) { mostrarAcceso("rel"); window.Rel?.completarCuenta(user); return; }
+  /* cada cuenta entra por su puerta: los relacionadores y jefes por
+     Relacionadores, el personal del boliche por Boliches */
+  const esCuentaRel = ["rrpp", "jefe"].includes(prof.rol) && !prof.admin_principal;
+  const modo = modoAcceso();
+  if ((modo === "boliche" && esCuentaRel) || (modo === "rel" && !esCuentaRel)) {
+    await sb.auth.signOut();
+    mostrarAcceso(modo);
+    const msg = modo === "boliche"
+      ? "Esta cuenta es de relacionador: entrá por Relacionadores."
+      : "Esta cuenta es del personal de un boliche: entrá por Boliches.";
+    if (modo === "boliche") { lgPaso = 0; pintarLogin(); $("#loginErr").textContent = msg; }
+    else window.Rel?.errorAcceso(msg);
+    return;
+  }
   if (!prof.activo) {
     await sb.auth.signOut();
-    lgPaso = 0; pintarLogin();
+    mostrarAcceso("boliche"); lgPaso = 0; pintarLogin();
     $("#loginErr").textContent = "Tu usuario está desactivado. Hablá con tu jefe de team o con el administrador.";
     return;
   }
@@ -507,8 +526,10 @@ async function boot() {
   // sin ningún boliche todavía (arranque de cero): entra directo con el
   // rol base, la pantalla de Eventos del admin explica cómo crear el primero
   if (!club) { me.rol = me._rol; me.team_id = me._team; await enterApp(); return; }
-  // los que manejan más de un boliche eligen primero en un menú
-  if (cls.length > 1) { showClubPicker(cls); return; }
+  // los que manejan más de un boliche eligen primero en un menú. El
+  // relacionador entra a su espacio (que es de todos sus boliches) y cambia
+  // de boliche desde arriba cuando necesita las herramientas de uno.
+  if (cls.length > 1 && !esCuentaRel) { showClubPicker(cls); return; }
   await applyClubRole();
   enterApp();
 }
@@ -687,7 +708,7 @@ window.logout = async () => { stopCam(); await sb.auth.signOut(); location.reloa
 function header() {
   const c = clubData(club);
   aplicarTemaClub(c);
-  const marca = `<span class="wm-club">${esc(clubNombre(club))}</span>`;
+  const marca = club ? `<span class="wm-club">${esc(clubNombre(club))}</span>` : `<span class="wm-club">VENUE</span>`;
   const ini = (me.nombre || "?").slice(0, 1).toUpperCase();
 
   $("#clubName").innerHTML = marca;
@@ -711,6 +732,8 @@ function header() {
   // flechita al lado del boliche solo si hay a dónde cambiar
   const hayOtros = myClubs().length > 1 || me.plataforma;
   qsa("#tbClub .chev, #clubChev").forEach(x => x.style.display = hayOtros ? "" : "none");
+  // sin boliche (relacionador nuevo) no hay evento que elegir
+  $("#tbEv") && ($("#tbEv").style.display = club ? "" : "none");
   pintarEvTopbar();
 }
 
@@ -989,6 +1012,7 @@ const TAB_ICONS = {
    días: viven en "Más" (celular) y al pie de la barra lateral
    (escritorio), no en el perfil, que queda solo para la cuenta. */
 const EXTRA_ICONS = {
+  solicitudes: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.5 3-5 6-5s5.2 1.5 6 5"/><path d="M15 11l2 2 4-4"/>',
   usuarios: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.5 3-5 6-5s5.2 1.5 6 5"/><path d="M17 7v6M14 10h6"/>',
   filtro: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
   cajalista: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.8-3.5 3-5 6-5s5.2 1.5 6 5"/><path d="M16 8h5M16 12h5M16 16h3"/>',
@@ -998,6 +1022,8 @@ const EXTRA_ICONS = {
 function accionesMas() {
   const a = [];
   if (me.rol === "admin") a.push(["usuarios", "Usuarios y equipos", abrirUsuarios]);
+  if (window.Rel && club && (me.rol === "admin" || (me.rol === "jefe" && lideraAca())))
+    a.push(["solicitudes", me.rol === "admin" ? "Relacionadores: invitar y solicitudes" : "Quieren unirse", () => window.Rel.abrirGestion()]);
   if (["admin", "jefe"].includes(me.rol)) a.push(["filtro", "Rechazados en puerta", sheetFiltro]);
   if (me.admin_principal) a.push(["cajalista", "Lista de la caja", sheetCajaFiltro]);
   if (me.rol === "admin") a.push(["combos", "Combos", sheetCombos]);
@@ -1034,14 +1060,19 @@ function tabsFor() {
     if (lideraAca()) t.splice(3, 0, ["team", "Team"]);  // admin que además lidera un team acá
     return t;
   }
-  if (me.rol === "jefe") {
-    const t = [["accesos", "Accesos"], ["mesas", "Mesas"]];
-    if (lideraAca()) t.push(["team", "Mi team"]);       // jefe solo en el boliche de su team
-    t.push(["stats", me.rol === "jefe" && lideraAca() ? "Stats" : "Mis stats"]);
-    return t;
+  /* Relacionadores y jefes: su espacio personal (cinco secciones, de todos
+     sus boliches) y, si tienen un boliche activo, sus herramientas de ese
+     boliche. En el celular solo van las cinco: las herramientas se abren
+     desde cada evento y desde Perfil. */
+  const t = [["rinicio", "Inicio"], ["reventos", "Eventos"], ["rstats", "Estadísticas"], ["rganancias", "Ganancias"], ["rperfil", "Perfil"]];
+  if (club && ["rrpp", "jefe"].includes(me.rol)) {
+    t.push(["accesos", "Listas y entradas"], ["mesas", "Mesas"]);
+    if (me.rol === "jefe" && lideraAca()) t.push(["team", "Mi team"], ["stats", "Stats del team"]);
   }
-  return [["accesos", "Accesos"], ["mesas", "Mesas"], ["stats", "Mis stats"]];
+  return t;
 }
+const TABS_REL = ["rinicio", "reventos", "rstats", "rganancias", "rperfil"];
+const esEspacioRel = () => tabsFor()[0][0] === "rinicio";
 const homeTab = () => tabsFor()[0][0];
 /* La navegación sale de una sola fuente (tabsFor) y se pinta en dos
    lugares: la barra lateral en escritorio y la inferior en móvil. Cada
@@ -1056,7 +1087,10 @@ function buildTabbar() {
 
   // En el celular entran cuatro; el resto va detrás de "Más".
   const bn = $("#botnav");
-  if (bn) {
+  if (bn && esEspacioRel()) {
+    bn.innerHTML = items.slice(0, 5).map(([t, l]) =>
+      `<button data-t="${t}"><svg viewBox="0 0 24 24" class="ic">${TAB_ICONS[t]}</svg><span>${esc(l)}</span></button>`).join("");
+  } else if (bn) {
     const mas = items.length > MAS_TABS || extras.length;
     const vis = items.slice(0, mas ? MAS_TABS : items.length), resto = items.slice(vis.length);
     bn.innerHTML = vis.map(([t, l]) =>
@@ -1099,6 +1133,9 @@ function setTab() {
   // "Más" queda marcado cuando la sección activa vive dentro de él.
   const mas = document.querySelector("#botnav [data-mas]");
   if (mas) mas.classList.toggle("on", !tabsFor().slice(0, MAS_TABS).some(([t]) => t === tab));
+  // el relacionador llega a sus herramientas desde Perfil: queda marcado
+  if (esEspacioRel() && !TABS_REL.includes(tab))
+    document.querySelector('#botnav [data-t="rperfil"]')?.classList.add("on");
 }
 
 /* Menú lateral: fijo en escritorio, deslizable en celular. */
@@ -1155,6 +1192,7 @@ function renderTab() {
   /* con conPantalla: si la RPC falla, muestra "Reintentar" en vez de una
      pantalla en blanco (la función tira throw, como screenCaja). */
   if (tab === "rrpps") return conPantalla(screenRrppsPuerta);   // consulta del portero
+  if (TABS_REL.includes(tab)) return conPantalla(window.Rel.pantallas[tab]);   // espacio del relacionador
   if (!ev && tab !== "eventos") {
     const verHist = ["rrpp", "jefe"].includes(me.rol);
     $("#main").innerHTML = `<div class="empty">No hay eventos próximos en este boliche.${me.rol === "admin" ? " Creá uno en Eventos." : ""}</div>${verHist ? `<div style="text-align:center;margin-top:8px"><button class="btn ghost2" style="width:auto;padding:10px 18px" id="btnHistVacio">Ver eventos pasados</button></div>` : ""}`;
@@ -4729,8 +4767,11 @@ async function sheetFichaUsuario(g) {
       <button class="btn ghost2" id="fuPausa">${g.activo ? "Pausar" : "Activar"}</button>
       <button class="btn ghost2" id="fuTel">${tel ? "Cambiar número" : "Cargar número"}</button>
       <button class="btn ghost2" id="fuClave">Resetear clave</button>
+      ${esRel && me.rol === "admin" && window.Rel ? `<button class="btn ghost2" id="fuPermisos">Permisos en este boliche</button>
+      <button class="btn ghost2" id="fuQuitar">Quitar de este boliche</button>` : ""}
     </div>`}`);
   gnConectarAccionesUsuario(g, tel);
+  window.Rel?.conectarFicha(g);
   gnPintarStats(g, esRel, "#gnStatsSheet");
 }
 
@@ -8119,7 +8160,8 @@ document.addEventListener("keydown", e => {
    apunta a cada botón de la barra, con qué es y "Siguiente". Sale una vez
    por persona en este navegador; se vuelve a ver desde el panel de perfil.
    =================================================================== */
-const claveTutorial = () => `venue.tutorial.v1.${me?.id}`;
+// el espacio del relacionador es nuevo: quien ya vio el tutorial viejo lo ve de nuevo
+const claveTutorial = () => `venue.tutorial.${esEspacioRel() ? "rel1" : "v1"}.${me?.id}`;
 const QUE_ES = {
   eventos: "Tu evento de la noche con sus números. Desde \"Gestionar evento\" lo editás, armás las listas y las fases, y creás eventos nuevos.",
   accesos: "Anotá invitados en las listas, vendé entradas con QR y mirá quién ya entró.",
@@ -8136,8 +8178,15 @@ const QUE_ES = {
   barmov: "Entradas y salidas de stock.",
   recepcion: "Registrá lo que llega al depósito.",
   recepmias: "Lo que registraste vos.",
+  rinicio: "Lo que ganaste, lo que te falta cobrar y tus próximos eventos, de todos tus boliches.",
+  reventos: "Tus eventos: compartí tu enlace, anotá invitados, vendé entradas y mesas.",
+  rstats: "Cómo te fue mes a mes, tus récords y tu trayectoria.",
+  rganancias: "Cada comisión por evento: estimada, por cobrar o pagada.",
+  rperfil: "Tus boliches, tus solicitudes para sumarte a otros y tu cuenta.",
 };
 async function tutorialSiCorresponde() {
+  // quien llegó por un enlace primero manda su solicitud; el tutorial, otro día
+  if (unirsePendiente()) return;
   let visto = true;
   try { visto = localStorage.getItem(claveTutorial()) === "1"; } catch { /* sin almacenamiento: no molestar */ }
   if (visto) return;
@@ -8710,8 +8759,16 @@ async function quitarSplash() {
   s.classList.add("fuera");
   setTimeout(() => s.remove(), 500);
 }
-if (sb) sb.auth.getSession()
-  .then(async ({ data: { session } }) => { if (session) await boot(); })
+/* Se arranca cuando terminaron de cargar todos los scripts: relacionador.js
+   va después de este archivo y boot() puede necesitarlo apenas resuelve la
+   sesión (que a veces resuelve antes de que el siguiente script corra). */
+const scriptsListos = new Promise(r => document.readyState === "loading"
+  ? document.addEventListener("DOMContentLoaded", r, { once: true }) : r());
+if (sb) scriptsListos.then(() => sb.auth.getSession())
+  .then(async ({ data: { session } }) => {
+    if (session) return await boot();
+    mostrarAcceso(unirsePendiente() ? "rel" : modoAcceso() || "inicio");
+  })
   .catch(console.error)
   .finally(quitarSplash);
 else quitarSplash();

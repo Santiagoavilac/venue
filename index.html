@@ -42,9 +42,30 @@ try { if (localStorage.getItem("venue.tema") === "oscuro") document.documentElem
   </div>
 </div>
 
-<!-- LOGIN: de a un dato por pantalla, como el ingreso de Resy -->
-<div class="login l2" id="login" data-paso="0">
-  <div class="l2-caja">
+<!-- LOGIN: primero se elige el acceso (boliche o relacionador); cada uno
+     tiene su propio ingreso -->
+<div class="login l2" id="login" data-paso="0" data-modo="inicio">
+  <div class="l2-caja" id="lgInicio">
+    <div class="l2-top"><span class="l2-marca">VENUE</span></div>
+    <div class="l2-cuerpo">
+      <h1>Bienvenido</h1>
+      <p class="l2-sub">¿Cómo vas a entrar?</p>
+      <div class="acc-ops">
+        <button type="button" class="acc-op" data-modo="boliche">
+          <span class="acc-ic"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/></svg></span>
+          <span class="acc-tx"><b>Boliches</b><small>Administración y personal del local</small></span>
+          <svg viewBox="0 0 24 24" class="ic acc-chev"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="acc-op" data-modo="rel">
+          <span class="acc-ic"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 3.6-6 7-6s6 2 7 6"/></svg></span>
+          <span class="acc-tx"><b>Relacionadores</b><small>Tu cuenta, tus boliches y tus ganancias</small></span>
+          <svg viewBox="0 0 24 24" class="ic acc-chev"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="l2-caja hidden" id="lgRel"></div>
+  <div class="l2-caja hidden" id="lgBoliche">
     <div class="l2-top">
       <span class="l2-marca" id="lgMarca">VENUE</span>
       <button type="button" class="l2-volver hidden" id="lgVolver" aria-label="Volver"><svg viewBox="0 0 24 24" class="ic"><path d="M15 5l-7 7 7 7"/></svg></button>
@@ -196,6 +217,7 @@ try { if (localStorage.getItem("venue.tema") === "oscuro") document.documentElem
 <script src="config.js"></script>
 <script src="contabilidad.js"></script>
 <script src="app.js"></script>
+<script src="relacionador.js"></script>
 <script src="reporte-escritorio.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
