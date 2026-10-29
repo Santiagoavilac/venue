@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,6 +33,23 @@ class _EventoScreenState extends ConsumerState<EventoScreen> {
   String? _fase;
   bool? _guardado;
   String? _anotando;
+
+  /// Alto/ancho real del flyer, para mostrarlo entero (sin cortar el título).
+  double? _proporcion;
+  String? _flyerMedido;
+
+  void _medirFlyer(String? url) {
+    if (url == null || url.isEmpty || url == _flyerMedido) return;
+    _flyerMedido = url;
+    final stream = CachedNetworkImageProvider(url).resolve(ImageConfiguration.empty);
+    late final ImageStreamListener l;
+    l = ImageStreamListener((info, _) {
+      stream.removeListener(l);
+      final i = info.image;
+      if (mounted && i.width > 0) setState(() => _proporcion = i.height / i.width);
+    }, onError: (_, _) => stream.removeListener(l));
+    stream.addListener(l);
+  }
 
   @override
   void initState() {
@@ -93,8 +111,11 @@ class _EventoScreenState extends ConsumerState<EventoScreen> {
     final d = async.value;
     final e = d?.evento ?? widget.previo;
     final ancho = MediaQuery.sizeOf(context).width;
-    final altoFlyer = ancho * 1.18;
     final arriba = MediaQuery.paddingOf(context).top;
+    _medirFlyer(e?.flyer);
+    // el flyer entero, debajo de la barra de estado; muy alto o muy ancho se acota
+    final altoFoto = ancho * (_proporcion ?? 1.25).clamp(0.8, 1.6);
+    final altoFlyer = arriba + altoFoto;
     final barra = ((_desplazado - altoFlyer + 140) / 60).clamp(0.0, 1.0);
 
     if (e == null) {
@@ -116,34 +137,43 @@ class _EventoScreenState extends ConsumerState<EventoScreen> {
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
-              child: SizedBox(
-                height: altoFlyer,
-                child: Stack(fit: StackFit.expand, clipBehavior: Clip.none, children: [
-                  // parallax: la foto se mueve a la mitad de velocidad y se
-                  // agranda si se tira para abajo
-                  Positioned(
-                    top: _desplazado < 0 ? _desplazado : _desplazado * 0.5,
-                    left: 0,
-                    right: 0,
-                    height: altoFlyer - (_desplazado < 0 ? _desplazado : 0),
-                    child: Hero(tag: 'flyer-${e.id}', child: ImagenRed(e.flyer, color: e.club.color)),
-                  ),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: [0, 0.2, 0.6, 1],
-                        colors: [Color(0x88000000), Colors.transparent, Colors.transparent, Aftr.fondo],
-                      ),
+              // la foto nunca sale por debajo de su lugar: antes tapaba el
+              // nombre y la fecha del evento y dejaba un corte a mitad de imagen
+              child: ClipRect(
+                clipper: const _SoloAbajo(),
+                child: SizedBox(
+                  height: altoFlyer,
+                  child: Stack(fit: StackFit.expand, clipBehavior: Clip.none, children: [
+                    // parallax: la foto (con su degradé) se mueve a la mitad de
+                    // velocidad y se agranda si se tira para abajo
+                    Positioned(
+                      top: _desplazado < 0 ? arriba + _desplazado : arriba + _desplazado * 0.5,
+                      left: 0,
+                      right: 0,
+                      height: altoFoto - (_desplazado < 0 ? _desplazado : 0),
+                      child: Stack(fit: StackFit.expand, children: [
+                        Hero(tag: 'flyer-${e.id}', child: ImagenRed(e.flyer, color: e.club.color)),
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: [0, 0.12, 0.62, 1],
+                              colors: [Color(0x66000000), Colors.transparent, Colors.transparent, Aftr.fondo],
+                            ),
+                          ),
+                        ),
+                      ]),
                     ),
-                  ),
-                ]),
+                  ]),
+                ),
               ),
             ),
             SliverToBoxAdapter(
+              // debajo del flyer, no encima: la sección de la foto se pinta por
+              // arriba de esta y lo que se montaba sobre ella quedaba tapado
               child: Transform.translate(
-                offset: const Offset(0, -56),
+                offset: const Offset(0, 6),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -540,4 +570,14 @@ class _BarraCompra extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Recorta solo por abajo: al tirar para abajo la foto se puede agrandar
+/// hacia arriba, pero nunca invade lo que sigue.
+class _SoloAbajo extends CustomClipper<Rect> {
+  const _SoloAbajo();
+  @override
+  Rect getClip(Size size) => Rect.fromLTRB(0, -2000, size.width, size.height);
+  @override
+  bool shouldReclip(_SoloAbajo viejo) => false;
 }
