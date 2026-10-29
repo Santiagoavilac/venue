@@ -9,6 +9,7 @@ import '../../core/widgets/movimiento.dart';
 import '../../core/widgets/piezas.dart';
 import '../../data/aftr_repo.dart';
 import '../../data/modelos.dart';
+import 'pago_qr.dart';
 
 Future<void> _hoja(BuildContext context, Widget hijo) => showModalBottomSheet<void>(
       context: context,
@@ -17,8 +18,8 @@ Future<void> _hoja(BuildContext context, Widget hijo) => showModalBottomSheet<vo
       builder: (_) => hijo,
     );
 
-/// El paso de pago. Hoy hay uno solo: el boliche confirma el pedido desde
-/// Venue y ahí aparecen los QR. Cuando haya pasarela, es otra variante acá.
+/// El paso de pago: QR del Banco Económico. La entrada sale cuando el banco
+/// confirma el pago.
 class PasoPago extends StatelessWidget {
   const PasoPago({super.key});
 
@@ -27,11 +28,11 @@ class PasoPago extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: Aftr.superficie2, borderRadius: BorderRadius.circular(16)),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Icon(Icons.verified_outlined, color: Aftr.acento, size: 22),
+          const Icon(Icons.qr_code_2_rounded, color: Aftr.acento, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'El boliche confirma tu pedido y tus QR aparecen en Accesos. Te avisamos ahí mismo.',
+              'Pagás con un QR desde la app de cualquier banco. Apenas se confirma, tu entrada aparece en Accesos.',
               style: Aftr.cuerpo(14, c: Aftr.texto),
             ),
           ),
@@ -75,18 +76,23 @@ class _Compra extends ConsumerStatefulWidget {
 class _CompraState extends ConsumerState<_Compra> {
   int _n = 1;
   bool _enviando = false;
-  bool _listo = false;
 
   int get _precio => widget.fase?.precio ?? widget.d.precio;
   int get _max => (widget.fase?.quedan ?? 10).clamp(1, 10);
 
   Future<void> _confirmar() async {
     setState(() => _enviando = true);
+    // se toman antes de esperar al servidor
+    final nav = Navigator.of(context);
+    final raiz = Navigator.of(context, rootNavigator: true).context;
     try {
-      await ref.read(repoProvider).comprar(widget.d.evento.id, widget.fase?.id, _n);
+      final orden = await ref.read(repoProvider).comprar(widget.d.evento.id, widget.fase?.id, _n);
       ref.invalidate(accesosProvider);
       ref.invalidate(eventoProvider(widget.d.evento.id));
-      if (mounted) setState(() => _listo = true);
+      if (!mounted || !raiz.mounted) return;
+      // del pedido directo al cobro con QR
+      nav.pop();
+      await abrirPagoQr(raiz, orden: orden, titulo: widget.d.evento.nombre);
     } catch (e) {
       if (mounted) avisar(context, mensajeDeError(e));
     } finally {
@@ -96,18 +102,6 @@ class _CompraState extends ConsumerState<_Compra> {
 
   @override
   Widget build(BuildContext context) {
-    if (_listo) {
-      return HojaListo(
-        titulo: 'Pedido enviado',
-        texto: '${widget.d.evento.club.nombre} lo confirma y tus $_n ${_n == 1 ? 'entrada aparece' : 'entradas aparecen'} en Accesos.',
-        accion: 'Ver en Accesos',
-        onAccion: () {
-          Navigator.of(context).pop();
-          context.go('/accesos');
-        },
-        onCerrar: () => Navigator.of(context).pop(),
-      );
-    }
     final e = widget.d.evento;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.paddingOf(context).bottom),
@@ -143,7 +137,7 @@ class _CompraState extends ConsumerState<_Compra> {
           NumeroAnimado(bs(_precio * _n), estilo: Aftr.fuerte(24)),
         ]),
         const SizedBox(height: 16),
-        BotonAftr('Confirmar pedido', cargando: _enviando, onTap: _confirmar),
+        BotonAftr('Pagar con QR', cargando: _enviando, onTap: _confirmar),
       ]),
     );
   }

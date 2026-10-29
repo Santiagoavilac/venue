@@ -79,9 +79,36 @@ class AftrRepo {
     );
   }
 
-  /// Crea el pedido; el boliche lo confirma desde Venue y ahí salen los QR.
-  Future<void> comprar(String evento, String? fase, int cantidad) =>
-      _rpc('aftr_comprar', {'p_evento': evento, 'p_fase': fase, 'p_cantidad': cantidad});
+  /// Crea el pedido y devuelve su id. Se paga con QR del banco (o lo
+  /// confirma el boliche a mano); recién ahí salen las entradas.
+  Future<String> comprar(String evento, String? fase, int cantidad) async {
+    final r = await _rpc('aftr_comprar', {'p_evento': evento, 'p_fase': fase, 'p_cantidad': cantidad});
+    return (r as Map)['id'] as String;
+  }
+
+  /// QR de cobro del Banco Económico para un pedido (lo genera el servidor;
+  /// si ya existe uno vigente, devuelve ese).
+  Future<Map<String, dynamic>> qrDePago(String orden) async {
+    final r = await _funcion({'accion': 'qr', 'orden': orden});
+    return Map<String, dynamic>.from(r['pago'] as Map);
+  }
+
+  /// Le pregunta al servidor si EL BANCO ya confirmó el pago.
+  Future<({String? estado, String? orden})> estadoPago(String orden) async {
+    final r = await _funcion({'accion': 'estado', 'orden': orden});
+    return (estado: (r['pago'] as Map?)?['estado'] as String?, orden: r['orden'] as String?);
+  }
+
+  Future<Map<String, dynamic>> _funcion(Map<String, dynamic> cuerpo) async {
+    try {
+      final r = await _sb.functions.invoke('baneco', body: cuerpo);
+      return Map<String, dynamic>.from(r.data as Map);
+    } on FunctionException catch (e) {
+      final d = e.details;
+      final msg = d is Map ? (d['detalle'] ?? d['error']) : null;
+      throw Exception(msg ?? 'No se pudo conectar con el cobro.');
+    }
+  }
 
   Future<void> reservarMesa(String evento, String mesa, String? combo) =>
       _rpc('aftr_reservar_mesa', {'p_evento': evento, 'p_mesa': mesa, 'p_combo': combo});

@@ -10,6 +10,7 @@ import '../../core/widgets/logo.dart';
 import '../../core/widgets/movimiento.dart';
 import '../../core/widgets/fondo_video.dart';
 import '../../core/widgets/piezas.dart';
+import '../evento/pago_qr.dart';
 import '../../data/aftr_repo.dart';
 import '../auth/asegurar_cuenta.dart';
 import '../../data/modelos.dart';
@@ -202,7 +203,7 @@ class _Tarjeta extends ConsumerWidget {
                 const Spacer(),
                 if (pendiente) ...[
                   const PuntoVivo(color: Aftr.acento, tam: 6),
-                  Text('ESPERANDO AL BOLICHE', style: Aftr.etiqueta(c: Aftr.acento)),
+                  Text(a.tipo == TipoAcceso.pedido ? 'FALTA PAGAR' : 'ESPERANDO AL BOLICHE', style: Aftr.etiqueta(c: Aftr.acento)),
                 ] else
                   const MarcaAftr(alto: 16),
               ]),
@@ -292,7 +293,9 @@ class _AbiertaState extends ConsumerState<_Abierta> {
         Text(a.titulo, style: Aftr.fuerte(20)),
         const SizedBox(height: 6),
         Text(
-          '${club.nombre} tiene que confirmar tu pedido. Cuando lo haga, tus QR aparecen acá solos.',
+          a.tipo == TipoAcceso.pedido
+              ? 'Pagalo con el QR del banco y tus entradas aparecen acá solas.'
+              : '${club.nombre} tiene que confirmar tu pedido. Cuando lo haga, tus QR aparecen acá solos.',
           textAlign: TextAlign.center,
           style: Aftr.cuerpo(14, c: Aftr.texto),
         ),
@@ -307,8 +310,11 @@ class _AbiertaState extends ConsumerState<_Abierta> {
           Expanded(
             child: BotonAftr('Enviar a un amigo', onTap: () => enviarEntrada(context, a)),
           ),
-        if (a.tipo == TipoAcceso.pedido)
-          Expanded(child: BotonAftr('Cancelar pedido', secundario: true, cargando: _cancelando, onTap: _cancelar)),
+        if (a.tipo == TipoAcceso.pedido) ...[
+          Expanded(child: BotonAftr('Pagar con QR', onTap: () => abrirPagoQr(context, orden: a.id, titulo: a.evento.nombre))),
+          const SizedBox(width: 10),
+          Expanded(child: BotonAftr('Cancelar', secundario: true, cargando: _cancelando, onTap: _cancelar)),
+        ],
         if (club.ubicado) ...[
           if (a.transferible || a.tipo == TipoAcceso.pedido) const SizedBox(width: 10),
           Presionable(
