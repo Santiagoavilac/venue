@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/networking/supabase.dart';
+import '../../../core/widgets/fondo_video.dart';
 import '../../../core/routing/router.dart';
 import '../data/sesion.dart';
 
@@ -49,7 +50,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on AuthException catch (e) {
       _error = esFallaDeRed(e)
           ? 'Sin conexión. Revisá la señal y probá de nuevo.'
-          : 'Usuario o contraseña incorrectos.';
+          : _usuario.text.contains('@')
+              ? 'Correo o contraseña incorrectos.'
+              : 'Usuario o contraseña incorrectos. Si cargaste tu correo en tu perfil, entrá con tu correo.';
     } catch (e) {
       _error = mensajeDeError(e);
     }
@@ -108,15 +111,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       },
       child: Scaffold(
         backgroundColor: fondo,
-        body: DecoratedBox(
-          // un brillo cálido abajo, como el fondo de Resy
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment(0, .55),
-              radius: 1.1,
-              colors: [Color(0xFF2A241B), fondo],
-            ),
-          ),
+        body: FondoVideo(
+          'assets/fondos/acceso.mp4',
           child: SafeArea(
             child: Center(
               child: ConstrainedBox(
@@ -143,13 +139,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: SingleChildScrollView(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                             const SizedBox(height: 6),
-                            Text(clave ? 'Ingresá tu contraseña' : 'Ingresá tu usuario',
+                            Text(clave ? 'Ingresá tu contraseña' : 'Ingresá tu usuario o correo',
                                 style: const TextStyle(
                                     color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
                             const SizedBox(height: 6),
                             Text(
                               clave
-                                  ? 'Entrás como @${_usuario.text.trim()}'
+                                  ? 'Entrás como ${_usuario.text.contains('@') ? '' : '@'}${_usuario.text.trim()}'
                                   : 'Acceso para personal autorizado',
                               style: const TextStyle(color: suave, fontSize: 14.5),
                             ),
@@ -159,7 +155,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             Offstage(
                               offstage: clave,
                               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                                rotulo('USUARIO'),
+                                rotulo('USUARIO O CORREO'),
                                 TextField(
                                   controller: _usuario,
                                   autofocus: true,

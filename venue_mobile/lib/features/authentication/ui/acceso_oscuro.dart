@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/fondo_video.dart';
+
 /// Piezas del ingreso, que es siempre oscuro sin importar el modo de la app
 /// (las mismas medidas que el login de usuario y contraseña).
 abstract final class Acceso {
@@ -88,11 +90,8 @@ class FondoAcceso extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: Acceso.fondo,
-        body: DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-                center: Alignment(0, .55), radius: 1.1, colors: [Color(0xFF2A241B), Acceso.fondo]),
-          ),
+        body: FondoVideo(
+          'assets/fondos/acceso.mp4',
           child: SafeArea(
             child: Center(
               child: ConstrainedBox(

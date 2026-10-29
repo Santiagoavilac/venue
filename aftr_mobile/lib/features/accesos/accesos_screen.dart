@@ -8,6 +8,7 @@ import '../../core/networking/supabase.dart';
 import '../../core/theme/aftr_theme.dart';
 import '../../core/widgets/logo.dart';
 import '../../core/widgets/movimiento.dart';
+import '../../core/widgets/fondo_video.dart';
 import '../../core/widgets/piezas.dart';
 import '../../data/aftr_repo.dart';
 import '../auth/asegurar_cuenta.dart';
@@ -387,7 +388,9 @@ class _SinCuenta extends StatelessWidget {
   final VoidCallback onEntrar;
 
   @override
-  Widget build(BuildContext context) => SafeArea(
+  Widget build(BuildContext context) => FondoVideo(
+        'assets/fondos/acceso.mp4',
+        child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -398,11 +401,12 @@ class _SinCuenta extends StatelessWidget {
             Text('Tus entradas, en un solo lugar.', style: Aftr.titular(30)),
             const SizedBox(height: 10),
             Text('Entrá para comprar, anotarte en listas, reservar mesas y recibir entradas de tus amigos.',
-                style: Aftr.cuerpo(15)),
+                style: Aftr.cuerpo(15, c: Aftr.texto)),
             const SizedBox(height: 24),
             BotonAftr('Entrar', onTap: onEntrar),
             const SizedBox(height: 110),
           ]),
+        ),
         ),
       );
 }

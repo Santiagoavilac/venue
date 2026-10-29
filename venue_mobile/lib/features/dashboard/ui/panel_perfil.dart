@@ -299,11 +299,16 @@ class _EditarPerfilState extends ConsumerState<_EditarPerfil> {
   final _tel = TextEditingController();
   final _clave = TextEditingController();
   final _clave2 = TextEditingController();
+  late final _correoActual = () {
+    final e = ref.read(supabaseProvider).auth.currentUser?.email ?? '';
+    return e.endsWith('@plataforma.local') ? '' : e;
+  }();
+  late final _correo = TextEditingController(text: _correoActual);
   bool _ocupado = false;
 
   @override
   void dispose() {
-    for (final t in [_nombre, _tel, _clave, _clave2]) {
+    for (final t in [_nombre, _tel, _clave, _clave2, _correo]) {
       t.dispose();
     }
     super.dispose();
@@ -319,6 +324,10 @@ class _EditarPerfilState extends ConsumerState<_EditarPerfil> {
     if (clave != _clave2.text) {
       return avisar(context, 'Las contraseñas no coinciden', tipo: TipoAviso.aviso);
     }
+    final correo = _correo.text.trim().toLowerCase();
+    if (correo.isNotEmpty && !RegExp(r'^[^@\s]+@[^@\s]+\.[a-z]{2,}$').hasMatch(correo)) {
+      return avisar(context, 'Ese correo no parece válido', tipo: TipoAviso.aviso);
+    }
     setState(() => _ocupado = true);
     final sb = ref.read(supabaseProvider);
     try {
@@ -332,13 +341,21 @@ class _EditarPerfilState extends ConsumerState<_EditarPerfil> {
         await sb.rpc('guardar_telefono', params: {'p_tel': _tel.text.trim()});
       }
       if (clave.isNotEmpty) await sb.auth.updateUser(UserAttributes(password: clave));
+      // correo propio para entrar (db/43): desde ahí entra con el correo
+      final correoNuevo = correo.isNotEmpty && correo != _correoActual;
+      if (correoNuevo) {
+        await sb.rpc('fijar_mi_correo', params: {'p_correo': correo});
+        await sb.auth.refreshSession();
+      }
       ref.invalidate(perfilProvider);
       ref.invalidate(miSolicitudProvider);
       if (!mounted) return;
       Navigator.pop(context);
-      avisar(context, pendiente
-          ? 'Listo. El cambio de nombre queda esperando al administrador'
-          : 'Perfil actualizado');
+      avisar(context, correoNuevo
+          ? 'Listo: desde ahora entrás con $correo'
+          : pendiente
+              ? 'Listo. El cambio de nombre queda esperando al administrador'
+              : 'Perfil actualizado');
     } catch (e) {
       if (mounted) {
         avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
@@ -354,7 +371,10 @@ class _EditarPerfilState extends ConsumerState<_EditarPerfil> {
         children: [
           const Text('Editar perfil', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          Text('Usuario @${widget.perfil.usuario} (no se puede cambiar: es con lo que entrás)',
+          Text(
+              _correoActual.isNotEmpty
+                  ? 'Entrás con $_correoActual y tu contraseña.'
+                  : 'Hoy entrás con tu usuario @${widget.perfil.usuario}. Si cargás tu correo, desde ahí entrás con el correo y la misma contraseña.',
               style: TextStyle(fontSize: 13, color: VenueColors.textoSuave)),
           const SizedBox(height: 16),
           TextField(
@@ -367,6 +387,13 @@ class _EditarPerfilState extends ConsumerState<_EditarPerfil> {
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                   labelText: 'Teléfono', hintText: 'Dejalo vacío para no cambiarlo')),
+          const SizedBox(height: 10),
+          TextField(
+              controller: _correo,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              textCapitalization: TextCapitalization.none,
+              decoration: const InputDecoration(labelText: 'Correo para entrar', hintText: 'tu@correo.com')),
           const SizedBox(height: 18),
           Text('Cambiar contraseña', style: TextStyle(fontSize: 13, color: VenueColors.textoSuave)),
           const SizedBox(height: 8),

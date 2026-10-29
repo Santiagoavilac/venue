@@ -405,8 +405,8 @@ function pintarLogin() {
   $("#lgPaso1").classList.toggle("hidden", !clave);
   $("#lgMarca").classList.toggle("hidden", true);
   $("#lgVolver").classList.toggle("hidden", false);
-  $("#lgTit").textContent = clave ? "Ingresá tu contraseña" : "Ingresá tu usuario";
-  $("#lgSub").textContent = clave ? `Entrás como @${$("#lgUser").value.trim().toLowerCase()}` : "Acceso solo para personal autorizado";
+  $("#lgTit").textContent = clave ? "Ingresá tu contraseña" : "Ingresá tu usuario o correo";
+  $("#lgSub").textContent = clave ? `Entrás como ${(v => v.includes("@") ? v : "@" + v)($("#lgUser").value.trim().toLowerCase())}` : "Acceso solo para personal autorizado";
   $("#btnLogin").textContent = clave ? "Ingresar" : "Siguiente";
   $("#btnLogin").disabled = clave ? !$("#lgPass").value : !$("#lgUser").value.trim();
 }
@@ -469,12 +469,14 @@ async function login() {
   if (!u || !p) return;
   $("#loginErr").innerHTML = "";
   $("#btnLogin").disabled = true; $("#btnLogin").textContent = "Ingresando…";
-  const { error } = await sb.auth.signInWithPassword({ email: `${u}@plataforma.local`, password: p });
+  // con usuario se arma el correo interno; quien cargó su correo entra con él
+  const { error } = await sb.auth.signInWithPassword({ email: u.includes("@") ? u : `${u}@plataforma.local`, password: p });
   if (error) {
     pintarLogin();
     $("#loginErr").textContent = /fetch|network/i.test(error.message || "")
       ? "Sin conexión. Revisá la señal y probá de nuevo."
-      : "Usuario o contraseña incorrectos.";
+      : u.includes("@") ? "Correo o contraseña incorrectos."
+      : "Usuario o contraseña incorrectos. Si cargaste tu correo en tu perfil, entrá con tu correo.";
     return;
   }
   boot();
@@ -8362,15 +8364,21 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") cerrarPanelP
 /* Editar perfil: nombre, teléfono y contraseña. El usuario no se cambia:
    es con lo que se entra. */
 async function sheetEditarPerfil() {
-  const { data: tel } = await sb.rpc("mi_telefono");
+  const [{ data: tel }, { data: { user } }] = await Promise.all([sb.rpc("mi_telefono"), sb.auth.getUser()]);
+  const correoActual = user?.email && !user.email.endsWith("@plataforma.local") ? user.email : "";
   sheet(`<div class="sh-h">Editar perfil</div>
     <div class="field"><label>Nombre y apellido</label><input id="epN" value="${esc(me.nombre)}" autocomplete="name"></div>
     <div class="field"><label>Teléfono</label><input id="epT" value="${esc(tel || "")}" inputmode="tel" autocomplete="tel" placeholder="7xxxxxxx"></div>
+    <div class="field"><label>Correo para entrar</label><input id="epC" type="email" value="${esc(correoActual)}" autocomplete="email" autocapitalize="none" placeholder="tu@correo.com"></div>
     <div class="field"><label>Nueva contraseña</label><input id="epP" type="password" placeholder="Dejala vacía para no cambiarla" autocomplete="new-password"></div>
-    <p class="hint" style="margin:-4px 0 12px">Tu usuario (@${esc(me.usuario)}) no se puede cambiar: es con lo que entrás.${esAdminPerfil() ? "" : " El cambio de nombre lo aprueba el administrador."}</p>
+    <p class="hint" style="margin:-4px 0 12px">${correoActual
+      ? `Entrás con <b>${esc(correoActual)}</b> y tu contraseña.`
+      : `Hoy entrás con tu usuario (@${esc(me.usuario)}). Si cargás tu correo, desde ahí entrás con el correo y la misma contraseña.`}${esAdminPerfil() ? "" : " El cambio de nombre lo aprueba el administrador."}</p>
     <button class="btn primary" id="epGo">Guardar</button>`);
   $("#epGo").onclick = async () => {
     const nombre = $("#epN").value.trim(), t = $("#epT").value.trim(), p = $("#epP").value;
+    const correo = $("#epC").value.trim().toLowerCase();
+    if (correo && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(correo)) return toast("Ese correo no parece válido", "warn");
     if (!nombre) return toast("Poné tu nombre", "warn");
     if (p && p.length < 6) return toast("La contraseña tiene que tener 6 caracteres o más", "warn");
     const b = $("#epGo"); b.disabled = true;
@@ -8388,6 +8396,14 @@ async function sheetEditarPerfil() {
       if (p) {
         const { error } = await sb.auth.updateUser({ password: p });
         if (error) throw error;
+      }
+      if (correo && correo !== correoActual) {
+        const { error } = await sb.rpc("fijar_mi_correo", { p_correo: correo });
+        if (error) throw error;
+        await sb.auth.refreshSession();
+        toast(`Listo: desde ahora entrás con ${correo}`);
+        closeSheet(); header();
+        return;
       }
       toast(pendiente ? "Listo. El cambio de nombre queda esperando al administrador" : "Perfil actualizado");
       closeSheet(); header();

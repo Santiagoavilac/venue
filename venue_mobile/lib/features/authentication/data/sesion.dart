@@ -105,8 +105,10 @@ class AuthRepository {
   /// Ingreso por "Boliches" (usuario + contraseña). Una cuenta
   /// desactivada o de relacionador no queda con sesión abierta.
   Future<void> ingresar(String usuario, String clave) async {
+    // con usuario se arma el correo interno; quien cargó su correo entra con él
+    final u = usuario.trim().toLowerCase();
     final r = await _sb.auth.signInWithPassword(
-      email: emailDe(usuario),
+      email: u.contains('@') ? u : emailDe(u),
       password: clave,
     );
     await _revisar(r.user?.id, relacionador: false);

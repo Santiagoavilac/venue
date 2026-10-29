@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/networking/supabase.dart';
 import '../../core/theme/aftr_theme.dart';
+import '../../core/widgets/fondo_video.dart';
 import '../../core/widgets/listo.dart';
 import '../../core/widgets/logo.dart';
 import '../../core/widgets/movimiento.dart';
@@ -55,7 +56,9 @@ class CuentaScreen extends ConsumerWidget {
 
     if (!logueado) {
       return Scaffold(
-        body: Padding(
+        body: FondoFoto(
+          'assets/fondos/cuenta.jpg',
+          child: Padding(
           padding: EdgeInsets.fromLTRB(24, arriba + 12, 24, 130),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Cuenta', style: Aftr.titular(40)),
@@ -66,6 +69,7 @@ class CuentaScreen extends ConsumerWidget {
             const SizedBox(height: 22),
             BotonAftr('Entrar', onTap: () => asegurarCuenta(context, ref)),
           ]),
+          ),
         ),
       );
     }

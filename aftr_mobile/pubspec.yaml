@@ -49,6 +49,7 @@ dependencies:
   screen_brightness: ^2.1.11
   crypto: ^3.0.7
   url_launcher: ^6.3.3
+  video_player: ^2.14.1
 
 dev_dependencies:
   flutter_test:
@@ -86,3 +87,4 @@ flutter:
   assets:
     - assets/logo/
     - assets/splash/
+    - assets/fondos/
