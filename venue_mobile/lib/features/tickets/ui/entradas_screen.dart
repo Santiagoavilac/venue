@@ -257,7 +257,7 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                           '${vigente.quedan == null ? '' : ' · quedan ${vigente.quedan}'}',
                   vigente == null ? VenueColors.aviso : VenueColors.ok,
                 ),
-              if (rol == Rol.admin || veOtras)
+              if (rol == Rol.admin || (veOtras && miTeam != null))
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(children: [
@@ -270,7 +270,7 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                         ),
                       ),
                     if (rol == Rol.admin && veOtras) const SizedBox(width: 8),
-                    if (veOtras)
+                    if (rol == Rol.admin || (veOtras && miTeam != null))
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () => mostrarReporteTeams(context, ref,

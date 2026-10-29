@@ -3752,6 +3752,37 @@ function tablaTop(filas, limite) {
     </button>`).join("")}
   </div>`;
 }
+/* Score por team para el jefe: solo el total de cada team (entraron + mesas),
+   nunca la gente de los otros teams. Sale de ranking_teams; si la base
+   todavía no la tiene, se arma con las filas que haya. */
+async function rankingTeams(filas, miTeam) {
+  const { data, error } = await sb.rpc("ranking_teams", { p_evento: ev.id });
+  if (!error) return data || [];
+  const g = new Map();
+  filas.forEach(r => {
+    if (!r.team_id) return;
+    const o = g.get(r.team_id) || { team_id: r.team_id, entraron: 0, mesas: 0 };
+    o.entraron += +r.entradas_usadas + +r.ingresaron; o.mesas += r.mv;
+    g.set(r.team_id, o);
+  });
+  return [...g.values()].map(t => ({ ...t, score: t.entraron + t.mesas, es_mio: t.team_id === miTeam,
+      team: teamsCache.find(x => x.id === t.team_id)?.nombre || "Team" }))
+    .filter(t => t.score > 0 || t.es_mio)
+    .sort((a, b) => b.score - a.score);
+}
+function tablaTeams(lista) {
+  if (!lista.length) return `<div class="tarjeta"><p style="text-align:center;color:var(--text-muted)">Todavía ningún team vendió en este evento.</p></div>`;
+  return `<div class="tarjeta sin-pad">
+    <div class="top-cab"><span style="width:26px">#</span><span style="flex:1">Team</span><span style="width:64px;text-align:right">Entraron</span><span style="width:64px;text-align:right">Score</span></div>
+    ${lista.map((t, i) => `<div class="top-fila"${t.es_mio ? ' style="background:var(--brand-soft)"' : ""}>
+      <span class="pos">${i < 3 && +t.score > 0 ? `<span style="color:${MEDALLAS[i]}">${ico("trofeo")}</span>` : i + 1}</span>
+      ${inicial(t.team)}
+      <span class="nm"><b>${esc(t.team)}${t.es_mio ? " (mi team)" : ""}</b><small>${+t.mesas ? `${t.mesas} mesas` : ""}</small></span>
+      <span class="num" style="width:64px">${t.entraron}</span>
+      <span class="num" style="width:64px">${t.score}</span>
+    </div>`).join("")}
+  </div>`;
+}
 /* Por team: sus números juntos y, al abrirlo, cada relacionador con lo que
    vendió y lo que hay que pagarle */
 function porTeamHTML(filas) {
@@ -3828,7 +3859,7 @@ async function screenStats() {
     (regsAll || []).forEach(r => { const o = g[r.lista_tipo_id] = g[r.lista_tipo_id] || { ca: 0, ce: 0 }; o.ca++; if (r.ingreso_at) o.ce++; });
     porLista = listaTipos.map(l => ({ nombre: l.nombre, ...(g[l.id] || { ca: 0, ce: 0 }) })).filter(l => l.ca);
   }
-  const all = soloMiTeam(rows).map(r => {
+  const todos = rows.map(r => {
     const m = mesasBy[r.rrpp_id] || {};
     return {
       ...r, mv: +(m.mesas_vendidas || 0), bm: +(m.bruto_mesas || 0),
@@ -3836,10 +3867,13 @@ async function screenStats() {
       bono: bonosBy[r.rrpp_id] || 0
     };
   });
+  const all = soloMiTeam(todos);
   const visibles = all.filter(r => r.anotados > 0 || r.entradas_vendidas > 0 || r.mv > 0 || r.bono > 0);
   /* loadTeams sigue: llena teamsCache, que usan otras pantallas y el ⋯.
      La lista de teams presentes se fue con el filtro de "Por relacionador". */
   if (["admin", "jefe"].includes(me.rol)) await loadTeams();
+  const verTopTeams = me.rol === "jefe" && cfgClub().rel && cfgClub().teams;
+  const topTeams = verTopTeams ? await rankingTeams(todos, all.find(r => r.rrpp_id === me.id)?.team_id ?? me.team_id) : [];
   const tot = visibles.reduce((a, r) => ({
     an: a.an + +r.anotados, in: a.in + +r.ingresaron,
     ev_: a.ev_ + +r.entradas_vendidas, eu: a.eu + +r.entradas_usadas,
@@ -3888,6 +3922,7 @@ async function screenStats() {
     ${(esAdm || me.rol === "jefe") && cfgClub().rel ? `
     ${tituloBloque(esAdm ? "Top relacionadores" : "Mi team", visibles.length > 5 ? "top" : "")}
     ${tablaTop(visibles, 5)}` : ""}
+    ${verTopTeams ? `${tituloBloque("Top teams")}${tablaTeams(topTeams)}` : ""}
     ${esAdm && cfgClub().rel && cfgClub().teams ? `<div class="solo-movil">${tituloBloque("Por team")}<div id="porTeam">${porTeamHTML(visibles)}</div></div>` : ""}
     ${(esAdm || me.rol === "jefe") && innerWidth >= 1000 && cfgClub().rel ? `<div id="rpEsc"></div>` : ""}
     ${esAdm ? `<div id="fasesBox"></div>` : ""}

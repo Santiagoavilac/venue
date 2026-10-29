@@ -39,6 +39,7 @@ class ReporteScreen extends ConsumerWidget {
     final eventos = ref.watch(eventosProvider).value ?? const <Evento>[];
     final esAdmin = rol == Rol.admin;
     final miTeam = equipo[perfil.id]?.teamId;
+    final topTeams = rol == Rol.jefe ? ref.watch(rankingTeamsProvider).value : null;
     final puedeExcel =
         perfil.contabilidadTotal || (rol == Rol.jefe && miTeam != null);
 
@@ -46,18 +47,22 @@ class ReporteScreen extends ConsumerWidget {
       onRefresh: () async {
         ref.invalidate(cierreProvider);
         ref.invalidate(liquidacionProvider);
+        ref.invalidate(rankingTeamsProvider);
         await ref.read(cierreProvider.future);
       },
       child: VistaAsync(
         valor: cierre,
         reintentar: () => ref.invalidate(cierreProvider),
         datos: (c) {
-          // el jefe ve su team; el relacionador, su fila
+          // el jefe ve su team; el relacionador, su fila. El team sale de su
+          // propia fila del evento; sin team conocido, solo se ve a sí mismo
+          // (comparar con null mostraba a todos los que no tienen team).
+          final teamJefe = c.personas.where((p) => p.id == perfil.id).firstOrNull?.teamId ?? miTeam;
           final mias = esAdmin
               ? c.personas
               : rol == Rol.jefe
               ? c.personas
-                    .where((p) => p.teamId == miTeam || p.id == perfil.id)
+                    .where((p) => p.id == perfil.id || (teamJefe != null && p.teamId == teamJefe))
                     .toList()
               : c.personas.where((p) => p.id == perfil.id).toList();
           num s(num Function(StatsPersona) f) =>
@@ -148,6 +153,10 @@ class ReporteScreen extends ConsumerWidget {
                       : null,
                 ),
                 _TablaTop(personas: mias, equipo: equipo, evento: ev, limite: 5),
+              ],
+              if (rol == Rol.jefe && club.usaRelacionadores && club.usaTeams) ...[
+                const TituloBloque('Top teams'),
+                _TopTeams(teams: topTeams ?? _scoresDe(c.personas, equipo, teamJefe)),
               ],
               if (esAdmin && club.usaRelacionadores && club.usaTeams) ...[
                 const TituloBloque('Por team'),
@@ -370,6 +379,87 @@ class _Leyenda extends StatelessWidget {
 
 /// Ranking como el "Top 5" de Fourvenues: puesto, persona, entradas que
 /// ingresaron y lo que hay que pagarle. Tocar una persona abre su detalle.
+/// Respaldo del top de teams cuando la base no tiene ranking_teams: se arma
+/// con las filas que llegaron, solo con totales.
+List<ScoreTeam> _scoresDe(List<StatsPersona> personas, Map<String, Miembro> equipo, String? mio) {
+  final g = <String, ({int en, int mv, String nombre})>{};
+  for (final p in personas) {
+    final t = p.teamId;
+    if (t == null) continue;
+    final o = g[t] ?? (en: 0, mv: 0, nombre: equipo[p.id]?.team ?? 'Team');
+    g[t] = (en: o.en + p.usadas + p.ingresaron, mv: o.mv + p.mesas, nombre: o.nombre);
+  }
+  return [
+    for (final e in g.entries)
+      ScoreTeam(teamId: e.key, team: e.value.nombre, entraron: e.value.en, mesas: e.value.mv, esMio: e.key == mio),
+  ].where((t) => t.score > 0 || t.esMio).toList()
+    ..sort((a, b) => b.score.compareTo(a.score));
+}
+
+/// Top de teams para el jefe: nombre, entraron y score. Su team resaltado.
+class _TopTeams extends StatelessWidget {
+  const _TopTeams({required this.teams});
+  final List<ScoreTeam> teams;
+
+  @override
+  Widget build(BuildContext context) {
+    if (teams.isEmpty) {
+      return Tarjeta(
+        child: Text('Todavía ningún team vendió en este evento.',
+            textAlign: TextAlign.center, style: TextStyle(color: VenueColors.textoSuave)),
+      );
+    }
+    const medallas = [Color(0xFFF5B400), Color(0xFF98A2B3), Color(0xFFCD7F32)];
+    final cab = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: VenueColors.textoTenue);
+    const cifra = TextStyle(fontWeight: FontWeight.w600, fontFeatures: [FontFeature.tabularFigures()]);
+    return Tarjeta(
+      padding: EdgeInsets.zero,
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+          child: Row(children: [
+            SizedBox(width: 30, child: Text('#', style: cab)),
+            Expanded(child: Text('Team', style: cab)),
+            SizedBox(width: 62, child: Text('Entraron', textAlign: TextAlign.right, style: cab)),
+            SizedBox(width: 62, child: Text('Score', textAlign: TextAlign.right, style: cab)),
+          ]),
+        ),
+        Divider(height: 1, color: VenueColors.lineaSuave),
+        for (var i = 0; i < teams.length; i++) ...[
+          if (i > 0) Divider(height: 1, indent: 16, color: VenueColors.lineaSuave),
+          Container(
+            color: teams[i].esMio ? Theme.of(context).colorScheme.primary.withValues(alpha: .08) : null,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: Row(children: [
+              SizedBox(
+                width: 30,
+                child: i < 3 && teams[i].score > 0
+                    ? Icon(Icons.emoji_events_rounded, size: 18, color: medallas[i])
+                    : Text('${i + 1}', style: TextStyle(color: VenueColors.textoTenue)),
+              ),
+              Inicial(teams[i].team, lado: 32),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(teams[i].esMio ? '${teams[i].team} (mi team)' : teams[i].team,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+                  if (teams[i].mesas > 0)
+                    Text('${teams[i].mesas} mesas',
+                        style: TextStyle(fontSize: 12, color: VenueColors.textoTenue)),
+                ]),
+              ),
+              SizedBox(width: 62, child: Text('${teams[i].entraron}', textAlign: TextAlign.right, style: cifra)),
+              SizedBox(width: 62, child: Text('${teams[i].score}', textAlign: TextAlign.right, style: cifra)),
+            ]),
+          ),
+        ],
+      ]),
+    );
+  }
+}
+
 class _TablaTop extends StatelessWidget {
   const _TablaTop({required this.personas, required this.equipo, required this.evento, this.limite});
   final List<StatsPersona> personas;

@@ -30,6 +30,16 @@ class StatsPersona {
   num get aPagar => comRrpp + comJefe + comRrppMesas + comJefeMesas + bono;
 }
 
+/// Una fila del top de teams: solo totales del team, nunca su gente.
+class ScoreTeam {
+  const ScoreTeam({required this.teamId, required this.team, required this.entraron,
+      required this.mesas, required this.esMio});
+  final String teamId, team;
+  final int entraron, mesas;
+  final bool esMio;
+  int get score => entraron + mesas;
+}
+
 /// Cierre del evento, con las mismas cuentas que `screenStats` de la web.
 class Cierre {
   const Cierre({
@@ -196,6 +206,26 @@ class ReporteRepository {
     );
   }
 
+  /// Top de teams del evento (ranking_teams). Null si la base todavía no
+  /// tiene la función: la pantalla lo arma con las filas que tenga.
+  Future<List<ScoreTeam>?> rankingTeams(String eventoId) async {
+    try {
+      final r = await _sb.rpc('ranking_teams', params: {'p_evento': eventoId}) as List;
+      return [
+        for (final x in r.cast<Map>())
+          ScoreTeam(
+            teamId: x['team_id'] as String,
+            team: x['team'] as String? ?? 'Team',
+            entraron: (x['entraron'] as num?)?.toInt() ?? 0,
+            mesas: (x['mesas'] as num?)?.toInt() ?? 0,
+            esMio: x['es_mio'] as bool? ?? false,
+          ),
+      ];
+    } on PostgrestException {
+      return null;
+    }
+  }
+
   /// Liquidación del servidor (admin).
   Future<Map<String, dynamic>> liquidacion(String eventoId) async =>
       Map<String, dynamic>.from(
@@ -311,6 +341,12 @@ final cierreProvider = FutureProvider.autoDispose<Cierre>((ref) async {
   final ev = ref.watch(eventoActivoProvider);
   if (ev == null) throw StateError('Sin evento');
   return ref.watch(reporteRepositoryProvider).cierre(ev.id);
+});
+
+final rankingTeamsProvider = FutureProvider.autoDispose<List<ScoreTeam>?>((ref) async {
+  final ev = ref.watch(eventoActivoProvider);
+  if (ev == null) return null;
+  return ref.watch(reporteRepositoryProvider).rankingTeams(ev.id);
 });
 
 final liquidacionProvider = FutureProvider.autoDispose<
