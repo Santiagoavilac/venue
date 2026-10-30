@@ -13,6 +13,9 @@
  *      manda rol:'rrpp' y su propio team; acá se EXIGE eso mismo).
  *  - {action:'reset', user_id, clave}
  *      "admin cualquiera; jefe sus RRPP" (comentario del cliente, L6653).
+ *  - {action:'link', user_id, volver}
+ *      link para entrar sin contraseña (un uso, 1 h), mismas reglas que
+ *      reset y nunca para admins. Responde {link}.
  *
  * Contratos del cliente: usuario en minúsculas (el cliente busca
  * .eq('usuario', usuario.toLowerCase())); clave mínimo 6; errores como
@@ -126,24 +129,42 @@ Deno.serve(async (req) => {
   const caller = await quienLlama(req);
   if (!caller || !["admin", "jefe"].includes(caller.rol)) return json({ error: "No autorizado" }, 403);
 
-  if (body.action === "reset") {
-    if ((body.clave ?? "").length < 6) return json({ error: "Clave mínimo 6 caracteres" }, 400);
+  /* reset de clave y link de acceso: mismas reglas sobre a quién se toca */
+  if (body.action === "reset" || body.action === "link") {
     const { data: target } = await admin.from("profiles")
-      .select("id, rol, team_id, admin_principal, clubs").eq("id", body.user_id).maybeSingle();
+      .select("id, usuario, rol, team_id, admin_principal, clubs, activo, eliminado_at").eq("id", body.user_id).maybeSingle();
     if (!target) return json({ error: "Usuario no encontrado" }, 404);
     // la cuenta con admin_principal es máxima autoridad: nadie más la toca
     // (ni otro admin); solo su dueño puede cambiar su propia clave
     if (target.admin_principal && target.id !== caller.id)
       return json({ error: "Esta cuenta administrativa está protegida." }, 403);
     if (caller.rol === "jefe" && (target.rol !== "rrpp" || target.team_id !== caller.team_id))
-      return json({ error: "Solo podés resetear claves de tu team" }, 403);
-    // un admin de boliche no resetea a otros admins ni a gente de otro local
+      return json({ error: "Solo podés gestionar a la gente de tu team" }, 403);
+    // un admin de boliche no toca a otros admins ni a gente de otro local
     if (caller.rol === "admin" && !caller.plataforma && target.id !== caller.id) {
       const mios = new Set<string>(caller.clubs ?? []);
       const suyos: string[] = target.clubs ?? [];
       if (target.rol === "admin" || !suyos.length || !suyos.every((c) => mios.has(c)))
-        return json({ error: "Solo podés resetear claves de la gente de tu boliche" }, 403);
+        return json({ error: "Solo podés gestionar a la gente de tu boliche" }, 403);
     }
+
+    if (body.action === "link") {
+      /* Link para entrar sin contraseña: un solo uso y vence a la hora (el
+         vencimiento de los códigos de Supabase). Nunca para un admin: esa
+         cuenta entra con su clave. No se envía nada: el link vuelve al que
+         lo pidió, que lo manda por WhatsApp. */
+      if (target.rol === "admin") return json({ error: "Los administradores entran con su contraseña." }, 403);
+      if (!target.activo || target.eliminado_at) return json({ error: "La cuenta está pausada." }, 400);
+      const { data, error } = await admin.auth.admin.generateLink({
+        type: "magiclink",
+        email: `${target.usuario}@plataforma.local`,
+        options: { redirectTo: body.volver ?? undefined },
+      });
+      if (error || !data?.properties?.action_link) return json({ error: error?.message ?? "No se pudo crear el link" }, 400);
+      return json({ link: data.properties.action_link });
+    }
+
+    if ((body.clave ?? "").length < 6) return json({ error: "Clave mínimo 6 caracteres" }, 400);
     const { error } = await admin.auth.admin.updateUserById(target.id, { password: body.clave! });
     if (error) return json({ error: error.message }, 400);
     return json({ ok: true });
