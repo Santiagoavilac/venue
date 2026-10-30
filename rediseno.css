@@ -516,3 +516,16 @@ img.ini-foto{object-fit:cover;background:var(--surface-2);padding:0}
 .solic-vacia{display:grid;place-items:center;font-size:12px}
 .solic-fl .ic{transform:rotate(-90deg);color:var(--text-muted)}
 .solic-nm{margin-top:10px;font-size:14px}
+
+/* ── Color de cada team: chip con su color (usuarios, entradas, listas) ── */
+.team-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:2px 10px;border-radius:999px;
+  font-size:12.5px;font-weight:600;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  color:color-mix(in srgb,var(--tc) 82%,var(--text,#111));
+  background:color-mix(in srgb,var(--tc) 14%,transparent);
+  border:1px solid color-mix(in srgb,var(--tc) 40%,transparent)}
+.team-chip::before{content:"";flex-shrink:0;width:8px;height:8px;border-radius:50%;background:var(--tc)}
+.team-chip.sin{--tc:var(--text-3,#888);font-weight:500}
+.tc-sw{display:flex;flex-wrap:wrap;gap:10px}
+.tc-sw button{width:34px;height:34px;padding:0;border-radius:50%;background:var(--tc);border:3px solid transparent;
+  box-shadow:0 0 0 1px var(--line-2,rgba(0,0,0,.15));cursor:pointer}
+.tc-sw button.on{border-color:var(--surface,#fff);box-shadow:0 0 0 2px var(--tc)}
