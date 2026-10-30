@@ -713,3 +713,9 @@ html:not([data-tema="oscuro"]) #cv2 .watermark{color:rgba(16,24,40,.05)}
 .tc-sw button{width:34px;height:34px;padding:0;border-radius:50%;background:var(--tc);border:3px solid transparent;
   box-shadow:0 0 0 1px var(--line-2,rgba(0,0,0,.15));cursor:pointer}
 .tc-sw button.on{border-color:var(--surface,#fff);box-shadow:0 0 0 2px var(--tc)}
+
+/* Login en el celular: el fondo de la página (lo que Safari muestra detrás
+   de la barra de estado y de la barra de abajo) va del mismo oscuro que el
+   login, para que no queden franjas blancas arriba y abajo. */
+html:has(#login:not(.hidden)),
+html:has(#login:not(.hidden)) body{background:#16181C!important}
