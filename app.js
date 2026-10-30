@@ -6491,7 +6491,7 @@ async function screenMesas() {
   $("#main").innerHTML = `
     ${pgHead({ ey: "Salón", t: "Mesas",
       s: `<b>${oc.length}</b> de <b>${mesas.length}</b> ${esPortero ? "ocupadas" : "vendidas"}${
-          !esPortero && oc.length ? ` · <b>Bs ${fmtBs(oc.reduce((a, m) => a + (+m.precio || 0), 0))}</b>` : ""}${pisos.length < 2 ? ` · ${esc(nombrePiso(planta))}` : ""}`,
+          me.rol === "admin" && oc.length ? ` · <b>Bs ${fmtBs(oc.reduce((a, m) => a + (+m.precio || 0), 0))}</b>` : ""}${pisos.length < 2 ? ` · ${esc(nombrePiso(planta))}` : ""}`,
       acc: `<div class="ms-h-acc" id="msAcc"></div>` })}
     ${misRes.length ? `<div class="hint" style="color:var(--warn);margin:0 0 10px">Reservas sin pago: ${misRes.map(x => `${esc(x.etiqueta)} vence ${vence(x)}`).join(" · ")} — confirmá el pago o se liberan solas.</div>` : ""}
     <div class="floors${pisos.length < 2 ? " solo" : ""}" style="margin:0 0 12px"><span class="ind" style="width:calc(${(100 / pisos.length).toFixed(2)}% - 5px);transform:translateX(${pisos.indexOf(planta) * 100}%)"></span>
