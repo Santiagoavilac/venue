@@ -1023,11 +1023,10 @@ function tabsFor() {
   if (me.rol === "deposito") return [["recepcion", "Registrar"], ["recepmias", "Lo mío"]];
   if (me.rol === "barra") return [["barpos", "Vender"]];
   if (me.rol === "caja") return [["caja", "Relacionadores"]];
-  // El portero abre en el escáner: es lo que hace toda la noche.
-  // El portero entra por Accesos, que para él es escáner + búsqueda.
+  // El portero abre en la lista: busca por nombre y marca el ingreso.
   /* "rrpps" es SOLO CONSULTA: el guardia busca al relacionador que llega y
      ve a qué team pertenece. No marca nada — marcar es de la caja. */
-  if (me.rol === "portero") return [["accesos", "Accesos"], ["lista", "Lista"], ["rrpps", "RRPPs"], ["mesas", "Mesas"]];
+  if (me.rol === "portero") return [["lista", "Lista"], ["accesos", "Escanear"], ["rrpps", "RRPPs"], ["mesas", "Mesas"]];
   if (me.rol === "admin") {
     // "eventos" es el Inicio: la gestión del evento es la puerta de entrada.
     // "accesos" agrupa listas, entradas, scanner e historial: es la misma
