@@ -13,12 +13,12 @@ void main() {
     expect(colorValido('#7C3'), isFalse);
   });
 
-  test('invitación de team: link que abre la app y código de respaldo', () {
+  test('invitación de team: link web con el código', () {
     final t = TeamInfo.desde({
       'id': 't', 'nombre': 'Team Norte', 'clubs': ['aurora'],
       'invite_code': 'ab12cd34ab12cd34ab12cd34ab12cd34',
     });
-    expect(t.link, 'venue://app/registro?invite=ab12cd34ab12cd34ab12cd34ab12cd34');
+    expect(t.link, 'https://venue-web-amber.vercel.app/?invite=ab12cd34ab12cd34ab12cd34ab12cd34');
     final m = mensajeDeInvitacion(t, 'Aurora Club');
     expect(m, contains(t.link));
     expect(m, contains('Team Norte'));
