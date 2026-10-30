@@ -130,10 +130,12 @@ class _LimitesSheetState extends ConsumerState<_LimitesSheet> {
     super.dispose();
   }
 
+  /// null = sin límite; -1 = no es un número válido.
   int? _num(TextEditingController c) {
     final t = c.text.trim();
     if (t.isEmpty) return null;
-    return (int.tryParse(t) ?? 0).clamp(0, 500);
+    final n = int.tryParse(t);
+    return n == null || n < 0 || n > 1000 ? -1 : n;
   }
 
   Future<void> _guardar() async {
@@ -141,8 +143,12 @@ class _LimitesSheetState extends ConsumerState<_LimitesSheet> {
       for (final f in widget.filas)
         (f: f, mio: _num(_mio[f.listaId]!), team: _num(_team[f.listaId]!)),
     ].where((c) => c.mio != c.f.mio || c.team != c.f.team).toList();
+    if (cambios.any((c) => c.mio == -1 || c.team == -1)) {
+      avisar(context, 'Poné números entre 0 y 1000 (o dejalo vacío para sin límite).', tipo: TipoAviso.aviso);
+      return;
+    }
     if (cambios.isEmpty) {
-      Navigator.pop(context, false);
+      avisar(context, 'No cambiaste ningún número.', tipo: TipoAviso.aviso);
       return;
     }
     final acepta = await showDialog<bool>(

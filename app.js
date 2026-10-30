@@ -2501,30 +2501,36 @@ async function sheetLimitesJefe() {
       <div class="lst-card" style="padding:12px 14px;margin-bottom:10px">
         <div class="lst-nm" style="margin-bottom:8px">${esc(f.lista)} <span class="r-sub">· anotaste ${f.anotados_mios}</span></div>
         <div class="row2">
-          <div class="field"><label>Mi límite</label><input type="number" min="0" max="500" inputmode="numeric" data-lm="${f.lista_tipo_id}" value="${val(f.cupo_mio)}"></div>
-          <div class="field"><label>Cada uno de mi team</label><input type="number" min="0" max="500" inputmode="numeric" data-lt="${f.lista_tipo_id}" value="${val(f.cupo_team)}"></div>
+          <div class="field"><label>Mi límite</label><input type="number" min="0" max="1000" inputmode="numeric" data-lm="${f.lista_tipo_id}" value="${val(f.cupo_mio)}"></div>
+          <div class="field"><label>Cada uno de mi team</label><input type="number" min="0" max="1000" inputmode="numeric" data-lt="${f.lista_tipo_id}" value="${val(f.cupo_team)}"></div>
         </div>
       </div>`).join("") || `<div class="empty">Este evento no tiene listas.</div>`}
+    <div id="limMsg" class="hint" style="margin:0 0 10px;color:var(--warn)"></div>
     ${filas.length ? `<button class="btn primary" id="limGo">Guardar</button>` : ""}`);
   const go = $("#limGo"); if (!go) return;
   go.onclick = () => {
-    const num = el => { const t = el.value.trim(); return t === "" ? null : Math.max(0, Math.min(500, parseInt(t, 10) || 0)); };
+    // sin tocar el número en silencio: si está fuera de rango, se avisa acá
+    const num = el => { const t = el.value.trim(); return t === "" ? null : (/^\d+$/.test(t) ? parseInt(t, 10) : NaN); };
+    const msg = t => { $("#limMsg").textContent = t; };
     const cambios = filas.map(f => ({
       f, mio: num(document.querySelector(`[data-lm="${f.lista_tipo_id}"]`)), team: num(document.querySelector(`[data-lt="${f.lista_tipo_id}"]`)),
     })).filter(c => c.mio !== (c.f.cupo_mio ?? null) || c.team !== (c.f.cupo_team ?? null));
-    if (!cambios.length) { closeSheet(); return toast("No cambiaste nada"); }
+    if (cambios.some(c => Number.isNaN(c.mio) || Number.isNaN(c.team) || c.mio > 1000 || c.team > 1000))
+      return msg("Poné números enteros entre 0 y 1000 (o dejalo vacío para sin límite).");
+    if (!cambios.length) return msg("No cambiaste ningún número.");
     const txt = v => v == null ? "sin límite" : `${v}`;
     sheet(`
       <div class="sh-h">Confirmar cambios</div>
       ${cambios.map(c => `<div class="dt-f"><span class="dt-k">${esc(c.f.lista)}</span><span class="dt-v">Vos: <b>${txt(c.mio)}</b> · Cada uno del team: <b>${txt(c.team)}</b></span></div>`).join("")}
       <p class="hint" style="margin:14px 0">Al aceptar, los límites se aplican de inmediato y <b>administración recibe un aviso de cualquier cambio</b>.</p>
+      <div id="limErr" class="hint" style="margin:0 0 10px;color:var(--danger)"></div>
       <div class="dt-acc"><button class="btn primary" id="limOk">Acepto</button><button class="btn ghost2" id="limNo">Cancelar</button></div>`);
     $("#limNo").onclick = () => closeSheet();
     $("#limOk").onclick = async () => {
       $("#limOk").disabled = true;
       for (const c of cambios) {
         const { error: e2 } = await sb.rpc("jefe_fijar_cupos", { p_lista: c.f.lista_tipo_id, p_mio: c.mio, p_team: c.team });
-        if (e2) { $("#limOk").disabled = false; return fail(e2); }
+        if (e2) { $("#limOk").disabled = false; $("#limErr").textContent = mensajeDeError(e2); return; }
       }
       closeSheet(); toast("Límites actualizados. Administración fue avisada.");
       screenListas();
