@@ -4673,6 +4673,7 @@ async function gnVistaUsuario(g) {
       <button class="btn ghost2" id="fuPausa">${g.activo ? "Pausar" : "Activar"}</button>
       <button class="btn ghost2" id="fuTel">${tel ? "Cambiar número" : "Cargar número"}</button>
       <button class="btn ghost2" id="fuClave">Resetear clave</button>
+      ${g.rol === "admin" ? "" : `<button class="btn ghost2" id="fuLink">Mandar link de acceso</button>`}
     </div>`}`;
   $("#gnBack").onclick = () => gnIr(desdeTeam ? { tipo: "team", id: desdeTeam.id } : null);
   gnConectarAccionesUsuario(g, tel);
@@ -4691,6 +4692,7 @@ function gnConectarAccionesUsuario(g, tel) {
   };
   $("#fuTel").onclick = () => editarTelDe(g.id, g.nombre, tel, sheetUsuarios);
   $("#fuClave").onclick = () => resetClave(g.id, g.nombre);
+  const bl = $("#fuLink"); if (bl) bl.onclick = () => mandarLinkAcceso(g, tel);
 }
 
 /* números del evento activo, solo para quien vende (porteros/caja sin
@@ -4730,6 +4732,7 @@ async function sheetFichaUsuario(g) {
       <button class="btn ghost2" id="fuPausa">${g.activo ? "Pausar" : "Activar"}</button>
       <button class="btn ghost2" id="fuTel">${tel ? "Cambiar número" : "Cargar número"}</button>
       <button class="btn ghost2" id="fuClave">Resetear clave</button>
+      ${g.rol === "admin" ? "" : `<button class="btn ghost2" id="fuLink">Mandar link de acceso</button>`}
     </div>`}`);
   gnConectarAccionesUsuario(g, tel);
   gnPintarStats(g, esRel, "#gnStatsSheet");
@@ -8714,6 +8717,35 @@ window.resetClave = async (userId, nombre) => {
   if (!res.ok) return toast(out.error || "Error", "warn");
   toast(`Clave de ${nombre} actualizada`);
 };
+
+/* Link para entrar sin contraseña (admin a su gente; jefe a sus RRPP). Lo
+   arma el servidor: sirve una sola vez y vence en una hora. No se manda
+   solo: queda acá para mandarlo por WhatsApp o copiarlo. */
+async function mandarLinkAcceso(g, tel) {
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${CFG.SUPABASE_URL}/functions/v1/crear-usuario`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ action: "link", user_id: g.id, volver: location.origin + "/" })
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok || !out.link) return toast(out.error || "No se pudo crear el link", "warn");
+  const texto = `Hola ${g.nombre}, entrá a Venue con este link (sirve una sola vez, vence en 1 hora): ${out.link}`;
+  sheet(`
+    <div class="sh-h">Link de acceso · ${esc(g.nombre)}</div>
+    <p class="hint" style="margin:0 0 14px">Entra directo como <b>@${esc(g.usuario)}</b>, sin contraseña. Sirve una sola vez y vence en 1 hora. Mandalo solo a esa persona.</p>
+    <div class="dt-acc" style="flex-wrap:wrap">
+      ${tel ? `<a class="btn primary" href="https://wa.me/${esc(tel)}?text=${encodeURIComponent(texto)}" target="_blank" rel="noopener">Mandar por WhatsApp</a>` : ""}
+      <button class="btn ${tel ? "ghost2" : "primary"}" id="lkCopiar">Copiar link</button>
+      ${navigator.share ? `<button class="btn ghost2" id="lkShare">Compartir</button>` : ""}
+    </div>`);
+  $("#lkCopiar").onclick = async () => {
+    try { await navigator.clipboard.writeText(texto); toast("Link copiado"); }
+    catch { toast("No se pudo copiar", "warn"); }
+  };
+  const sh = $("#lkShare");
+  if (sh) sh.onclick = () => navigator.share({ text: texto }).catch(() => {});
+}
 
 /* ---------- arranque: sesión persistida ---------- */
 /* Splash: el logo de Venue queda mientras se sabe si hay sesión, un
