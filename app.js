@@ -2448,6 +2448,75 @@ async function cargarRegistrosLista(forzar) {
 /* repinta con lo que ya está en memoria (no toca la red) */
 const pintarListas = () => screenListas(true);
 
+/* Límites de lista del jefe: el suyo y el de cada relacionador de su team,
+   por lista del evento. Antes de aplicar, el jefe acepta que administración
+   recibe aviso de cualquier cambio (queda registrado en el servidor). */
+async function sheetLimitesJefe() {
+  const { data, error } = await sb.rpc("jefe_cupos", { p_evento: ev.id });
+  if (error) return fail(error);
+  const filas = data || [];
+  const val = v => v == null ? "" : String(v);
+  sheet(`
+    <div class="sh-h">Límites de lista · ${esc(ev.nombre)}</div>
+    <p class="hint" style="margin:0 0 12px">Cuántas personas podés anotar vos y cuántas cada relacionador de tu team${filas[0] ? ` (${filas[0].team_personas} persona${filas[0].team_personas === 1 ? "" : "s"})` : ""}. Vacío = sin límite.</p>
+    ${filas.map(f => `
+      <div class="lst-card" style="padding:12px 14px;margin-bottom:10px">
+        <div class="lst-nm" style="margin-bottom:8px">${esc(f.lista)} <span class="r-sub">· anotaste ${f.anotados_mios}</span></div>
+        <div class="row2">
+          <div class="field"><label>Mi límite</label><input type="number" min="0" max="500" inputmode="numeric" data-lm="${f.lista_tipo_id}" value="${val(f.cupo_mio)}"></div>
+          <div class="field"><label>Cada uno de mi team</label><input type="number" min="0" max="500" inputmode="numeric" data-lt="${f.lista_tipo_id}" value="${val(f.cupo_team)}"></div>
+        </div>
+      </div>`).join("") || `<div class="empty">Este evento no tiene listas.</div>`}
+    ${filas.length ? `<button class="btn primary" id="limGo">Guardar</button>` : ""}`);
+  const go = $("#limGo"); if (!go) return;
+  go.onclick = () => {
+    const num = el => { const t = el.value.trim(); return t === "" ? null : Math.max(0, Math.min(500, parseInt(t, 10) || 0)); };
+    const cambios = filas.map(f => ({
+      f, mio: num(document.querySelector(`[data-lm="${f.lista_tipo_id}"]`)), team: num(document.querySelector(`[data-lt="${f.lista_tipo_id}"]`)),
+    })).filter(c => c.mio !== (c.f.cupo_mio ?? null) || c.team !== (c.f.cupo_team ?? null));
+    if (!cambios.length) { closeSheet(); return toast("No cambiaste nada"); }
+    const txt = v => v == null ? "sin límite" : `${v}`;
+    sheet(`
+      <div class="sh-h">Confirmar cambios</div>
+      ${cambios.map(c => `<div class="dt-f"><span class="dt-k">${esc(c.f.lista)}</span><span class="dt-v">Vos: <b>${txt(c.mio)}</b> · Cada uno del team: <b>${txt(c.team)}</b></span></div>`).join("")}
+      <p class="hint" style="margin:14px 0">Al aceptar, los límites se aplican de inmediato y <b>administración recibe un aviso de cualquier cambio</b>.</p>
+      <div class="dt-acc"><button class="btn primary" id="limOk">Acepto</button><button class="btn ghost2" id="limNo">Cancelar</button></div>`);
+    $("#limNo").onclick = () => closeSheet();
+    $("#limOk").onclick = async () => {
+      $("#limOk").disabled = true;
+      for (const c of cambios) {
+        const { error: e2 } = await sb.rpc("jefe_fijar_cupos", { p_lista: c.f.lista_tipo_id, p_mio: c.mio, p_team: c.team });
+        if (e2) { $("#limOk").disabled = false; return fail(e2); }
+      }
+      closeSheet(); toast("Límites actualizados. Administración fue avisada.");
+      screenListas();
+    };
+  };
+}
+
+/* Admin: cambios de límites hechos por jefes que todavía no vio. */
+async function avisoCambiosCupo() {
+  const { data } = await sb.rpc("cambios_cupo_pendientes", { p_club: club });
+  const el = $("#lsCambiosCupo"); if (!el) return;
+  const cs = data || [];
+  if (!cs.length) { el.innerHTML = ""; return; }
+  const txt = v => v == null ? "sin límite" : `${v}`;
+  el.innerHTML = `<button class="hint" id="lsCcVer" style="display:block;width:100%;text-align:left;margin:0 0 12px;padding:12px 14px;border-radius:12px;border:1px solid var(--warn);color:var(--warn);background:transparent;cursor:pointer">
+    ${cs.length} cambio${cs.length === 1 ? "" : "s"} de límites hecho${cs.length === 1 ? "" : "s"} por jefes. Tocá para ver.</button>`;
+  $("#lsCcVer").onclick = () => {
+    sheet(`
+      <div class="sh-h">Cambios de límites</div>
+      ${cs.map(c => `<div class="dt-f"><span class="dt-k">${esc(c.jefe)}${c.team ? ` · ${esc(c.team)}` : ""}<br><small>${esc(c.evento)} · ${esc(c.lista)} · ${hora(c.created_at)}</small></span>
+        <span class="dt-v">Él: <b>${txt(c.cupo_jefe)}</b><br>Su team: <b>${txt(c.cupo_team)}</b> (${c.personas})</span></div>`).join("")}
+      <button class="btn primary" id="ccVisto" style="margin-top:14px">Marcar como vistos</button>`);
+    $("#ccVisto").onclick = async () => {
+      const { error } = await sb.rpc("marcar_cambios_cupo_vistos", { p_club: club });
+      if (error) return fail(error);
+      closeSheet(); el.innerHTML = ""; toast("Listo");
+    };
+  };
+}
+
 async function screenListas(soloPintar) {
   if (!listaTipos.length) {
     // Puede ser que el evento no tenga listas, o que la carga haya fallado.
@@ -2527,7 +2596,9 @@ async function screenListas(soloPintar) {
             abierta, para que agregar no quede sin acceso. */
         canAdd && listaTipos.length && !listaSelId
           ? `<button class="btn primary iv-add" data-addlt="${listaTipos[0].id}">Agregar invitados</button>` : ""}
+      ${me.rol === "jefe" ? `<button class="btn ghost2 iv-add" id="lsLimites">Límites</button>` : ""}
     </div>
+    <div id="lsCambiosCupo"></div>
     <div class="iv-tools">
       <div class="iv-buscar"><input id="lsBuscar" placeholder="Buscar por nombre en todas las listas…" autocomplete="off"></div>
       ${esAdminLs ? `<div class="iv-filtros">
@@ -2616,6 +2687,8 @@ async function screenListas(soloPintar) {
     }).join("")}</div>`;
   const ltf = $("#lsTeamF"), lsf = $("#lsSellerF");
   if (ltf) ltf.onchange = () => { lsFTeam = ltf.value; pintarListas(); };
+  const blim = $("#lsLimites"); if (blim) blim.onclick = () => sheetLimitesJefe();
+  if (esAdminLs) avisoCambiosCupo();
   if (lsf) lsf.onchange = () => { lsFSeller = lsf.value; pintarListas(); };
   // buscador global: encuentra al anotado en cualquier lista del evento
   const lb = $("#lsBuscar"), lres = $("#lsResultados"), lac = $("#lsAcordeon");
