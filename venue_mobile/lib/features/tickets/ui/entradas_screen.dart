@@ -11,6 +11,7 @@ import '../../events/data/eventos.dart';
 import '../../events/ui/gestion_screen.dart';
 import '../../teams/data/equipo.dart';
 import '../data/entradas.dart';
+import '../../teams/ui/chip_team.dart';
 import 'reporte_teams.dart';
 import 'ticket_sheet.dart';
 
@@ -517,6 +518,7 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                         entrada: e,
                         fase: fases[e.faseId]?.nombre,
                         vendedor: alcance == _Alcance.mias ? null : e.rrppNombre,
+                        team: alcance == _Alcance.mias ? null : equipo[e.rrppId],
                         deLaCasa: casa.contains(e.rrppId),
                         marcada: _marcadas.contains(e.id),
                         alMarcar: e.valida
@@ -569,6 +571,7 @@ class _FilaEntrada extends StatelessWidget {
     required this.entrada,
     required this.fase,
     required this.vendedor,
+    this.team,
     required this.deLaCasa,
     required this.marcada,
     required this.alMarcar,
@@ -580,6 +583,9 @@ class _FilaEntrada extends StatelessWidget {
   final Entrada entrada;
   final String? fase;
   final String? vendedor;
+
+  /// Quien la vendió, con su team en este boliche (para la pastilla de color).
+  final Miembro? team;
   final bool deLaCasa;
   final bool marcada;
   final ValueChanged<bool>? alMarcar;
@@ -638,6 +644,10 @@ class _FilaEntrada extends StatelessWidget {
                       Text('la vendió $vendedor',
                           style: TextStyle(
                               color: VenueColors.textoSuave, fontSize: 12.5)),
+                    if (team != null) ...[
+                      const SizedBox(height: 5),
+                      ChipTeam(teamId: team!.teamId, nombre: team!.team),
+                    ],
                   ],
                 ),
               ),

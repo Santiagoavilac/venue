@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
+import 'chip_team.dart';
 
 import '../../../core/networking/supabase.dart';
 import '../../../core/theme/venue_theme.dart';
@@ -359,9 +360,6 @@ class _Usuarios extends ConsumerStatefulWidget {
 class _UsuariosState extends ConsumerState<_Usuarios> {
   String _q = '';
 
-  /// Grupos (teams) desplegados. Arrancan plegados para no tener la lista
-  /// entera encima; al buscar se abren todos.
-  final _abiertos = <String>{};
 
   @override
   Widget build(BuildContext context) {
@@ -415,15 +413,7 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
               ),
             ],
           ]);
-          final teamW = Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.groups_outlined, size: 16, color: VenueColors.textoTenue),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(team ?? 'Sin team',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13.5, color: VenueColors.textoSuave)),
-            ),
-          ]);
+          final teamW = ChipTeam(teamId: equipo[u.id]?.teamId, nombre: team ?? '');
           final estado = u.activo
               ? const PillEstado('Activo')
               : const PillEstado('Pausado', tono: Tono.neutro);
@@ -529,90 +519,12 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
                 ]),
               )
             else
-              ..._grupos(lista, equipo, fila, abiertosTodos: q.isNotEmpty),
+              for (final u in lista) fila(u),
           ],
         );
       },
     );
   }
-
-  /// La gente agrupada por team (sin team al final), cada grupo plegable.
-  List<Widget> _grupos(List<Usuario> lista, Map<String, Miembro> equipo,
-      Widget Function(Usuario) fila, {required bool abiertosTodos}) {
-    const sinTeam = 'Sin team';
-    final porTeam = <String, List<Usuario>>{};
-    for (final u in lista) {
-      final t = equipo[u.id]?.teamId != null ? equipo[u.id]!.team : sinTeam;
-      (porTeam[t] ??= []).add(u);
-    }
-    final nombres = porTeam.keys.toList()
-      ..sort((a, b) => a == sinTeam ? 1 : b == sinTeam ? -1 : a.compareTo(b));
-    return [
-      for (final t in nombres) ...[
-        _CabeceraGrupo(
-          titulo: t,
-          cantidad: porTeam[t]!.length,
-          activos: porTeam[t]!.where((u) => u.activo).length,
-          abierto: abiertosTodos || _abiertos.contains(t),
-          alTocar: abiertosTodos
-              ? null
-              : () => setState(() => _abiertos.contains(t) ? _abiertos.remove(t) : _abiertos.add(t)),
-        ),
-        if (abiertosTodos || _abiertos.contains(t)) ...[
-          for (final u in porTeam[t]!) fila(u),
-          const SizedBox(height: 6),
-        ],
-      ],
-    ];
-  }
-}
-
-class _CabeceraGrupo extends StatelessWidget {
-  const _CabeceraGrupo({
-    required this.titulo,
-    required this.cantidad,
-    required this.activos,
-    required this.abierto,
-    this.alTocar,
-  });
-  final String titulo;
-  final int cantidad, activos;
-  final bool abierto;
-  final VoidCallback? alTocar;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Tarjeta(
-          padding: EdgeInsets.zero,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: alTocar,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-              child: Row(children: [
-                Inicial(titulo, lado: 34),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(titulo, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
-                    Text(
-                      '$cantidad ${cantidad == 1 ? 'persona' : 'personas'}'
-                      '${activos < cantidad ? ' · ${cantidad - activos} en pausa' : ''}',
-                      style: TextStyle(fontSize: 13, color: VenueColors.textoSuave),
-                    ),
-                  ]),
-                ),
-                AnimatedRotation(
-                  turns: abierto ? .5 : 0,
-                  duration: const Duration(milliseconds: 180),
-                  child: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
-                ),
-              ]),
-            ),
-          ),
-        ),
-      );
 }
 
 class _Cab extends StatelessWidget {
@@ -1039,6 +951,7 @@ class _Teams extends ConsumerWidget {
     Future<void> formulario([TeamInfo? t]) async {
       final nombre = TextEditingController(text: t?.nombre ?? '');
       final sel = {...?t?.clubs, if (t == null) club.id};
+      var color = t == null ? null : colorDeTeam(t.id, t.color);
       final ok = await showDialog<bool>(
         context: context,
         builder: (c) => StatefulBuilder(
@@ -1050,7 +963,13 @@ class _Teams extends ConsumerWidget {
                   autofocus: true,
                   decoration: const InputDecoration(labelText: 'Nombre')),
               if (t != null) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
+                Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Color', style: TextStyle(fontSize: 13, color: VenueColors.textoSuave))),
+                const SizedBox(height: 8),
+                SelectorColorTeam(valor: color!, alCambiar: (c) => set(() => color = c)),
+                const SizedBox(height: 14),
                 Wrap(spacing: 8, children: [
                   for (final b in clubs)
                     FilterChip(
@@ -1070,7 +989,9 @@ class _Teams extends ConsumerWidget {
       final n = nombre.text.trim();
       if (ok != true || n.isEmpty) return;
       await hacer(
-          () => t == null ? repo.crearTeam(n, club.id) : repo.editarTeam(t.id, n, sel.toList()),
+          () => t == null
+              ? repo.crearTeam(n, club.id)
+              : repo.editarTeam(t.id, n, sel.toList(), color: color == null ? null : hexDe(color!)),
           t == null ? 'Team creado' : 'Team actualizado');
     }
 
@@ -1096,12 +1017,24 @@ class _Teams extends ConsumerWidget {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
                     child: Row(children: [
-                          Inicial(t.nombre, lado: 38),
+                          Container(
+                            width: 38,
+                            height: 38,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                                color: colorDeTeam(t.id, t.color), shape: BoxShape.circle),
+                            child: Text(
+                                (t.nombre.replaceFirst(RegExp(r'^team ', caseSensitive: false), '').trim().isEmpty
+                                        ? 'T'
+                                        : t.nombre.replaceFirst(RegExp(r'^team ', caseSensitive: false), '').trim()[0])
+                                    .toUpperCase(),
+                                style: const TextStyle(
+                                    color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(t.nombre,
-                                  style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+                              ChipTeam(teamId: t.id, nombre: t.nombre),
                               const SizedBox(height: 1),
                               Text(
                                 '${equipo.values.where((m) => m.teamId == t.id).length} personas'

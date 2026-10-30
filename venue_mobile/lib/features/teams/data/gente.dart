@@ -53,7 +53,7 @@ class Membresia {
 class TeamInfo {
   const TeamInfo({
     required this.id, required this.nombre, required this.clubs, required this.invitacion,
-    this.jefeId, this.activo = true,
+    this.jefeId, this.activo = true, this.color,
   });
   final String id;
   final String nombre;
@@ -61,6 +61,9 @@ class TeamInfo {
   final String invitacion;
   final String? jefeId;
   final bool activo;
+
+  /// '#RRGGBB' elegido por el admin, o null (color automático).
+  final String? color;
 
   /// Link que abre el registro en la app con la invitación ya cargada.
   String get link => 'venue://app/registro?invite=$invitacion';
@@ -72,6 +75,7 @@ class TeamInfo {
         invitacion: j['invite_code'] as String? ?? '',
         jefeId: j['jefe_id'] as String?,
         activo: j['activo'] != false,
+        color: j['color'] as String?,
       );
 }
 
@@ -112,14 +116,14 @@ class GenteRepository {
 
   Future<List<TeamInfo>> teams(String clubId) async {
     final r = await _sb.from('teams')
-        .select('id, nombre, clubs, invite_code, jefe_id, activo')
+        .select('id, nombre, clubs, invite_code, jefe_id, activo, color')
         .contains('clubs', [clubId]).order('nombre', ascending: true);
     return r.map(TeamInfo.desde).toList();
   }
 
   Future<TeamInfo?> team(String id) async {
     final r = await _sb.from('teams')
-        .select('id, nombre, clubs, invite_code, jefe_id, activo').eq('id', id).maybeSingle();
+        .select('id, nombre, clubs, invite_code, jefe_id, activo, color').eq('id', id).maybeSingle();
     return r == null ? null : TeamInfo.desde(r);
   }
 
@@ -209,8 +213,8 @@ class GenteRepository {
   Future<void> crearTeam(String nombre, String clubId) =>
       _sb.from('teams').insert({'nombre': nombre, 'clubs': [clubId], 'activo': true});
 
-  Future<void> editarTeam(String id, String nombre, List<String> clubs) =>
-      _sb.from('teams').update({'nombre': nombre, 'clubs': clubs}).eq('id', id);
+  Future<void> editarTeam(String id, String nombre, List<String> clubs, {String? color}) =>
+      _sb.from('teams').update({'nombre': nombre, 'clubs': clubs, 'color': ?color}).eq('id', id);
 
   /// Elimina el team. Su gente pasa a [destino] o queda sin team.
   Future<int> eliminarTeam(String id, {String? destino}) async {

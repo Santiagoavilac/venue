@@ -15,8 +15,10 @@
  *   - el cifrado es AES-256-CBC con un IV aleatorio de 16 bytes ADELANTE del
  *     texto cifrado, relleno PKCS7 y salida base64 (se verificó descifrando
  *     el ejemplo del manual). La llave son los 32 caracteres en ASCII.
- *   - statusQR y paidQR son GET "con cuerpo" en el manual; un GET no lleva
- *     cuerpo, así que van como parámetros de la URL.
+ *   - statusQR y paidQR son GET CON CUERPO JSON: probado en el ambiente de
+ *     prueba, con el qrId en la URL responde "value con valor nulo" y con
+ *     POST da 405. fetch no deja mandar cuerpo en un GET, así que esas dos
+ *     van por una conexión HTTPS propia (getConCuerpo).
  *   - el estado viene como statusQRCode (tabla) o statusQrCode (ejemplo) y
  *     payment como objeto (tabla) o lista (ejemplo): se aceptan las dos formas.
  */
@@ -54,22 +56,62 @@ class ErrorBanco extends Error {
   constructor(public paso: string, public codigo: unknown, mensaje: string) { super(mensaje); }
 }
 
-async function banco(metodo: string, ruta: string, opts: { cuerpo?: unknown; query?: Record<string, string>; token?: string } = {}): Promise<Resp> {
+/* GET con cuerpo: HTTP/1.1 a mano sobre TLS (fetch lo prohíbe). Una
+   petición por conexión ("Connection: close"); se acepta respuesta con
+   Content-Length o chunked. */
+async function getConCuerpo(url: URL, headers: Record<string, string>, cuerpo: string): Promise<{ status: number; texto: string }> {
+  const enc = new TextEncoder(), datos = enc.encode(cuerpo);
+  const cab = Object.entries({ ...headers, Host: url.host, "Content-Length": String(datos.length), Connection: "close" })
+    .map(([k, v]) => `${k}: ${v}`).join("\r\n");
+  const con = await Deno.connectTls({ hostname: url.hostname, port: Number(url.port || 443) });
+  const corte = setTimeout(() => { try { con.close(); } catch { /* ya cerrada */ } }, 25000);
+  try {
+    const pedido = enc.encode(`GET ${url.pathname}${url.search} HTTP/1.1\r\n${cab}\r\n\r\n`);
+    const todo = new Uint8Array(pedido.length + datos.length);
+    todo.set(pedido); todo.set(datos, pedido.length);
+    await con.write(todo);
+    const partes: Uint8Array[] = [];
+    for await (const p of con.readable) partes.push(p);
+    const crudo = new Uint8Array(partes.reduce((n, p) => n + p.length, 0));
+    let i = 0; for (const p of partes) { crudo.set(p, i); i += p.length; }
+    const sep = [...crudo].findIndex((_, k) => crudo[k] === 13 && crudo[k + 1] === 10 && crudo[k + 2] === 13 && crudo[k + 3] === 10);
+    if (sep < 0) throw new Error("Respuesta incompleta del banco");
+    const cabeza = new TextDecoder().decode(crudo.slice(0, sep));
+    let resto = crudo.slice(sep + 4);
+    const status = Number(cabeza.split(" ")[1]);
+    if (/^transfer-encoding:\s*chunked/im.test(cabeza)) {
+      const out: number[] = []; let k = 0;
+      while (k < resto.length) {
+        let fin = k; while (fin < resto.length && !(resto[fin] === 13 && resto[fin + 1] === 10)) fin++;
+        const n = parseInt(new TextDecoder().decode(resto.slice(k, fin)), 16);
+        if (!n) break;
+        out.push(...resto.slice(fin + 2, fin + 2 + n)); k = fin + 2 + n + 2;
+      }
+      resto = new Uint8Array(out);
+    }
+    return { status, texto: new TextDecoder().decode(resto) };
+  } finally {
+    clearTimeout(corte);
+    try { con.close(); } catch { /* ya cerrada */ }
+  }
+}
+
+async function banco(metodo: string, ruta: string, opts: { cuerpo?: unknown; token?: string } = {}): Promise<Resp> {
   const url = new URL(BASE() + ruta);
-  for (const [k, v] of Object.entries(opts.query ?? {})) url.searchParams.set(k, v);
-  const r = await fetch(url, {
-    method: metodo,
-    headers: {
-      "Content-Type": "application/json", Accept: "application/json",
-      ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
-    },
-    body: opts.cuerpo === undefined ? undefined : JSON.stringify(opts.cuerpo),
-    signal: AbortSignal.timeout(25000),
-  });
-  const texto = await r.text();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json", Accept: "application/json",
+    ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
+  };
+  const cuerpo = opts.cuerpo === undefined ? undefined : JSON.stringify(opts.cuerpo);
+  let status: number, texto: string;
+  if (metodo === "GET" && cuerpo !== undefined) ({ status, texto } = await getConCuerpo(url, headers, cuerpo));
+  else {
+    const r = await fetch(url, { method: metodo, headers, body: cuerpo, signal: AbortSignal.timeout(25000) });
+    status = r.status; texto = await r.text();
+  }
   let datos: Resp;
-  try { datos = JSON.parse(texto); } catch { throw new ErrorBanco(ruta, r.status, `Respuesta no JSON (HTTP ${r.status})`); }
-  if (!r.ok) throw new ErrorBanco(ruta, r.status, String(datos.message ?? `HTTP ${r.status}`));
+  try { datos = JSON.parse(texto); } catch { throw new ErrorBanco(ruta, status, `Respuesta no JSON (HTTP ${status})`); }
+  if (status < 200 || status > 299) throw new ErrorBanco(ruta, status, String(datos.message ?? `HTTP ${status}`));
   return datos;
 }
 
@@ -103,7 +145,7 @@ const pagoDe = (r: Resp) => (Array.isArray(r.payment) ? r.payment[0] : r.payment
 
 async function consultarEstado(qrId: string) {
   return await conToken(async (t) => {
-    const r = await banco("GET", "/api/qrsimple/statusQR", { query: { qrId }, token: t });
+    const r = await banco("GET", "/api/qrsimple/statusQR", { cuerpo: { qrId }, token: t });
     if (r.responseCode !== 0) throw new ErrorBanco("statusQR", r.responseCode, String(r.message));
     return { estado: estadoDe(r), pago: pagoDe(r) };
   });
@@ -153,7 +195,7 @@ async function accionQr(req: Request, ordenId: unknown) {
   if (o.estado !== "pendiente") throw new Response(JSON.stringify({ error: `Este pedido está ${o.estado}.` }), { status: 409 });
   if (!(o.total > 0)) throw new Response(JSON.stringify({ error: "Este pedido no tiene importe." }), { status: 409 });
 
-  const transactionId = String(o.id).replaceAll("-", "");
+  const transactionId = String(o.id).replaceAll("-", "").slice(0, 30);   // el banco acepta hasta 30
   const vence = o.vence_at ? new Date(new Date(o.vence_at).getTime() - 4 * 3600_000).toISOString().slice(0, 10) : hoyBolivia();
   const r = await conToken(async (t) => banco("POST", "/api/qrsimple/generateQR", {
     token: t,
@@ -218,7 +260,7 @@ async function accionBarrido() {
   }
   // 2) conciliación del día con paidQR (por si un estado se perdió)
   try {
-    const r = await conToken((t) => banco("GET", "/api/qrsimple/paidQR", { token: t, query: { paymentDate: hoyBolivia() } }));
+    const r = await conToken((t) => banco("GET", "/api/qrsimple/paidQR", { token: t, cuerpo: { paymentDate: hoyBolivia() } }));
     for (const p of (r.paymentList as Record<string, unknown>[] | undefined) ?? []) {
       const { data: q } = await admin.from("pago_qr").select("id, estado").eq("qr_id", String(p.qrId)).maybeSingle();
       if (q && q.estado !== "pagado") {

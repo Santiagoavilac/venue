@@ -1368,7 +1368,7 @@ async function screenEntradas() {
         : `<span class="tkst ok">válida</span>`;
       const rrppNom = nombreVend(t.rrpp_id), teamNom = vendedores[t.rrpp_id]?.teamNombre;
       const subs = verVendedor && vendedores[t.rrpp_id]
-        ? `<span class="rc-sub">${IC.person}<span>${esc(rrppNom)}</span></span>${teamNom ? `<span class="rc-sub">${IC.tag}<span>${esc(teamNom)}</span></span>` : ""}`
+        ? `<span class="rc-sub">${IC.person}<span>${esc(rrppNom)}</span></span>${teamNom ? `<span class="rc-sub">${chipTeam(teamDeVend(t.rrpp_id), teamNom)}</span>` : ""}`
         : "";
       return `
       <div class="list-row rc" data-row="${esc((t.cliente + " #" + t.code + " " + nombreVend(t.rrpp_id) + " " + (vendedores[t.rrpp_id]?.teamNombre || "")).toLowerCase())}" data-seller="${t.rrpp_id}" data-team="${teamDeVend(t.rrpp_id)}" data-used="${t.estado === "usada" ? 1 : 0}" data-rrppnom="${esc((nombreVend(t.rrpp_id) || "").toLowerCase())}">
@@ -2632,7 +2632,7 @@ async function screenListas(soloPintar) {
               <span class="rc-body">
                 <span class="rc-nm">${esc(r.nombre)}</span>
                 <span class="rc-sub"><span>${esc(r.rrpp?.nombre || "—")}</span></span>
-                <span class="rc-sub"><span>${esc(teamNomDe(r.rrpp_id))}</span></span>
+                <span class="rc-sub">${chipTeam(teamDe(r.rrpp_id), teamNomDe(r.rrpp_id))}</span>
                 ${r.ingreso_at || r.code ? `<span class="iv-est">
                   ${r.ingreso_at ? `<span class="iv-ok">Ingresó ${hora(r.ingreso_at)}</span>` : ""}
                   ${r.code ? `<span class="iv-qr">QR</span>` : ""}
@@ -3169,7 +3169,7 @@ async function screenCaja() {
     <div id="cjTeams">${teams.map(t => `
       <div class="lst-card ${cajaSel === t ? "open" : ""}" data-cjt="${esc(t)}">
         <div class="lst-head">
-          <span class="lst-nm">${esc(t)}</span>
+          <span class="lst-nm">${t === "Sin team" ? chipTeam("", t) : chipTeam(idTeamPorNombre(t), t)}</span>
           <span class="lst-cnt"><b>${byTeam[t].length}</b></span>
         </div>
         ${cajaSel === t ? `<div class="lst-body">${byTeam[t].map(fila).join("")}</div>` : ""}
@@ -3267,7 +3267,7 @@ async function screenRrppsPuerta() {
     <div id="rpTeams">${teams.map(t => `
       <div class="lst-card ${rpSel === t ? "open" : ""}" data-rpt="${esc(t)}">
         <div class="lst-head">
-          <span class="lst-nm">${esc(t)}</span>
+          <span class="lst-nm">${t === "Sin team" ? chipTeam("", t) : chipTeam(idTeamPorNombre(t), t)}</span>
           <span class="lst-cnt"><b>${byTeam[t].length}</b></span>
         </div>
         ${rpSel === t ? `<div class="lst-body">${byTeam[t].map(fila).join("")}</div>` : ""}
@@ -4533,7 +4533,7 @@ function gnListaUsuarios(gente, telPorId) {
       <span class="gn-nm">${esc(g.nombre)}${g.id === me.id ? ` <span class="us-yo">Vos</span>` : ""}</span>
       <span class="gn-user">@${esc(g.usuario)}</span>
       <span class="gn-rol">${rolBadge(g._effRol)}</span>
-      <span class="gn-team">${ico("grupo")}${g._effTeamNom ? esc(g._effTeamNom) : `<span class="vacio">Sin team</span>`}</span>
+      <span class="gn-team">${chipTeam(g._effTeam, g._effTeamNom)}</span>
       <span class="gn-est">${g.activo ? pillEst("Activo") : pillEst("Pausado", "off")}</span>
       <button class="tk-mas" data-mas-gu="${g.id}" title="Ficha" aria-label="Ficha de ${esc(g.nombre)}">${ico("puntos")}</button>
     </div>`;
@@ -4606,7 +4606,7 @@ function gnListaTeams(gente) {
     return `
     <div class="gn-fila gn-fila-tm" data-tm="${t.id}" role="button" tabindex="0">
       ${inicial(t.nombre.replace(/^team /i, "") || "T")}
-      <span class="gn-nm">${esc(t.nombre)}</span>
+      <span class="gn-nm">${chipTeam(t.id, t.nombre)}</span>
       <span class="gn-user">${jefes.length ? `Jefe: ${esc(jefes.map(j => j.nombre.split(" ")[0]).join(", "))}` : `<span class="vacio">Sin jefe</span>`}</span>
       <span class="gn-rol">${rrpps.length} RRPP</span>
       <span class="gn-team">${ico("grupo")}${miembros.length} miembro${miembros.length === 1 ? "" : "s"}</span>
@@ -4942,6 +4942,9 @@ function sheetEditarTeam(t, onDone) {
   sheet(`
     <div class="sh-h">Editar team</div>
     <div class="field"><label>Nombre</label><input id="etNombre" value="${esc(t.nombre)}"></div>
+    <div class="field"><label>Color</label>
+      <div class="tc-sw" id="etColor">${TEAM_COLORES.map(c =>
+        `<button type="button" data-c="${c}" style="--tc:${c}" class="${colorTeam(t.id) === c ? "on" : ""}" aria-label="Color ${c}"></button>`).join("")}</div></div>
     <div class="field"><label>Boliches donde opera</label>
       <div class="chk-group" id="etClubs">${clubsDisponibles.map(c =>
         `<label class="chk"><input type="checkbox" value="${c.id}"${misClubs.includes(c.id) ? " checked" : ""}> ${esc(c.nombre)}</label>`
@@ -4952,12 +4955,17 @@ function sheetEditarTeam(t, onDone) {
     <div class="field"><label>Al eliminar, mover sus usuarios a</label>
       <select id="etDest"><option value="">— dejar sin team —</option>${teamsCache.filter(x => x.id !== t.id).map(x => `<option value="${x.id}"${x.id === me.team_id ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select></div>
     <button class="btn danger" id="etDel">Eliminar team</button>`);
+  let etColor = colorTeam(t.id);
+  qsa("#etColor [data-c]").forEach(b => b.onclick = () => {
+    etColor = b.dataset.c;
+    qsa("#etColor [data-c]").forEach(x => x.classList.toggle("on", x === b));
+  });
   $("#etGo").onclick = async () => {
     const nombre = $("#etNombre").value.trim();
     if (!nombre) return toast("Poné el nombre", "warn");
     const seleccionados = [...document.querySelectorAll("#etClubs input:checked")].map(i => i.value);
     const clubs = seleccionados.length ? seleccionados : clubsDisponibles.map(c => c.id);
-    const { error } = await sb.from("teams").update({ nombre, clubs }).eq("id", t.id);
+    const { error } = await sb.from("teams").update({ nombre, clubs, color: etColor }).eq("id", t.id);
     if (error) return toast(error.message, "warn");
     toast("Team actualizado"); invalidarCache("teams"); efectivosClub = null; await loadTeams(true); listo();
   };
@@ -5291,7 +5299,7 @@ async function screenTeamAdmin() {
       return `
       <div class="tm-card${abierto ? " abierto" : ""}">
         <button class="tm-head" data-tm="${t.id}" aria-expanded="${abierto}">
-          <span class="relmark">${esc((t.nombre.replace(/^team /i, "")[0] || "T").toUpperCase())}</span>
+          <span class="relmark" style="background:${colorTeam(t.id)};color:#fff">${esc((t.nombre.replace(/^team /i, "")[0] || "T").toUpperCase())}</span>
           <span class="tm-nm">${esc(t.nombre)}</span>
           <span class="tm-cnt">${cnt[t.id] || 0}</span>
           <svg viewBox="0 0 24 24" class="ic tm-ch${abierto ? " abierto" : ""}"><path d="M6 9l6 6 6-6"/></svg>
@@ -6448,7 +6456,7 @@ async function loadTeams(forzar) {
   // en la red del boliche eran varios segundos de pantalla congelada.
   // Quien necesita el QR lo pide para ese team puntual (sheetQrTeamAdmin).
   const { data } = await sb.from("teams")
-    .select("id,nombre,activo,jefe_id,clubs,invite_code")
+    .select("id,nombre,activo,jefe_id,clubs,invite_code,color")
     .eq("activo", true).order("nombre");
   teamsCache = data || [];
   cacheClub.teams = club;
@@ -6467,6 +6475,7 @@ async function loadTeamsConQr(forzar) {
    del perfil. */
 let efectivosCache = {}, efectivosClub = null;
 async function loadEfectivos(forzar) {
+  await loadTeams();   // los colores de los teams salen de acá
   if (!forzar && efectivosClub === club) return;
   const { data } = await sb.rpc("teams_efectivos", { p_club: club });
   efectivosCache = {};
@@ -6475,6 +6484,22 @@ async function loadEfectivos(forzar) {
 }
 const teamDe = uid => efectivosCache[uid]?.team_id || "";
 const teamNomDe = uid => efectivosCache[uid]?.team || "Sin team";
+
+/* Color de cada team, para distinguirlos de un vistazo. Lo elige el admin
+   al editar el team; si no eligió, sale uno fijo de la paleta según el id
+   (siempre el mismo para ese team). */
+const TEAM_COLORES = ["#E5484D", "#F76B15", "#E2A50E", "#30A46C", "#12A594", "#0090FF", "#3E63DD", "#8E4EC6", "#D6409F", "#978365"];
+function colorTeam(id) {
+  if (!id) return "";
+  const t = teamsCache.find(x => x.id === id);
+  if (t?.color) return t.color;
+  let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return TEAM_COLORES[h % TEAM_COLORES.length];
+}
+const chipTeam = (id, nombre) => id
+  ? `<span class="team-chip" style="--tc:${colorTeam(id)}">${esc(nombre || teamsCache.find(x => x.id === id)?.nombre || "Team")}</span>`
+  : `<span class="team-chip sin">Sin team</span>`;
+const idTeamPorNombre = n => teamsCache.find(x => x.nombre === n)?.id || "";
 
 const EST_LABEL = { disponible: "Libre", reservada: "Reservada", pagada: "Pagada", ocupada: "Ocupada" };
 /* pisos por club: los que tengan mesas; si no hay, defaults del boliche */
