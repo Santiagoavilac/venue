@@ -16,6 +16,7 @@ import '../../teams/data/equipo.dart';
 import '../../tickets/data/entradas.dart';
 import '../../tickets/ui/ticket_sheet.dart';
 import '../data/listas.dart';
+import 'limites_jefe.dart';
 
 /// Reglas de quién puede qué sobre un invitado. Son las mismas de la web;
 /// el servidor las vuelve a aplicar en cada RPC.
@@ -327,6 +328,15 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                 '${filtrados.length} anotados · ${filtrados.where((i) => i.ingreso).length} ingresaron',
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
               ),
+              if (rol == Rol.jefe) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => abrirLimitesJefe(context, ref),
+                  icon: const Icon(Icons.tune_rounded, size: 20),
+                  label: const Text('Límites'),
+                ),
+              ],
+              if (esAdmin) const AvisoCambiosCupo(),
               const SizedBox(height: 10),
               TextField(
                 onChanged: (v) => setState(() => _q = v),
