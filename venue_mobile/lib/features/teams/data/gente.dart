@@ -65,8 +65,9 @@ class TeamInfo {
   /// '#RRGGBB' elegido por el admin, o null (color automático).
   final String? color;
 
-  /// Link que abre el registro en la app con la invitación ya cargada.
-  String get link => 'venue://app/registro?invite=$invitacion';
+  /// Link de registro con la invitación ya cargada. Va a la web: la mayoría
+  /// no tiene la app instalada y `venue://` les abría una pantalla negra.
+  String get link => 'https://venue-web-amber.vercel.app/?invite=$invitacion';
 
   factory TeamInfo.desde(Map<String, dynamic> j) => TeamInfo(
         id: j['id'] as String,
@@ -82,8 +83,7 @@ class TeamInfo {
 /// Texto para mandarle a quien se quiere sumar al team.
 String mensajeDeInvitacion(TeamInfo t, String boliche) =>
     'Sumate a ${t.nombre} en $boliche con Venue.\n'
-    'Abrí este link desde tu teléfono: ${t.link}\n'
-    'Si no abre, entrá a la app → "Tengo un link de invitación" y pegá este código: ${t.invitacion}';
+    'Registrate desde este link: ${t.link}';
 
 /// Slug de boliche válido (mismo formato que exige la base).
 bool slugValido(String s) => RegExp(r'^[a-z0-9][a-z0-9-]{1,29}$').hasMatch(s);
