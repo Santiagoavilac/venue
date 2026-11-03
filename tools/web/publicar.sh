@@ -4,7 +4,8 @@
 # config.js lleva la clave anon (pública por diseño); se verifica abajo.
 set -e
 cd "$(dirname "$0")/../.."
-python3 /Users/user/.codex/helpers/storage_guard.py --check-heavy
+# control de espacio en disco (ayudante local opcional)
+g=/Users/user/.codex/helpers/storage_guard.py; [ ! -f "$g" ] || python3 "$g" --check-heavy
 DEPLOY_TMP="$(mktemp -d)"
 trap 'rm -rf -- "$DEPLOY_TMP"' EXIT HUP INT TERM
 D="$DEPLOY_TMP/venue-web"; mkdir -p "$D"
