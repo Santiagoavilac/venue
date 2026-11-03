@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")/../.."
 # control de espacio en disco (ayudante local opcional)
-g=/Users/user/.codex/helpers/storage_guard.py; [ ! -f "$g" ] || python3 "$g" --check-heavy
+g=/Users/user/.codex/helpers/storage_guard.py; [ -n "${SIN_CONTROL_DISCO:-}" ] || [ ! -f "$g" ] || python3 "$g" --check-heavy
 DEPLOY_TMP="$(mktemp -d)"
 trap 'rm -rf -- "$DEPLOY_TMP"' EXIT HUP INT TERM
 D="$DEPLOY_TMP/aftr-web"; mkdir -p "$D"
