@@ -1,0 +1,101 @@
+[
+  {
+    "clave": "skyy",
+    "nombre": "SKYY Vodka",
+    "categoria": "Vodka",
+    "imagen": "https://www.skyyvodka.com/app/uploads/2023/02/products-slide-card-skyy-vodka.jpg",
+    "fuente": "https://www.skyyvodka.com/en-us/products/skyy-vodka/"
+  },
+  {
+    "clave": "fernet-branca",
+    "nombre": "Fernet-Branca",
+    "categoria": "Fernet",
+    "imagen": "https://www.fernetbranca.com/wp-content/uploads/2017/08/age_verify_bottle.png",
+    "fuente": "https://www.fernetbranca.com/"
+  },
+  {
+    "clave": "ron-abuelo",
+    "nombre": "Ron Abuelo Añejo 7 Años",
+    "categoria": "Ron",
+    "imagen": "https://www.varelahermanos.com/wp-content/uploads/2021/01/ronabuelo-750ml-300x300.png",
+    "fuente": "https://www.varelahermanos.com/product-category/ron-abuelo/"
+  },
+  {
+    "clave": "havana-reserva",
+    "nombre": "Havana Club Añejo Reserva",
+    "categoria": "Ron",
+    "imagen": "https://www.ccu.cl/wp-content/uploads/2018/03/havana-club-anejo-reserva-40.png",
+    "fuente": "https://www.ccu.cl/marcas-productos/havana-club/"
+  },
+  {
+    "clave": "absolut-original",
+    "nombre": "Absolut Original",
+    "categoria": "Vodka",
+    "imagen": "https://www.ccu.cl/wp-content/uploads/2018/03/absolut-original.png",
+    "fuente": "https://www.ccu.cl/marcas-productos/absolut/"
+  },
+  {
+    "clave": "absolut-raspberri",
+    "nombre": "Absolut Raspberri",
+    "categoria": "Vodka",
+    "imagen": "https://www.ccu.cl/wp-content/uploads/2019/08/absolut-raspberri.png",
+    "fuente": "https://www.ccu.cl/marcas-productos/absolut/"
+  },
+  {
+    "clave": "smirnoff-21",
+    "nombre": "Smirnoff No. 21",
+    "categoria": "Vodka",
+    "imagen": "https://www.diageo.com/~/media/Images/D/Diageo-V2/Universal/product-carousel/smirnoff-classic-no-21.png",
+    "fuente": "https://www.diageo.com/en/our-brands/vodka/smirnoff"
+  },
+  {
+    "clave": "tanqueray",
+    "nombre": "Tanqueray London Dry Gin",
+    "categoria": "Gin",
+    "imagen": "https://images.ctfassets.net/hs93c4k6gio0/7wrwX1NMblViIWlKHK0XRn/b7e89e517bf1124a1ad059ff6120e1c4/london-dry1.png",
+    "fuente": "https://www.tanqueray.com/en-gb/tanqueray-london-dry-gin"
+  },
+  {
+    "clave": "gordons",
+    "nombre": "Gordon's London Dry Gin",
+    "categoria": "Gin",
+    "imagen": "https://www.diageo.com/~/media/Images/D/Diageo-V2/Diageo-Corp/our-brands/gin/gordons/gordon-london-dry-gin.png",
+    "fuente": "https://www.diageo.com/en/our-brands/gin/gordons"
+  },
+  {
+    "clave": "37-lenguas",
+    "nombre": "37 Lenguas · por verificar",
+    "categoria": "Por verificar",
+    "verificacion_pendiente": true
+  },
+  {
+    "clave": "fernet-cola",
+    "nombre": "Fernet con cola",
+    "categoria": "Tragos",
+    "es_bebida": false
+  },
+  {
+    "clave": "cuba-libre",
+    "nombre": "Cuba Libre",
+    "categoria": "Tragos",
+    "es_bebida": false
+  },
+  {
+    "clave": "gin-tonic",
+    "nombre": "Gin Tonic",
+    "categoria": "Tragos",
+    "es_bebida": false
+  },
+  {
+    "clave": "vodka-soda",
+    "nombre": "Vodka Soda",
+    "categoria": "Tragos",
+    "es_bebida": false
+  },
+  {
+    "clave": "mojito",
+    "nombre": "Mojito",
+    "categoria": "Tragos",
+    "es_bebida": false
+  }
+]

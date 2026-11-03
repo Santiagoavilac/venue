@@ -3935,3 +3935,9 @@ button.kp .kp-cola .ic{transform:rotate(-90deg);width:18px;height:18px}
    regla vieja de escritorio las centraba) */
 .list-row.rc .rc-body{align-items:flex-start;text-align:left}
 .ph-actions .ghost{min-height:44px;padding:10px 16px}
+
+/* Regla de interfaz: estados en texto simple, sin chips ni cápsulas. */
+.pago-chip,.tkst,.pill,.tag-estado,.flag-badge,.estado-hoy,.pill-est,.pill-club{
+ background:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:0!important;
+}
+.pill-est::before{display:none!important}

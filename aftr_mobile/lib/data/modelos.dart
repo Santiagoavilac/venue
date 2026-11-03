@@ -285,24 +285,26 @@ class Lugar {
 }
 
 class Cliente {
-  const Cliente({required this.id, required this.usuario, required this.nombre, this.foto});
+  const Cliente({required this.id, required this.usuario, required this.nombre, this.foto, this.archivoFoto});
 
   final String id;
   final String usuario;
   final String nombre;
   final String? foto;
+  final String? archivoFoto;
 
   factory Cliente.desde(Map<String, dynamic> j) => Cliente(
         id: '${j['user_id'] ?? ''}',
         usuario: j['usuario'] as String? ?? '',
         nombre: j['nombre'] as String? ?? '',
         foto: (j['foto_url'] ?? j['foto']) as String?,
+        archivoFoto: j['foto_archivo'] as String?,
       );
 }
 
 enum TipoAcceso { entrada, lista, mesa, pedido }
 
-enum EstadoAcceso { pendiente, valida, usada, anulada }
+enum EstadoAcceso { pendiente, valida, usada, anulada, bloqueada, reemplazada }
 
 /// Una tarjeta de la billetera: entrada, lugar en lista, mesa o pedido
 /// esperando que el boliche lo confirme.
@@ -337,6 +339,8 @@ class Acceso {
         'valida' => EstadoAcceso.valida,
         'usada' => EstadoAcceso.usada,
         'anulada' => EstadoAcceso.anulada,
+        'bloqueada' => EstadoAcceso.bloqueada,
+        'reemplazada' => EstadoAcceso.reemplazada,
         _ => EstadoAcceso.pendiente,
       };
 }
@@ -350,7 +354,7 @@ class Accesos {
   /// terminaron, el más cercano primero.
   List<Acceso> proximos(DateTime ahora) => todos
       .where((a) =>
-          (a.estado == EstadoAcceso.valida || a.estado == EstadoAcceso.pendiente) &&
+          (a.estado == EstadoAcceso.valida || a.estado == EstadoAcceso.pendiente || a.estado == EstadoAcceso.bloqueada) &&
           !a.evento.fecha.isBefore(DateTime(ahora.year, ahora.month, ahora.day).subtract(const Duration(days: 1))))
       .toList()
     ..sort((a, b) => a.evento.inicio.compareTo(b.evento.inicio));

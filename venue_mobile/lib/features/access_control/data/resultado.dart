@@ -7,6 +7,8 @@ enum Veredicto {
   fueraDeHorario('FUERA DE HORARIO'),
   sinConexion('SIN CONEXIÓN'),
   sinPermiso('SIN PERMISO'),
+  bloqueada('EN REVENTA'),
+  reemplazada('QR REEMPLAZADO'),
   credencial('CREDENCIAL');
 
   const Veredicto(this.texto);
@@ -166,6 +168,22 @@ class ResultadoEscaneo {
     }
 
     switch (r['resultado']) {
+      case 'bloqueada':
+        return ResultadoEscaneo(
+          veredicto: Veredicto.bloqueada,
+          codigo: cod,
+          nombre: nombre,
+          tipo: 'Entrada bloqueada',
+          detalle: 'Está publicada o en una operación de reventa. No permite ingreso.',
+        );
+      case 'reemplazada':
+        return ResultadoEscaneo(
+          veredicto: Veredicto.reemplazada,
+          codigo: cod,
+          nombre: nombre,
+          tipo: 'QR anterior invalidado',
+          detalle: 'Esta entrada cambió de dueño. Solicitá el QR vigente del comprador.',
+        );
       case 'valida':
         return ResultadoEscaneo(
           veredicto: Veredicto.pasa,

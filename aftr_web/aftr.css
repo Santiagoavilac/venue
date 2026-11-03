@@ -357,3 +357,42 @@ body.en-mapa #barra { display: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* AFTR: controles de texto, fechas compactas y saldo permanente. */
+.ciudad { font-size: 13px; color: var(--texto2); white-space: nowrap; }
+.nav-escritorio a, .nav-escritorio a.activa { border-radius: 0; background: none; }
+.nav-escritorio a.activa { text-decoration: underline; text-underline-offset: 8px; }
+.saludo { font-size: 32px; margin-bottom: 10px; }
+.tira { height: 44px; padding-top: 0; padding-bottom: 0; gap: 22px; border: 0; }
+.dia, .dia.todo { width: auto; min-height: 44px; flex-direction: row; font-size: 13px; font-weight: 500; text-transform: none; border-bottom: 1px solid transparent; }
+.dia.si { border-bottom-color: var(--texto); }
+.destacado { aspect-ratio: 1; }
+.destacado .info > div:first-child { font-size: 13px; }
+.precio-destacado { display: block; margin-top: 14px; font-size: 14px; font-weight: 600; }
+.avatar { overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.foto-preview.avatar { width: 128px; height: 128px; margin: 24px auto; }
+.foto-elegir { cursor: pointer; }
+#saldo-fijo { position: fixed; top: 0; left: 0; right: 0; z-index: 80; min-height: calc(36px + env(safe-area-inset-top)); padding: calc(8px + env(safe-area-inset-top)) 20px 8px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 13px; font-weight: 600; background: #000; border-bottom: 1px solid var(--borde); }
+#saldo-fijo[hidden] { display: none; }
+body.con-saldo { --saldo-alto: calc(36px + env(safe-area-inset-top)); padding-top: var(--saldo-alto); }
+body.con-saldo #barra { top: var(--saldo-alto); padding-top: 0; }
+body.con-saldo .redondos { top: var(--saldo-alto); padding-top: 8px; }
+body.con-saldo .mapa-pag { top: var(--saldo-alto); }
+body.con-saldo .mapa-arriba { top: 8px; }
+.guia-aftr { position: fixed; inset: 0; z-index: 95; isolation: isolate; }
+.guia-foco { position: absolute; border-radius: 6px; box-shadow: 0 0 0 200vmax rgba(0,0,0,.75); pointer-events: none; }
+.guia-tarjeta { position: absolute; left: 20px; right: 20px; max-width: 440px; margin: auto; max-height: 65dvh; overflow-y: auto; background: var(--sup); border: 1px solid var(--borde2); border-radius: 12px; padding: 20px; }
+.guia-arriba, .guia-acciones { display: flex; align-items: center; justify-content: space-between; }
+.guia-arriba { color: var(--texto3); font-size: 12px; }
+.guia-tarjeta button { padding: 12px 0; min-height: 44px; font-size: 14px; }
+.guia-tarjeta h2 { font-size: 21px; margin: 12px 0 10px; }
+.guia-tarjeta p { color: var(--texto2); font-size: 15px; line-height: 1.5; margin-bottom: 16px; }
+.guia-acciones { gap: 24px; }
+.guia-acciones button:last-child { margin-left: auto; font-weight: 700; }
+@media(min-width:900px) {
+  .saludo { font-size: 40px; }
+  .destacado { aspect-ratio: 2.2; }
+  body.con-saldo .mapa-pag { top: calc(var(--saldo-alto) + 60px); }
+  body.con-saldo .mapa-arriba { top: 16px; }
+}

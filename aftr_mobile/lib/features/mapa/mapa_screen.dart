@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:apple_maps_flutter/apple_maps_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +16,7 @@ import '../../data/aftr_repo.dart';
 import '../../data/modelos.dart';
 import 'mapa_logica.dart';
 import 'pines.dart';
+import '../lugar/lugar_screen.dart';
 
 /// El mapa (Search de Resy): Apple Maps oscuro a pantalla completa, búsqueda y
 /// filtros arriba, y una hoja abajo con las tarjetas sincronizadas con los
@@ -110,6 +112,26 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
     final ahora = DateTime.now();
     final lugares = ref.watch(lugaresProvider).value ?? const <Lugar>[];
     final eventos = ref.watch(eventosProvider).value ?? const <Evento>[];
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
+      final visibles = lugares.where((l) => l.nombre.toLowerCase().contains(_busqueda.text.toLowerCase())).toList();
+      return Scaffold(body: SafeArea(child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 120),
+        children: [
+          Text('Explorá la noche', style: Aftr.titular(34)),
+          const SizedBox(height: 18),
+          TextField(controller: _busqueda, onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(hintText: 'Buscar lugares', prefixIcon: Icon(Icons.search))),
+          const SizedBox(height: 18),
+          for (final lugar in visibles) ...[
+            FilaLugar(lugar),
+            if (lugar.ubicado) Align(alignment: Alignment.centerRight,
+              child: TextButton.icon(onPressed: () => comoLlegar(lugar.nombre, lugar.lat!, lugar.lng!),
+                icon: const Icon(Icons.map_outlined), label: const Text('Abrir en mapas'))),
+          ],
+          if (visibles.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('No hay lugares para esta búsqueda.')),
+        ],
+      )));
+    }
     final filtrados = filtrarEventos(eventos, _filtros, _busqueda.text, ahora);
     final todos = _filtros.isEmpty && _busqueda.text.trim().isEmpty;
     final pines = pinesPara(lugares, filtrados, todos: todos);

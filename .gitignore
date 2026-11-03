@@ -29,3 +29,14 @@ aftr_mobile/ios/Pods/
 *.jks
 *.keystore
 key.properties
+
+# artefactos locales (compilaciones, registros de herramientas)
+outputs/
+work/
+supabase/.temp/
+aftr_mobile/android/.gradle/
+aftr_mobile/android/.kotlin/
+aftr_mobile/android/local.properties
+venue_mobile/android/.kotlin/
+*.env
+!*.env.example

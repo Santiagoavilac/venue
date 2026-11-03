@@ -24,7 +24,11 @@ class VenueApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         theme: tema,
         routerConfig: ref.watch(routerProvider),
-        builder: (context, child) => _ConSplash(child: child ?? const SizedBox.shrink()),
+        builder: (context, child) => GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: _ConSplash(child: child ?? const SizedBox.shrink()),
+        ),
       ),
     );
   }

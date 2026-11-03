@@ -1,3 +1,4 @@
+import '../../../core/widgets/opcion_texto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,7 +22,8 @@ class AccesosScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final conHistorial = ref.watch(perfilProvider).value?.adminPrincipal ?? false;
+    final conHistorial =
+        ref.watch(perfilProvider).value?.adminPrincipal ?? false;
     final ev = ref.watch(eventoActivoProvider);
     if (ev != null) {
       // lo que cambia otro (un ingreso en puerta, una venta) refresca solo
@@ -63,12 +65,17 @@ class AccesosScreen extends ConsumerWidget {
   }
 }
 
-final resumenProvider = FutureProvider.autoDispose<Map<String, int>>((ref) async {
+final resumenProvider = FutureProvider.autoDispose<Map<String, int>>((
+  ref,
+) async {
   final ev = ref.watch(eventoActivoProvider);
   if (ev == null) return const {};
-  final r = Map<String, dynamic>.from(await ref
-      .watch(supabaseProvider)
-      .rpc('resumen_evento', params: {'p_evento': ev.id}) as Map);
+  final r = Map<String, dynamic>.from(
+    await ref
+            .watch(supabaseProvider)
+            .rpc('resumen_evento', params: {'p_evento': ev.id})
+        as Map,
+  );
   return r.map((k, v) => MapEntry(k, (v as num?)?.toInt() ?? 0));
 });
 
@@ -90,21 +97,46 @@ class ResumenView extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _Dato('Adentro ahora', '$adentro',
-                  'Invitados de lista y entradas con QR que ya ingresaron',
-                  color: VenueColors.ok),
-              Row(children: [
-                Expanded(child: _Dato('Anotados en listas', '${n('anotados')}',
-                    '${n('ingresaron')} ingresaron')),
-                const SizedBox(width: 12),
-                Expanded(child: _Dato('Entradas con QR', '${n('qr_total')}',
-                    '${n('qr_usados')} ingresaron')),
-              ]),
-              Row(children: [
-                Expanded(child: _Dato('Prepagadas', '${n('entradas')}', 'vendidas')),
-                const SizedBox(width: 12),
-                Expanded(child: _Dato('Mesas', '${n('mesas')}', 'vendidas o reservadas')),
-              ]),
+              _Dato(
+                'Adentro ahora',
+                '$adentro',
+                'Invitados de lista y entradas con QR que ya ingresaron',
+                color: VenueColors.ok,
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _Dato(
+                      'Anotados en listas',
+                      '${n('anotados')}',
+                      '${n('ingresaron')} ingresaron',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _Dato(
+                      'Entradas con QR',
+                      '${n('qr_total')}',
+                      '${n('qr_usados')} ingresaron',
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _Dato('Prepagadas', '${n('entradas')}', 'vendidas'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _Dato(
+                      'Mesas',
+                      '${n('mesas')}',
+                      'vendidas o reservadas',
+                    ),
+                  ),
+                ],
+              ),
             ],
           );
         },
@@ -122,28 +154,38 @@ class _Dato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(titulo,
-                    style: TextStyle(
-                        color: VenueColors.textoSuave, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(valor,
-                    style: TextStyle(
-                        fontSize: 34, fontWeight: FontWeight.w800, color: color)),
-                Text(pie,
-                    style: TextStyle(
-                        color: VenueColors.textoSuave, fontSize: 12.5)),
-              ],
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              titulo,
+              style: TextStyle(
+                color: VenueColors.textoSuave,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              valor,
+              style: TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+            Text(
+              pie,
+              style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }
 
 /// Un ingreso ya ocurrido, de lista o de entrada, para el Historial.
@@ -156,12 +198,20 @@ class Ingreso {
 }
 
 /// Une invitados y entradas que ya ingresaron, del más reciente al más viejo.
-List<Ingreso> armarHistorial(List<Invitado> invitados, List<Entrada> entradas,
-    Map<String, String> nombreLista) {
+List<Ingreso> armarHistorial(
+  List<Invitado> invitados,
+  List<Entrada> entradas,
+  Map<String, String> nombreLista,
+) {
   final l = <Ingreso>[
     for (final i in invitados)
       if (i.ingreso)
-        Ingreso(i.nombre, nombreLista[i.listaId] ?? 'Lista', i.rrppNombre, i.ingresoAt!),
+        Ingreso(
+          i.nombre,
+          nombreLista[i.listaId] ?? 'Lista',
+          i.rrppNombre,
+          i.ingresoAt!,
+        ),
     for (final e in entradas)
       if (e.estado == 'usada' && e.usedAt != null)
         Ingreso(e.cliente, 'Entradas', e.rrppNombre, e.usedAt!),
@@ -188,44 +238,61 @@ class _HistorialViewState extends ConsumerState<HistorialView> {
       valor: invitados,
       reintentar: () => ref.invalidate(invitadosProvider),
       datos: (inv) {
-        final todos = armarHistorial(inv, entradas.value ?? const [],
-            {for (final l in listas) l.id: l.nombre});
+        final todos = armarHistorial(inv, entradas.value ?? const [], {
+          for (final l in listas) l.id: l.nombre,
+        });
         final porCat = <String, int>{};
         for (final i in todos) {
           porCat[i.categoria] = (porCat[i.categoria] ?? 0) + 1;
         }
-        final filas = _cat == null ? todos : todos.where((i) => i.categoria == _cat).toList();
+        final filas = _cat == null
+            ? todos
+            : todos.where((i) => i.categoria == _cat).toList();
         if (todos.isEmpty) {
           return const MensajeVista(
-              icono: Icons.history_rounded, titulo: 'Todavía no ingresó nadie');
+            icono: Icons.history_rounded,
+            titulo: 'Todavía no ingresó nadie',
+          );
         }
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            Wrap(spacing: 8, runSpacing: 4, children: [
-              ChoiceChip(
-                label: Text('Todos (${todos.length})'),
-                selected: _cat == null,
-                onSelected: (_) => setState(() => _cat = null),
-              ),
-              for (final c in porCat.entries)
-                ChoiceChip(
-                  label: Text('${c.key} (${c.value})'),
-                  selected: _cat == c.key,
-                  onSelected: (_) => setState(() => _cat = c.key),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                OpcionTexto(
+                  label: Text('Todos (${todos.length})'),
+                  selected: _cat == null,
+                  onSelected: (_) => setState(() => _cat = null),
                 ),
-            ]),
+                for (final c in porCat.entries)
+                  OpcionTexto(
+                    label: Text('${c.key} (${c.value})'),
+                    selected: _cat == c.key,
+                    onSelected: (_) => setState(() => _cat = c.key),
+                  ),
+              ],
+            ),
             const SizedBox(height: 8),
             for (final i in filas)
               ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: Text(i.nombre,
-                    style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+                title: Text(
+                  i.nombre,
+                  style: const TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 subtitle: Text(
-                    [i.categoria, if (i.quien.isNotEmpty) i.quien].join(' · ')),
-                trailing: Text(horaCorta(i.cuando),
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                  [i.categoria, if (i.quien.isNotEmpty) i.quien].join(' · '),
+                ),
+                trailing: Text(
+                  horaCorta(i.cuando),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
           ],
         );

@@ -66,6 +66,7 @@ class TutorialGuiado extends StatefulWidget {
 class _TutorialGuiadoState extends State<TutorialGuiado> {
   int _n = 0;
   Rect? _rect;
+  int _transicion = 0;
 
   @override
   void initState() {
@@ -74,26 +75,31 @@ class _TutorialGuiadoState extends State<TutorialGuiado> {
   }
 
   void _ir(int n) {
-    setState(() {
-      _n = n;
-      _rect = null;
-    });
+    final transicion = ++_transicion;
     // la sección de atrás cambia después de este cuadro, y se mide en el
     // siguiente, ya dibujada
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || transicion != _transicion) return;
       widget.pasos[n].alMostrar?.call();
-      WidgetsBinding.instance.addPostFrameCallback((_) => _medir());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || transicion != _transicion) return;
+        _medir(n);
+      });
+      WidgetsBinding.instance.scheduleFrame();
     });
+    WidgetsBinding.instance.scheduleFrame();
   }
 
-  void _medir() {
+  void _medir(int n) {
     if (!mounted) return;
     final caja = context.findRenderObject() as RenderBox?;
-    final r = widget.pasos[_n].objetivo();
-    if (caja == null || r == null) return;
+    final r = widget.pasos[n].objetivo();
+    if (caja == null || r == null) {
+      setState(() => _n = n);
+      return;
+    }
     final o = caja.globalToLocal(r.topLeft);
-    setState(() => _rect = o & r.size);
+    setState(() { _n = n; _rect = o & r.size; });
   }
 
   void _siguiente() => _n + 1 < widget.pasos.length ? _ir(_n + 1) : widget.alTerminar();

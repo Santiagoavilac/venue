@@ -18,10 +18,12 @@ import 'hojas.dart';
 /// Detalle del evento: flyer con parallax que se vuelve barra al subir,
 /// fases como los horarios de Resy, listas, mesas y la barra de compra.
 class EventoScreen extends ConsumerStatefulWidget {
-  const EventoScreen({super.key, required this.id, this.previo});
+  const EventoScreen({super.key, required this.id, this.previo, this.historia, this.accion});
 
   final String id;
   final Evento? previo;
+  final String? historia;
+  final String? accion;
 
   @override
   ConsumerState<EventoScreen> createState() => _EventoScreenState();
@@ -33,6 +35,7 @@ class _EventoScreenState extends ConsumerState<EventoScreen> {
   String? _fase;
   bool? _guardado;
   String? _anotando;
+  bool _accionAbierta = false;
 
   /// Alto/ancho real del flyer, para mostrarlo entero (sin cortar el título).
   double? _proporcion;
@@ -83,12 +86,12 @@ class _EventoScreenState extends ConsumerState<EventoScreen> {
     if (!await asegurarCuenta(context, ref)) return;
     if (!mounted) return;
     final fase = d.ventaPorFases ? (d.fases.where((f) => f.id == _fase && f.comprable).firstOrNull ?? d.faseActual) : null;
-    await abrirCompra(context, d, fase);
+    await abrirCompra(context, d, fase, historia: widget.historia);
   }
 
   Future<void> _mesa(EventoDetalle d) async {
     if (!await asegurarCuenta(context, ref)) return;
-    if (mounted) await abrirMesa(context, d);
+    if (mounted) await abrirMesa(context, d, historia: widget.historia);
   }
 
   Future<void> _lista(EventoDetalle d, Lista l) async {
@@ -109,6 +112,13 @@ class _EventoScreenState extends ConsumerState<EventoScreen> {
   Widget build(BuildContext context) {
     final async = ref.watch(eventoProvider(widget.id));
     final d = async.value;
+    if (d != null && !_accionAbierta && widget.historia != null &&
+        (widget.accion == 'entrada' || widget.accion == 'mesa')) {
+      _accionAbierta = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) { if (widget.accion == 'mesa') { _mesa(d); } else { _comprar(d); } }
+      });
+    }
     final e = d?.evento ?? widget.previo;
     final ancho = MediaQuery.sizeOf(context).width;
     final arriba = MediaQuery.paddingOf(context).top;

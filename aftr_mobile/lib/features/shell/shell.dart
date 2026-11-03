@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/aftr_theme.dart';
 import '../../data/aftr_repo.dart';
 import '../../data/modelos.dart';
+import '../guia/guia.dart';
 
 /// Las cuatro pestañas en una barra de vidrio oscuro, como la de Resy. La
 /// activa se ilumina con un punto debajo; Accesos muestra cuántos QR válidos
@@ -46,6 +47,7 @@ class Shell extends ConsumerWidget {
               for (var i = 0; i < _items.length; i++)
                 Expanded(
                   child: _Item(
+                    key: destinosGuia[i],
                     icono: _items[i].$1,
                     activo: _items[i].$2,
                     texto: _items[i].$3,
@@ -66,7 +68,7 @@ class Shell extends ConsumerWidget {
 }
 
 class _Item extends StatelessWidget {
-  const _Item({required this.icono, required this.activo, required this.texto, required this.elegido, required this.onTap, this.globo});
+  const _Item({super.key, required this.icono, required this.activo, required this.texto, required this.elegido, required this.onTap, this.globo});
 
   final IconData icono;
   final IconData activo;

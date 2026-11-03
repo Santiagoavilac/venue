@@ -10,6 +10,7 @@ import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/patron.dart';
 import '../../access_control/ui/accesos_screen.dart';
+import '../../aftr_social/ui/historias_screen.dart';
 import '../../analytics/ui/reporte_screen.dart';
 import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
@@ -1034,6 +1035,8 @@ class _Perfil extends ConsumerWidget {
         if (club != null) ...[
           TituloBloque('Herramientas · ${club.nombre}'),
           _lista([
+            _fila(inicio: const Icon(Icons.auto_awesome_outlined), titulo: 'Historias en AFTR', sub: 'Publicar fotos, videos y artes con tu atribución', fin: flecha,
+                alTocar: () => abrirHerramienta(context, ref, 'Historias', const HistoriasScreen())),
             _fila(inicio: const Icon(Icons.how_to_reg_outlined), titulo: 'Listas y entradas', sub: 'Anotar invitados y vender QR', fin: flecha,
                 alTocar: () => abrirHerramienta(context, ref, 'Listas y entradas', const AccesosScreen())),
             _fila(inicio: const Icon(Icons.table_bar_outlined), titulo: 'Mesas', sub: 'Vender y reservar', fin: flecha,

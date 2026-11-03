@@ -24,15 +24,14 @@ class TarjetaDestacada extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ahora = e.esAhora(DateTime.now());
     return Presionable(
       onTap: () => context.push('/evento/${e.id}', extra: e),
       child: AspectRatio(
-        aspectRatio: 0.82,
+        aspectRatio: 1,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(Aftr.radio + 4),
           child: Stack(fit: StackFit.expand, children: [
-            Hero(tag: 'flyer-${e.id}', child: ImagenRed(e.flyer, color: e.club.color)),
+            Hero(tag: 'flyer-${e.id}', child: ImagenRed(e.flyer)),
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -48,17 +47,14 @@ class TarjetaDestacada extends StatelessWidget {
               right: 18,
               bottom: 18,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  if (ahora) ...[const PuntoVivo(), const SizedBox(width: 4)],
-                  Text((ahora ? 'ESTA NOCHE' : e.club.nombre.toUpperCase()), style: Aftr.etiqueta(c: ahora ? Aftr.vivo : Aftr.acento)),
-                ]),
+                Text(e.club.nombre, style: Aftr.cuerpo(13, c: Aftr.texto2)),
                 const SizedBox(height: 8),
                 Text(e.nombre, maxLines: 2, overflow: TextOverflow.ellipsis, style: Aftr.titular(36)),
                 const SizedBox(height: 10),
                 Text(lineaEvento(e), style: Aftr.cuerpo(14, c: Aftr.texto)),
                 if (precioDesde(e) != null) ...[
                   const SizedBox(height: 14),
-                  Pildora(precioDesde(e)!, activa: true, denso: true),
+                  Text(precioDesde(e)!, style: Aftr.fuerte(14)),
                 ],
               ]),
             ),

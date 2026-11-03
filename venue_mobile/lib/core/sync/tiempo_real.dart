@@ -28,7 +28,8 @@ final cambiosEventoProvider =
   }
 
   var canal = sb.channel('rt-$eventoId');
-  for (final tabla in const ['mesas', 'entradas', 'registros']) {
+  for (final tabla in const ['mesas', 'entradas', 'registros',
+    'aftr_historias', 'aftr_reventa_ofertas', 'aftr_reventa_ordenes']) {
     canal = canal.onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',

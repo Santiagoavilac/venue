@@ -1,0 +1,380 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
+
+import '../../core/networking/supabase.dart';
+import '../../core/theme/aftr_theme.dart';
+import '../../core/widgets/piezas.dart';
+import '../../data/aftr_repo.dart';
+import '../../data/modelos.dart';
+import '../../data/social_repo.dart';
+import '../auth/asegurar_cuenta.dart';
+
+List<List<DatosSocial>> agruparHistorias(List<DatosSocial> historias) {
+  final grupos = <String, List<DatosSocial>>{};
+  for (final h in historias) {
+    final key = '${h['identidad']}:${h['identidad'] == 'club' ? h['club_id'] : h['autor_id']}';
+    (grupos[key] ??= []).add(h);
+  }
+  return grupos.values.toList();
+}
+
+class HistoriasFila extends ConsumerWidget {
+  const HistoriasFila({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final feed = ref.watch(historiasProvider);
+    final grupos = agruparHistorias(listaSocial(feed.value?['historias']));
+    return SizedBox(
+      height: 116,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+        scrollDirection: Axis.horizontal,
+        separatorBuilder: (_, _) => const SizedBox(width: 15),
+        itemCount: grupos.length + 1,
+        itemBuilder: (_, i) {
+          if (i == 0) {
+            return _CirculoHistoria(nombre: 'Tu historia', agregar: true,
+              onTap: () async {
+                if (!await asegurarCuenta(context, ref) || !context.mounted) return;
+                await Navigator.of(context, rootNavigator: true).push<void>(
+                  MaterialPageRoute(builder: (_) => const CrearHistoriaScreen()));
+              });
+          }
+          final h = grupos[i - 1].first;
+          return _CirculoHistoria(nombre: '${h['nombre'] ?? h['autor'] ?? 'AFTR'}',
+            onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
+              MaterialPageRoute(builder: (_) => HistoriasVisor(
+                grupos: grupos, grupoInicial: i - 1,
+                desfase: desfaseSocial(feed.value ?? {})))));
+        },
+      ),
+    );
+  }
+}
+
+class _CirculoHistoria extends StatelessWidget {
+  const _CirculoHistoria({required this.nombre, required this.onTap, this.agregar = false});
+  final String nombre;
+  final VoidCallback onTap;
+  final bool agregar;
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true, label: agregar ? 'Publicar una historia' : 'Historias de $nombre',
+    child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(40), child: SizedBox(
+      width: 70,
+      child: Column(children: [
+        Container(width: 66, height: 66, padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(shape: BoxShape.circle,
+            gradient: agregar ? null : const LinearGradient(colors: [Aftr.acento, Color(0xFFBD7D49), Aftr.acento]),
+            border: agregar ? Border.all(color: Aftr.bordeFuerte) : null),
+          child: Container(alignment: Alignment.center,
+            decoration: const BoxDecoration(color: Aftr.superficie2, shape: BoxShape.circle,
+              border: Border.fromBorderSide(BorderSide(color: Aftr.fondo, width: 3))),
+            child: agregar ? const Icon(Icons.add_rounded, color: Aftr.texto) :
+              Text(nombre.isEmpty ? 'A' : nombre.substring(0, 1).toUpperCase(), style: Aftr.titular(28))),
+        ),
+        const SizedBox(height: 7),
+        Text(nombre, maxLines: 1, overflow: TextOverflow.ellipsis, style: Aftr.cuerpo(11, c: Aftr.texto)),
+      ]),
+    )),
+  );
+}
+
+class HistoriasVisor extends ConsumerStatefulWidget {
+  const HistoriasVisor({super.key, required this.grupos, required this.grupoInicial,
+    this.desfase = Duration.zero});
+  final List<List<DatosSocial>> grupos;
+  final int grupoInicial;
+  final Duration desfase;
+  @override
+  ConsumerState<HistoriasVisor> createState() => _VisorState();
+}
+
+class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObserver {
+  late int _grupo = widget.grupoInicial;
+  int _indice = 0, _generacion = 0;
+  VideoPlayerController? _video;
+  String? _url, _error;
+  bool _lista = false, _pausa = false, _fondo = false, _menu = false;
+  Duration _imagen = Duration.zero;
+  DateTime _ultimo = DateTime.now();
+  DateTime? _firmada;
+  Timer? _reloj;
+  DatosSocial get _h => widget.grupos[_grupo][_indice];
+  bool get _detenida => _pausa || _fondo || _menu || !_lista;
+  bool get _esVideo => _h['tipo'] == 'video';
+  double get _avance => _esVideo
+    ? (_video == null || _video!.value.duration.inMilliseconds == 0 ? 0 :
+       _video!.value.position.inMilliseconds / _video!.value.duration.inMilliseconds).clamp(0.0, 1.0).toDouble()
+    : (_imagen.inMilliseconds / 5000).clamp(0.0, 1.0).toDouble();
+
+  @override
+  void initState() {
+    super.initState(); WidgetsBinding.instance.addObserver(this); _cargar();
+    _reloj = Timer.periodic(const Duration(milliseconds: 50), (_) {
+      if (!mounted) return;
+      final ahora = DateTime.now();
+      final transcurrido = ahora.difference(_ultimo); _ultimo = ahora;
+      if (tiempoRestante(_h['vence_at'], ahora.add(widget.desfase)) == Duration.zero) {
+        _siguiente(); return;
+      }
+      if (_detenida || _video?.value.isBuffering == true || _error != null) return;
+      if (!_esVideo) _imagen += transcurrido;
+      if (_avance >= 0.999) { _siguiente(); } else { setState(() {}); }
+    });
+  }
+  @override
+  void dispose() {
+    _generacion++; _reloj?.cancel(); _video?.dispose();
+    WidgetsBinding.instance.removeObserver(this); super.dispose();
+  }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _fondo = state != AppLifecycleState.resumed; _sincronizar();
+    if (!_fondo && _firmada != null && DateTime.now().difference(_firmada!).inSeconds > 45) {
+      _cargar();
+    }
+  }
+  void _sincronizar() {
+    if (_detenida) { _video?.pause(); } else { _video?.play(); }
+    _ultimo = DateTime.now();
+  }
+  Future<void> _cargar() async {
+    final version = ++_generacion;
+    final anterior = _video; _video = null; anterior?.dispose();
+    _lista = false; _error = null; _url = null; _imagen = Duration.zero;
+    if (mounted) setState(() {});
+    try {
+      final url = await ref.read(socialRepoProvider).firmar('aftr-historias', '${_h['storage_path']}');
+      if (!mounted || version != _generacion) return;
+      _firmada = DateTime.now();
+      if (_esVideo) {
+        final video = VideoPlayerController.networkUrl(Uri.parse(url));
+        await video.initialize();
+        if (!mounted || version != _generacion) { video.dispose(); return; }
+        _video = video; _lista = true; _sincronizar();
+      }
+      setState(() => _url = url);
+    } catch (e) {
+      if (mounted && version == _generacion) setState(() => _error = mensajeDeError(e));
+    }
+  }
+  void _siguiente({bool autor = false}) {
+    if (!autor && _indice + 1 < widget.grupos[_grupo].length) { _indice++; }
+    else if (_grupo + 1 < widget.grupos.length) { _grupo++; _indice = 0; }
+    else { if (mounted) Navigator.of(context).pop(); return; }
+    _cargar();
+  }
+  void _anterior({bool autor = false}) {
+    if (!autor && _indice > 0) { _indice--; }
+    else if (_grupo > 0) { _grupo--; _indice = 0; }
+    else { _imagen = Duration.zero; _video?.seekTo(Duration.zero); return; }
+    _cargar();
+  }
+  Future<void> _opciones() async {
+    _menu = true; _sincronizar();
+    final propia = _h['autor_id'] == ref.read(usuarioIdProvider);
+    final accion = await showModalBottomSheet<String>(context: context, builder: (ctx) => SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (propia) ListTile(leading: const Icon(Icons.delete_outline), title: const Text('Eliminar historia'),
+          onTap: () => Navigator.pop(ctx, 'retirar')),
+        ListTile(leading: const Icon(Icons.flag_outlined), title: const Text('Reportar historia'),
+          onTap: () => Navigator.pop(ctx, 'reportar')),
+      ])));
+    if (!mounted) return;
+    if (accion != null) {
+      try {
+        if (!await asegurarCuenta(context, ref) || !mounted) return;
+        await ref.read(socialRepoProvider).historias(accion, {'id': _h['id'],
+          if (accion == 'reportar') 'motivo': 'Contenido inapropiado reportado desde el visor'});
+        ref.invalidate(historiasProvider);
+        if (mounted) { avisar(context, accion == 'retirar' ? 'Historia eliminada.' : 'Reporte enviado.'); _siguiente(); }
+      } catch (e) { if (mounted) avisar(context, mensajeDeError(e)); }
+    }
+    _menu = false; _sincronizar();
+  }
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(historiasProvider, (_, siguiente) {
+      final datos = siguiente.value;
+      if (datos != null && !listaSocial(datos['historias']).any((h) => h['id'] == _h['id'])) {
+        if (mounted) Navigator.of(context).pop();
+      }
+    });
+    final grupo = widget.grupos[_grupo];
+    return Scaffold(backgroundColor: Colors.black, body: SafeArea(child: Stack(fit: StackFit.expand, children: [
+      if (_url != null && !_esVideo) Center(child: Image.network(_url!, fit: BoxFit.contain,
+        frameBuilder: (_, child, frame, synchronous) {
+          if ((frame != null || synchronous) && !_lista) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && !_lista) { setState(() => _lista = true); _sincronizar(); }
+            });
+          }
+          return child;
+        }, errorBuilder: (_, _, _) => Center(child: TextButton(onPressed: _cargar, child: const Text('No se pudo cargar. Reintentar'))))),
+      if (_video != null) Center(child: AspectRatio(aspectRatio: _video!.value.aspectRatio, child: VideoPlayer(_video!))),
+      if (!_lista && _error == null) const Center(child: CircularProgressIndicator(color: Aftr.acento)),
+      if (_error != null) Center(child: Padding(padding: const EdgeInsets.all(30), child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(_error!, textAlign: TextAlign.center, style: Aftr.cuerpo(15)),
+        TextButton(onPressed: _cargar, child: const Text('Reintentar')),
+      ]))),
+      Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.translucent,
+        onTapUp: (d) => d.localPosition.dx < MediaQuery.sizeOf(context).width * .3 ? _anterior() : _siguiente(),
+        onLongPressStart: (_) { _pausa = true; _sincronizar(); },
+        onLongPressEnd: (_) { _pausa = false; _sincronizar(); },
+        onHorizontalDragEnd: (d) { if ((d.primaryVelocity ?? 0) < -150) _siguiente(autor: true); else if ((d.primaryVelocity ?? 0) > 150) _anterior(autor: true); },
+        onVerticalDragEnd: (d) { if ((d.primaryVelocity ?? 0) > 200) Navigator.pop(context); })),
+      Positioned(top: 0, left: 0, right: 0, child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 8, 8, 26),
+        decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black87, Colors.transparent])),
+        child: Column(children: [
+          Row(children: [for (var i = 0; i < grupo.length; i++) Expanded(child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: LinearProgressIndicator(value: i < _indice ? 1 : i == _indice ? _avance : 0,
+              minHeight: 3, color: Aftr.texto, backgroundColor: Colors.white30, borderRadius: BorderRadius.circular(3))))]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: Text('${_h['nombre'] ?? _h['autor'] ?? 'AFTR'}', style: Aftr.fuerte(16))),
+            IconButton(onPressed: _opciones, icon: const Icon(Icons.more_horiz)),
+            IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+          ]),
+        ]))),
+      if (_h['evento_id'] != null) Positioned(bottom: 24, left: 24, right: 24, child: Column(children: [
+        Text('${_h['evento'] ?? ''}', textAlign: TextAlign.center, style: Aftr.fuerte(19)),
+        const SizedBox(height: 12),
+        BotonAftr(_h['cta'] == 'mesa' ? 'Reservar mesa' : _h['cta'] == 'entrada' ? 'Comprar entradas' : 'Ver evento',
+          onTap: () {
+            final h = _h; final router = GoRouter.of(context);
+            Navigator.pop(context);
+            router.push('/evento/${h['evento_id']}?historia=${Uri.encodeQueryComponent('${h['id']}')}${h['cta'] == null ? '' : '&accion=${h['cta']}'}');
+          }),
+      ])),
+    ])));
+  }
+}
+
+class CrearHistoriaScreen extends ConsumerStatefulWidget {
+  const CrearHistoriaScreen({super.key});
+  @override
+  ConsumerState<CrearHistoriaScreen> createState() => _CrearHistoriaState();
+}
+
+class _CrearHistoriaState extends ConsumerState<CrearHistoriaScreen> {
+  Uint8List? _bytes;
+  VideoPlayerController? _video;
+  Evento? _evento;
+  String? _cta, _subida;
+  String? _error;
+  bool _ocupado = false, _publicada = false;
+  @override
+  void dispose() {
+    _video?.dispose();
+    if (!_publicada && _subida != null) ref.read(socialRepoProvider).borrar('aftr-historias', _subida!);
+    super.dispose();
+  }
+  Future<void> _elegir({bool video = false}) async {
+    setState(() { _ocupado = true; _error = null; });
+    try {
+      final picker = ImagePicker();
+      final archivo = video ? await picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(seconds: 30)) :
+        await picker.pickImage(source: ImageSource.gallery, maxWidth: 2160, maxHeight: 3840, imageQuality: 88);
+      if (archivo == null) return;
+      if (await archivo.length() > 30 * 1024 * 1024) throw const FormatException('El archivo debe pesar menos de 30 MB.');
+      final bytes = await archivo.readAsBytes(); final tipo = tipoMedio(bytes);
+      VideoPlayerController? controlador;
+      if (tipo.video) {
+        controlador = VideoPlayerController.file(File(archivo.path));
+        await controlador.initialize();
+        if (controlador.value.duration > const Duration(seconds: 30)) {
+          await controlador.dispose(); throw const FormatException('El video debe durar hasta 30 segundos.');
+        }
+        await controlador.setLooping(true); await controlador.play();
+      }
+      if (!mounted) { controlador?.dispose(); return; }
+      _video?.dispose();
+      if (_subida != null) { await ref.read(socialRepoProvider).borrar('aftr-historias', _subida!); _subida = null; }
+      setState(() { _bytes = bytes; _video = controlador; });
+    } catch (e) { if (mounted) setState(() => _error = mensajeDeError(e)); }
+    finally { if (mounted) setState(() => _ocupado = false); }
+  }
+  Future<void> _arte() async {
+    final url = Uri.tryParse(_evento?.flyer ?? '');
+    if (url == null || url.scheme != 'https') { setState(() => _error = 'Este evento no tiene un arte disponible.'); return; }
+    setState(() { _ocupado = true; _error = null; });
+    final cliente = HttpClient()..connectionTimeout = const Duration(seconds: 15);
+    try {
+      final respuesta = await (await cliente.getUrl(url)).close().timeout(const Duration(seconds: 20));
+      if (respuesta.statusCode != 200) throw const FormatException('No se pudo obtener el arte.');
+      final builder = BytesBuilder(copy: false);
+      await for (final parte in respuesta.timeout(const Duration(seconds: 20))) {
+        builder.add(parte);
+        if (builder.length > 30 * 1024 * 1024) throw const FormatException('El arte supera 30 MB.');
+      }
+      final bytes = builder.takeBytes();
+      if (tipoMedio(bytes).video) throw const FormatException('El arte debe ser una imagen.');
+      if (!mounted) return;
+      _video?.dispose(); _video = null;
+      if (_subida != null) { await ref.read(socialRepoProvider).borrar('aftr-historias', _subida!); _subida = null; }
+      setState(() => _bytes = bytes);
+    } catch (e) { if (mounted) setState(() => _error = mensajeDeError(e)); }
+    finally { cliente.close(force: true); if (mounted) setState(() => _ocupado = false); }
+  }
+  Future<void> _publicar() async {
+    if (_bytes == null || _ocupado) return;
+    setState(() { _ocupado = true; _error = null; });
+    try {
+      _subida ??= await ref.read(socialRepoProvider).subir(_bytes!, historia: true);
+      await ref.read(socialRepoProvider).historias('publicar', {
+        'identidad': 'usuario', 'storage_path': _subida,
+        'evento_id': _evento?.id, 'cta': _evento == null ? null : _cta,
+      });
+      _publicada = true; ref.invalidate(historiasProvider);
+      if (mounted) { avisar(context, 'Tu historia está publicada por 24 horas.'); Navigator.pop(context); }
+    } catch (e) { if (mounted) setState(() => _error = mensajeDeError(e)); }
+    finally { if (mounted) setState(() => _ocupado = false); }
+  }
+  @override
+  Widget build(BuildContext context) {
+    final eventos = ref.watch(eventosProvider);
+    return Scaffold(appBar: AppBar(title: const Text('Tu historia')), body: ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 40), children: [
+        Text('24 horas en la noche.', style: Aftr.titular(32)),
+        const SizedBox(height: 8), Text('Fotos, videos de hasta 30 segundos o el arte de un evento.', style: Aftr.cuerpo(14)),
+        const SizedBox(height: 20),
+        ClipRRect(borderRadius: BorderRadius.circular(24), child: AspectRatio(aspectRatio: 9 / 12,
+          child: Container(color: Aftr.superficie2, alignment: Alignment.center,
+            child: _video != null ? AspectRatio(aspectRatio: _video!.value.aspectRatio, child: VideoPlayer(_video!)) :
+            _bytes != null ? Image.memory(_bytes!, fit: BoxFit.contain) : const Icon(Icons.add_photo_alternate_outlined, size: 58, color: Aftr.texto3)))),
+        const SizedBox(height: 14),
+        Row(children: [Expanded(child: OutlinedButton.icon(onPressed: _ocupado ? null : () => _elegir(), icon: const Icon(Icons.photo_outlined), label: const Text('Foto'))),
+          const SizedBox(width: 12), Expanded(child: OutlinedButton.icon(onPressed: _ocupado ? null : () => _elegir(video: true), icon: const Icon(Icons.videocam_outlined), label: const Text('Video')))]),
+        const SizedBox(height: 20),
+        DropdownButtonFormField<String>(initialValue: _evento?.id, isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Vincular un evento (opcional)'),
+          items: [const DropdownMenuItem(value: '', child: Text('Sin evento')),
+            for (final e in eventos.value ?? <Evento>[]) DropdownMenuItem(value: e.id, child: Text(e.nombre, overflow: TextOverflow.ellipsis))],
+          onChanged: _ocupado ? null : (id) => setState(() { _evento = eventos.value?.where((e) => e.id == id).firstOrNull; _cta = null; })),
+        if (eventos.hasError) TextButton(onPressed: () => ref.invalidate(eventosProvider), child: const Text('Reintentar cargar eventos')),
+        if (_evento != null) ...[
+          const SizedBox(height: 10),
+          if (_evento!.flyer != null) TextButton.icon(onPressed: _ocupado ? null : _arte, icon: const Icon(Icons.auto_awesome_outlined), label: const Text('Usar arte de este evento')),
+          DropdownButtonFormField<String>(key: ValueKey(_evento?.id), initialValue: _cta ?? '',
+            decoration: const InputDecoration(labelText: 'Botón de la historia'),
+            items: const [DropdownMenuItem(value: '', child: Text('Ver evento')),
+              DropdownMenuItem(value: 'entrada', child: Text('Comprar entradas')),
+              DropdownMenuItem(value: 'mesa', child: Text('Reservar mesa'))],
+            onChanged: _ocupado ? null : (v) => setState(() => _cta = v == '' ? null : v)),
+        ],
+        if (_error != null) Padding(padding: const EdgeInsets.symmetric(vertical: 14), child: Text(_error!, style: Aftr.cuerpo(14, c: Aftr.alerta))),
+        const SizedBox(height: 24),
+        BotonAftr('Publicar historia', cargando: _ocupado, onTap: _bytes == null ? null : _publicar),
+      ]));
+  }
+}

@@ -1,0 +1,13 @@
+project_id = "venue-aftr"
+
+[functions.baneco]
+enabled = true
+verify_jwt = false
+# Una única fuente de la función; no se duplica dentro de supabase/functions.
+entrypoint = "../db/functions/baneco/index.ts"
+import_map = "../db/functions/baneco/import_map.json"
+
+[functions.historias-media]
+enabled = true
+verify_jwt = false
+entrypoint = "../db/functions/historias-media/index.ts"

@@ -1,0 +1,148 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { Banco, type Datos, ErrorBanco } from "../bank.ts";
+import { crearHandler } from "../handler.ts";
+const id = "11111111-1111-4111-8111-111111111111";
+const igual = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
+
+function escenario() {
+  const tablas: Record<string, Datos[]> = {
+    aftr_ordenes: [{ id, cliente_id: "cliente", estado: "pendiente", total: 25.50, vence_at: "2030-01-01T00:00:00Z" }], pago_qr: [],
+  };
+  const llamadas: string[] = [], logs: Datos[] = [];
+  const admin = {
+    auth: { getUser: (jwt: string) => Promise.resolve({ data: { user: jwt === "sesion" ? { id: "cliente" } : null }, error: null }) },
+    from(tabla: string) {
+      let filas = [...(tablas[tabla] ?? [])], cambios: Datos | null = null, singular = false;
+      const query = {
+        select: (_?: string) => query,
+        eq: (campo: string, valor: unknown) => { filas = filas.filter((x) => x[campo] === valor); return query; },
+        not: (campo: string, _: string, valor: unknown) => { filas = filas.filter((x) => x[campo] !== valor); return query; },
+        order: () => query, limit: () => query,
+        update: (datos: Datos) => { cambios = datos; return query; },
+        single: () => { singular = true; return query; },
+        maybeSingle: () => { singular = true; return query; },
+        then(resolve: (r: { data: unknown; error: unknown }) => void) {
+          if (cambios) for (const fila of filas) Object.assign(fila, cambios);
+          resolve({ data: singular ? filas[0] ?? null : filas, error: null });
+        },
+      };
+      return query;
+    },
+    rpc(nombre: string, p: Datos) {
+      llamadas.push(nombre);
+      if (nombre === "baneco_reservar_qr" || nombre === "baneco_reservar_destino") {
+        let q = tablas.pago_qr[0];
+        const reservado = !q;
+        q ??= { id: "fila", [p.p_tipo === 'recarga' ? 'recarga_id' : p.p_tipo === 'pedido' ? 'pedido_id' : 'orden_id']: id, estado: "generando", generacion_id: "generacion",
+          transaction_id: "comercio", monto: 25.50, moneda: "BOB", vence: "2030-01-01", ambiente: "certificacion" };
+        if (reservado) tablas.pago_qr.push(q);
+        return Promise.resolve({ data: { reservado, pago: { ...q } }, error: null });
+      }
+      if (nombre === "baneco_tomar_barrido") return Promise.resolve({ data: { dia: "2026-10-29", token: "lease" }, error: null });
+      if (nombre === "baneco_finalizar_barrido") {
+        tablas.finalizacion = [p]; return Promise.resolve({ data: null, error: null });
+      }
+      return Promise.resolve({ data: { estado: "pagado", nuevo: true }, error: null });
+    },
+  } as unknown as SupabaseClient;
+  const config: Record<string, string> = { BANECO_CRON_TOKEN: "c".repeat(32), BANECO_WEBHOOK_TOKEN: "a".repeat(32) };
+  const banco = {
+    config: { ambiente: "certificacion" }, prepararCuenta: () => Promise.resolve("cifrado"), autenticar: () => Promise.resolve("t"),
+    generar: (_q: Datos, _c: string) => Promise.resolve({ qrId: "qr", imagen: "aW1hZ2Vu" }),
+    estado: (_qr: string) => Promise.resolve({ estado: 0, pago: undefined }),
+    pagados: (_dia: string) => Promise.resolve([] as Datos[]), anular: (_qr: string) => Promise.resolve(),
+  };
+  const handler = crearHandler(admin, banco as unknown as Banco, (k) => config[k], Date.now, (d) => logs.push(d));
+  const request = (body: unknown, headers: Record<string, string> = {}) => handler(new Request("https://local/baneco", {
+    method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body),
+  }));
+  return { handler, request, tablas, llamadas, banco, logs, config };
+}
+Deno.test("una recarga usa el destino propio y el importe persistido", async () => {
+  const s = escenario(); s.tablas.pulse_recargas = [{ id, cliente_id: 'cliente', estado: 'pendiente', importe_centavos: 2550, vence_at: '2030-01-01' }];
+  igual((await s.request({ accion: 'qr', tipo: 'recarga', orden: id, amount: 1 }, { Authorization: 'Bearer sesion' })).status, 200);
+  igual(s.llamadas.includes('baneco_reservar_destino'), true); igual(s.tablas.pago_qr[0].recarga_id, id);
+});
+Deno.test("un pedido de bebidas ajeno no se puede pagar ni consultar", async () => {
+  const s = escenario(); s.tablas.aftr_bar_pedidos = [{ id, cliente_id: 'otro', estado: 'pendiente' }];
+  igual((await s.request({ accion: 'qr', tipo: 'pedido', orden: id }, { Authorization: 'Bearer sesion' })).status, 404);
+  igual(s.llamadas.length, 0);
+});
+Deno.test("el tipo de destino no acepta propiedades heredadas ni tablas arbitrarias", async () => {
+  for (const tipo of ['__proto__', 'constructor', 'pulse_cuentas']) {
+    const s = escenario(); igual((await s.request({ accion: 'qr', tipo, orden: id }, { Authorization: 'Bearer sesion' })).status, 400);
+  }
+});
+Deno.test("estado sin sesión se rechaza antes de consultar al banco", async () => {
+  const s = escenario(); let consultas = 0; s.banco.estado = () => { consultas++; throw new Error(); };
+  igual((await s.request({ accion: "estado", orden: id })).status, 401); igual(consultas, 0);
+});
+Deno.test("un cliente no accede al pedido de otro", async () => {
+  const s = escenario(); s.tablas.aftr_ordenes[0].cliente_id = "otro";
+  igual((await s.request({ accion: "qr", orden: id }, { Authorization: "Bearer sesion" })).status, 404); igual(s.llamadas.length, 0);
+});
+Deno.test("un importe enviado por el cliente no cambia el QR", async () => {
+  const s = escenario(); let monto: unknown;
+  s.banco.generar = (q) => { monto = q.monto; return Promise.resolve({ qrId: "qr", imagen: "aW1hZ2Vu" }); };
+  igual((await s.request({ accion: "qr", orden: id, amount: 0.01 }, { Authorization: "Bearer sesion" })).status, 200);
+  igual(monto, 25.50);
+});
+Deno.test("dos solicitudes de QR simultáneas generan una sola vez", async () => {
+  const s = escenario(); let cantidad = 0;
+  let liberar!: () => void, inicio!: () => void;
+  const comenzo = new Promise<void>((r) => inicio = r), espera = new Promise<void>((r) => liberar = r);
+  s.banco.generar = async () => { cantidad++; inicio(); await espera; return { qrId: "qr", imagen: "aW1hZ2Vu" }; };
+  const primero = s.request({ accion: "qr", orden: id }, { Authorization: "Bearer sesion" });
+  await comenzo;
+  igual((await s.request({ accion: "qr", orden: id }, { Authorization: "Bearer sesion" })).status, 409);
+  liberar(); igual((await primero).status, 200); igual(cantidad, 1);
+});
+Deno.test("timeout al generar queda para revisión y no borra el pedido", async () => {
+  const s = escenario(); s.banco.generar = () => Promise.reject(new ErrorBanco("generateQR", "RED", true));
+  igual((await s.request({ accion: "qr", orden: id }, { Authorization: "Bearer sesion" })).status, 502);
+  igual(s.tablas.pago_qr[0].estado, "revisar"); igual(s.tablas.aftr_ordenes[0].estado, "pendiente");
+});
+Deno.test("no devuelve el QR de un pedido vencido", async () => {
+  const s = escenario(); s.tablas.aftr_ordenes[0].vence_at = "2026-10-30T00:00:00Z";
+  s.tablas.pago_qr.push({ orden_id: id, qr_id: "qr", estado: "activo", ambiente: "certificacion" });
+  igual((await s.request({ accion: "qr", orden: id }, { Authorization: "Bearer sesion" })).status, 409);
+});
+Deno.test("notificación falsificada no consulta banco ni confirma entradas", async () => {
+  const s = escenario();
+  igual((await s.request({ payment: { qrId: "qr", amount: 25.50 } })).status, 401); igual(s.llamadas.length, 0);
+});
+Deno.test("notificación autorizada reconsulta al banco y nunca confía en amount recibido", async () => {
+  const s = escenario(); s.tablas.pago_qr.push({ id: "fila", qr_id: "qr", estado: "activo", ambiente: "certificacion" });
+  let consultas = 0; s.banco.estado = () => { consultas++; return Promise.resolve({ estado: 0, pago: undefined }); };
+  igual((await s.request({ payment: { qrId: "qr", amount: 999 } }, { "x-baneco-token": "a".repeat(32) })).status, 200);
+  igual(consultas, 1); igual(s.llamadas.includes("aftr_pago_confirmado"), false);
+});
+Deno.test("cron requiere su secreto y no acepta acciones desconocidas", async () => {
+  const s = escenario(); igual((await s.request({ accion: "barrido" })).status, 401);
+  igual((await s.request({ accion: "pagar" })).status, 400); igual(s.llamadas.length, 0);
+});
+Deno.test("conciliación corre sin QR activos y utiliza el día persistido", async () => {
+  const s = escenario(); let dia: unknown;
+  s.banco.pagados = (fecha) => { dia = fecha; return Promise.resolve([]); };
+  igual((await s.request({ accion: "barrido" }, { "x-cron": "c".repeat(32) })).status, 200);
+  igual(dia, "2026-10-29"); igual(s.tablas.finalizacion[0].p_dia_ok, "2026-10-29");
+});
+Deno.test("error de conciliación no avanza el cursor ni expone secretos", async () => {
+  const s = escenario(); s.banco.pagados = () => Promise.reject(new Error("secreto y datos bancarios"));
+  await s.request({ accion: "barrido" }, { "x-cron": "c".repeat(32) });
+  igual(s.tablas.finalizacion[0].p_dia_ok, null); igual(s.tablas.finalizacion[0].p_errores, 1);
+  igual(JSON.stringify(s.logs).includes("secreto y datos bancarios"), false);
+});
+Deno.test("rechaza GET y JSON inválido sin tocar base ni banco", async () => {
+  const s = escenario(); igual((await s.handler(new Request("https://local"))).status, 405);
+  igual((await s.handler(new Request("https://local", { method: "POST", body: "{" }))).status, 400); igual(s.llamadas.length, 0);
+});
+
+Deno.test("una consulta individual fallida no bloquea un día ya conciliado", async () => {
+  const s = escenario();
+  s.tablas.pago_qr.push({id: "fila", qr_id: "qr", estado: "activo", ambiente: "certificacion", intentos: 0});
+  s.banco.estado = () => Promise.reject(new Error("fallo simulado"));
+  await s.request({accion: "barrido"}, {"x-cron": "c".repeat(32)});
+  igual(s.tablas.finalizacion[0].p_dia_ok, "2026-10-29");
+  igual(s.tablas.finalizacion[0].p_errores, 1);
+});

@@ -13,6 +13,9 @@ import '../../core/widgets/tarjetas.dart';
 import '../../data/aftr_repo.dart';
 import '../auth/asegurar_cuenta.dart';
 import '../auth/ingreso.dart';
+import '../guia/guia.dart';
+import 'editar_foto.dart';
+import '../../core/widgets/avatar.dart';
 
 class CuentaScreen extends ConsumerWidget {
   const CuentaScreen({super.key});
@@ -22,19 +25,37 @@ class CuentaScreen extends ConsumerWidget {
       context: context,
       useRootNavigator: true,
       builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(24, 0, 24, 20 + MediaQuery.paddingOf(ctx).bottom),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Manija(),
-          const SizedBox(height: 14),
-          Text('¿Eliminar tu cuenta?', style: Aftr.fuerte(22)),
-          const SizedBox(height: 8),
-          Text('Se borran tu perfil, tus guardados y los lugares que seguís. Las entradas que tengas dejan de estar a tu nombre en AFTR. No se puede deshacer.',
-              style: Aftr.cuerpo(15)),
-          const SizedBox(height: 22),
-          BotonAftr('Eliminar cuenta', onTap: () => Navigator.of(ctx).pop(true)),
-          const SizedBox(height: 10),
-          BotonAftr('Cancelar', secundario: true, onTap: () => Navigator.of(ctx).pop(false)),
-        ]),
+        padding: EdgeInsets.fromLTRB(
+          24,
+          0,
+          24,
+          20 + MediaQuery.paddingOf(ctx).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Manija(),
+            const SizedBox(height: 14),
+            Text('¿Eliminar tu cuenta?', style: Aftr.fuerte(22)),
+            const SizedBox(height: 8),
+            Text(
+              'Se borran tu perfil, tus guardados y los lugares que seguís. Las entradas que tengas dejan de estar a tu nombre en AFTR. No se puede deshacer.',
+              style: Aftr.cuerpo(15),
+            ),
+            const SizedBox(height: 22),
+            BotonAftr(
+              'Eliminar cuenta',
+              onTap: () => Navigator.of(ctx).pop(true),
+            ),
+            const SizedBox(height: 10),
+            BotonAftr(
+              'Cancelar',
+              secundario: true,
+              onTap: () => Navigator.of(ctx).pop(false),
+            ),
+          ],
+        ),
       ),
     );
     if (ok != true) return;
@@ -59,16 +80,22 @@ class CuentaScreen extends ConsumerWidget {
         body: FondoFoto(
           'assets/fondos/cuenta.jpg',
           child: Padding(
-          padding: EdgeInsets.fromLTRB(24, arriba + 12, 24, 130),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Cuenta', style: Aftr.titular(40)),
-            const Spacer(),
-            const PalabraAftr(alto: 30),
-            const SizedBox(height: 18),
-            Text('Guardá eventos, seguí lugares y tené tus QR siempre a mano.', style: Aftr.cuerpo(16, c: Aftr.texto)),
-            const SizedBox(height: 22),
-            BotonAftr('Entrar', onTap: () => asegurarCuenta(context, ref)),
-          ]),
+            padding: EdgeInsets.fromLTRB(24, arriba + 12, 24, 130),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Cuenta', style: Aftr.titular(40)),
+                const Spacer(),
+                const PalabraAftr(alto: 30),
+                const SizedBox(height: 18),
+                Text(
+                  'Guardá eventos, seguí lugares y tené tus QR siempre a mano.',
+                  style: Aftr.cuerpo(16, c: Aftr.texto),
+                ),
+                const SizedBox(height: 22),
+                BotonAftr('Entrar', onTap: () => asegurarCuenta(context, ref)),
+              ],
+            ),
           ),
         ),
       );
@@ -77,34 +104,44 @@ class CuentaScreen extends ConsumerWidget {
     return Scaffold(
       body: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(0, arriba + 12, 0, 130 + MediaQuery.paddingOf(context).bottom),
+        padding: EdgeInsets.fromLTRB(
+          0,
+          arriba + 12,
+          0,
+          130 + MediaQuery.paddingOf(context).bottom,
+        ),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Aparecer(
-              child: Row(children: [
-                CircleAvatar(
-                  radius: 34,
-                  backgroundColor: Aftr.superficie2,
-                  child: Text(
-                    (perfil?.nombre.isNotEmpty ?? false) ? perfil!.nombre.characters.first.toUpperCase() : '?',
-                    style: Aftr.titular(30),
+              child: Row(
+                children: [
+                  Semantics(button: true, label: 'Cambiar foto de perfil', child: Presionable(
+                    onTap: perfil == null ? null : () => editarFoto(context, perfil),
+                    child: AvatarAftr(nombre: perfil?.nombre, foto: perfil?.foto, radio: 34),
+                  )),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(perfil?.nombre ?? '', style: Aftr.fuerte(24)),
+                        if (perfil != null)
+                          Text('@${perfil.usuario}', style: Aftr.cuerpo(15)),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(perfil?.nombre ?? '', style: Aftr.fuerte(24)),
-                    if (perfil != null) Text('@${perfil.usuario}', style: Aftr.cuerpo(15)),
-                  ]),
-                ),
-              ]),
+                ],
+              ),
             ),
           ),
           if (perfil == null)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: BotonAftr('Completar perfil', onTap: () => context.push('/bienvenida')),
+              child: BotonAftr(
+                'Completar perfil',
+                onTap: () => context.push('/bienvenida'),
+              ),
             ),
           if (guardados != null && guardados.eventos.isNotEmpty) ...[
             const TituloSeccion('Guardados'),
@@ -124,13 +161,43 @@ class CuentaScreen extends ConsumerWidget {
             for (final l in guardados.lugares) FilaLugar(l),
           ],
           const TituloSeccion('Ajustes'),
-          _Opcion(Icons.confirmation_number_outlined, 'Mis accesos', () => context.go('/accesos')),
-          _Opcion(Icons.logout_rounded, 'Cerrar sesión', () => ref.read(ingresoProvider).salir()),
-          _Opcion(Icons.delete_outline_rounded, 'Eliminar cuenta', () => _eliminar(context, ref), peligro: true),
+          if (perfil != null) _Opcion(Icons.add_a_photo_outlined, 'Cambiar foto de perfil', () => editarFoto(context, perfil)),
+          _Opcion(Icons.help_outline, 'Ver guía de AFTR', () => ref.read(pedidoGuiaProvider.notifier).abrir()),
+          _Opcion(
+            Icons.account_balance_wallet_outlined,
+            'PULSE · Saldo y recargas',
+            () => context.push('/pulse'),
+          ),
+          _Opcion(
+            Icons.table_bar_outlined,
+            'Mis mesas',
+            () => context.push('/mis-mesas'),
+          ),
+          _Opcion(
+            Icons.confirmation_number_outlined,
+            'Mis accesos',
+            () => context.go('/accesos'),
+          ),
+          _Opcion(
+            Icons.logout_rounded,
+            'Cerrar sesión',
+            () => ref.read(ingresoProvider).salir(),
+          ),
+          _Opcion(
+            Icons.delete_outline_rounded,
+            'Eliminar cuenta',
+            () => _eliminar(context, ref),
+            peligro: true,
+          ),
           const SizedBox(height: 30),
           const Center(child: MarcaAftr(alto: 26, color: Aftr.texto3)),
           const SizedBox(height: 8),
-          Center(child: Text('AFTR · Nightlife & Events', style: Aftr.cuerpo(12, c: Aftr.texto3))),
+          Center(
+            child: Text(
+              'AFTR · Nightlife & Events',
+              style: Aftr.cuerpo(12, c: Aftr.texto3),
+            ),
+          ),
         ],
       ),
     );
@@ -146,15 +213,26 @@ class _Opcion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Presionable(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          child: Row(children: [
-            Icon(icono, color: peligro ? Aftr.alerta : Aftr.texto, size: 22),
-            const SizedBox(width: 14),
-            Expanded(child: Text(texto, style: Aftr.cuerpo(16, c: peligro ? Aftr.alerta : Aftr.texto, w: FontWeight.w500))),
-            const Icon(Icons.chevron_right_rounded, color: Aftr.texto3),
-          ]),
-        ),
-      );
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      child: Row(
+        children: [
+          Icon(icono, color: peligro ? Aftr.alerta : Aftr.texto, size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              texto,
+              style: Aftr.cuerpo(
+                16,
+                c: peligro ? Aftr.alerta : Aftr.texto,
+                w: FontWeight.w500,
+              ),
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: Aftr.texto3),
+        ],
+      ),
+    ),
+  );
 }
