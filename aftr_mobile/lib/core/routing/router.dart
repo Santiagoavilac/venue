@@ -7,6 +7,9 @@ import '../../features/accesos/accesos_screen.dart';
 import '../../features/auth/bienvenida_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/cuenta/cuenta_screen.dart';
+import '../../features/pulse/pulse_screen.dart';
+import '../../features/pulse/mesas_screen.dart';
+import '../../features/reventa/reventa.dart';
 import '../../features/descubrir/descubrir_screen.dart';
 import '../../features/evento/evento_screen.dart';
 import '../../features/lugar/lugar_screen.dart';
@@ -15,14 +18,18 @@ import '../../features/shell/shell.dart';
 
 /// Pantallas que suben desde abajo (ingreso y bienvenida), como hojas
 /// completas.
-CustomTransitionPage<T> _desdeAbajo<T>(GoRouterState st, Widget hijo) => CustomTransitionPage<T>(
+CustomTransitionPage<T> _desdeAbajo<T>(GoRouterState st, Widget hijo) =>
+    CustomTransitionPage<T>(
       key: st.pageKey,
       fullscreenDialog: true,
       transitionDuration: const Duration(milliseconds: 420),
       reverseTransitionDuration: const Duration(milliseconds: 320),
       child: hijo,
       transitionsBuilder: (_, a, _, c) => SlideTransition(
-        position: Tween(begin: const Offset(0, 1), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
+        position: Tween(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
         child: c,
       ),
     );
@@ -35,24 +42,55 @@ final routerProvider = Provider<GoRouter>((ref) {
     navigatorKey: raiz,
     initialLocation: '/',
     routes: [
+      GoRoute(path: '/pulse', builder: (_, _) => const PulseScreen()),
+      GoRoute(path: '/mis-mesas', builder: (_, _) => const MisMesasScreen()),
+      GoRoute(path: '/reventa', builder: (_, st) => ReventaScreen(eventoId: st.uri.queryParameters['evento'])),
+      GoRoute(path: '/reventa/orden/:id', builder: (_, st) => OrdenReventaScreen(id: st.pathParameters['id']!)),
       StatefulShellRoute.indexedStack(
         builder: (_, _, nav) => Shell(nav: nav),
         branches: [
-          StatefulShellBranch(routes: [GoRoute(path: '/', builder: (_, _) => const DescubrirScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/mapa', builder: (_, _) => const MapaScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/accesos', builder: (_, _) => const AccesosScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/cuenta', builder: (_, _) => const CuentaScreen())]),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/', builder: (_, _) => const DescubrirScreen()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/mapa', builder: (_, _) => const MapaScreen()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/accesos',
+                builder: (_, _) => const AccesosScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/cuenta', builder: (_, _) => const CuentaScreen()),
+            ],
+          ),
         ],
       ),
       GoRoute(
         parentNavigatorKey: raiz,
         path: '/evento/:id',
-        builder: (_, st) => EventoScreen(id: st.pathParameters['id']!, previo: st.extra is Evento ? st.extra as Evento : null),
+        builder: (_, st) => EventoScreen(
+          id: st.pathParameters['id']!,
+          previo: st.extra is Evento ? st.extra as Evento : null,
+          historia: st.uri.queryParameters['historia'],
+          accion: st.uri.queryParameters['accion'],
+        ),
       ),
       GoRoute(
         parentNavigatorKey: raiz,
         path: '/lugar/:id',
-        builder: (_, st) => LugarScreen(id: st.pathParameters['id']!, previo: st.extra is Lugar ? st.extra as Lugar : null),
+        builder: (_, st) => LugarScreen(
+          id: st.pathParameters['id']!,
+          previo: st.extra is Lugar ? st.extra as Lugar : null,
+        ),
       ),
       GoRoute(
         parentNavigatorKey: raiz,

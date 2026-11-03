@@ -11,10 +11,13 @@ import '../../core/widgets/logo.dart';
 import '../../core/widgets/movimiento.dart';
 import '../../core/widgets/piezas.dart';
 import '../../core/widgets/tarjetas.dart';
+import '../../core/widgets/avatar.dart';
 import '../../data/aftr_repo.dart';
 import '../auth/asegurar_cuenta.dart';
 import '../../data/modelos.dart';
 import '../splash/splash.dart';
+import '../historias/historias.dart';
+import '../../data/social_repo.dart';
 
 /// La noche elegida en la tira de fechas; null es "Todo".
 final nocheProvider = NotifierProvider<_Noche, DateTime?>(_Noche.new);
@@ -59,19 +62,20 @@ class DescubrirScreen extends ConsumerWidget {
             onRefresh: () async {
               ref.invalidate(eventosProvider);
               ref.invalidate(lugaresProvider);
+              ref.invalidate(historiasProvider);
               await ref.read(eventosProvider.future);
             },
           ),
+          const SliverToBoxAdapter(child: HistoriasFila()),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
-              child: Aparecer(child: Text('Discover\nthe night.', style: Aftr.titular(44))),
+              child: Aparecer(child: Text('Descubrir', style: Aftr.titular(32))),
             ),
           ),
           SliverToBoxAdapter(
-            child: _TiraFechas(
+            child: FechasAftr(
               elegida: noche,
-              conEventos: {for (final e in eventos.value ?? const <Evento>[]) e.fecha},
               onElegir: (d) => ref.read(nocheProvider.notifier).elegir(d),
             ),
           ),
@@ -110,12 +114,13 @@ class DescubrirScreen extends ConsumerWidget {
         ),
       ];
     }
-    final hoy = enRango(todos, Cuando.hoy, ahora);
-    final finde = enRango(todos, Cuando.finde, ahora);
-    final gratis = lista.where((e) => e.desdePrecio == 0 || e.tieneLista).toList();
-    final conMesa = lista.where((e) => e.mesasLibres > 0).toList();
+    final restantes = todos.where((e) => e.id != lista.first.id).toList();
+    final hoy = enRango(restantes, Cuando.hoy, ahora);
+    final finde = enRango(restantes, Cuando.finde, ahora);
+    final gratis = lista.skip(1).where((e) => e.desdePrecio == 0 || e.tieneLista).toList();
+    final conMesa = lista.skip(1).where((e) => e.mesasLibres > 0).toList();
     final generos = <String, List<Evento>>{};
-    for (final e in lista) {
+    for (final e in lista.skip(1)) {
       for (final g in e.generos) {
         (generos[g] ??= []).add(e);
       }
@@ -183,27 +188,13 @@ class _Cabecera extends ConsumerWidget {
       titleSpacing: 20,
       centerTitle: false,
       title: Row(children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(color: Aftr.superficie2, borderRadius: BorderRadius.circular(20)),
-          child: Row(children: [
-            Text('Santa Cruz', style: Aftr.cuerpo(14, c: Aftr.texto, w: FontWeight.w600)),
-            const SizedBox(width: 4),
-            const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Aftr.texto),
-          ]),
-        ),
+        Text('Santa Cruz', style: Aftr.cuerpo(13, c: Aftr.texto2)),
         const Spacer(),
         const PalabraAftr(alto: 16),
         const Spacer(),
         Presionable(
           onTap: () => logueado ? context.go('/cuenta') : asegurarCuenta(context, ref),
-          child: CircleAvatar(
-            radius: 18,
-            backgroundColor: Aftr.superficie2,
-            child: perfil != null
-                ? Text(perfil.nombre.characters.first.toUpperCase(), style: Aftr.fuerte(15))
-                : const Icon(Icons.person_outline_rounded, size: 20, color: Aftr.texto),
-          ),
+          child: AvatarAftr(nombre: perfil?.nombre, foto: perfil?.foto),
         ),
       ]),
     );
@@ -251,103 +242,48 @@ class _Vacio extends StatelessWidget {
       );
 }
 
-/// La tira de fechas (como Dice o RA): "Todo" y los próximos 21 días, con el
-/// nombre chico arriba, el número grande en la serif, un punto dorado si esa
-/// noche hay algo y una línea que se desliza hasta el elegido. Sin cajas.
-class _TiraFechas extends StatelessWidget {
-  const _TiraFechas({required this.elegida, required this.conEventos, required this.onElegir});
-
+/// Fechas en una sola línea, con el mismo alto de toque para cada opción.
+class FechasAftr extends StatelessWidget {
+  const FechasAftr({super.key, required this.elegida, required this.onElegir});
   final DateTime? elegida;
-  final Set<DateTime> conEventos;
   final ValueChanged<DateTime?> onElegir;
-
-  static const _anchoTodo = 60.0;
-  static const _anchoDia = 48.0;
-  static const _dias = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
+  static const _dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
   @override
   Widget build(BuildContext context) {
-    final h = DateTime.now();
-    final hoy = DateTime(h.year, h.month, h.day);
-    final dias = [for (var i = 0; i < 21; i++) DateTime(hoy.year, hoy.month, hoy.day + i)];
-    final i = elegida == null ? -1 : dias.indexWhere((d) => _mismoDia(d, elegida!));
-    final centro = i < 0 ? _anchoTodo / 2 : _anchoTodo + _anchoDia * i + _anchoDia / 2;
-    return Container(
-      height: 86,
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Aftr.borde))),
-      child: SingleChildScrollView(
+    final ahora = DateTime.now();
+    final hoy = DateTime(ahora.year, ahora.month, ahora.day);
+    final opciones = <(String, DateTime?)>[
+      ('Todo', null),
+      for (var i = 0; i < 21; i++)
+        (i == 0 ? 'Hoy' : i == 1 ? 'Mañana' : '${_dias[DateTime(hoy.year, hoy.month, hoy.day + i).weekday - 1]} ${DateTime(hoy.year, hoy.month, hoy.day + i).day}',
+         DateTime(hoy.year, hoy.month, hoy.day + i)),
+    ];
+    return SizedBox(
+      height: 44,
+      child: ListView(
         scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: Stack(children: [
-          Row(children: [
-            _Dia(ancho: _anchoTodo, arriba: '', numero: 'Todo', elegido: elegida == null, hay: false, onTap: () => onElegir(null)),
-            for (var j = 0; j < dias.length; j++)
-              _Dia(
-                ancho: _anchoDia,
-                arriba: j == 0 ? 'HOY' : (j == 1 ? 'MAÑ' : _dias[dias[j].weekday - 1].toUpperCase()),
-                numero: '${dias[j].day}',
-                elegido: j == i,
-                hay: conEventos.any((f) => _mismoDia(f, dias[j])),
-                onTap: () => onElegir(dias[j]),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        children: [for (final o in opciones)
+          Semantics(
+            button: true,
+            selected: elegida == null ? o.$2 == null : o.$2 != null && _mismoDia(elegida!, o.$2!),
+            child: InkWell(
+              onTap: () => onElegir(o.$2),
+              child: Container(
+                alignment: Alignment.center,
+                margin: const EdgeInsets.only(right: 22),
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(
+                  color: (elegida == null ? o.$2 == null : o.$2 != null && _mismoDia(elegida!, o.$2!)) ? Aftr.texto : Colors.transparent,
+                  width: 1,
+                ))),
+                child: Text(o.$1, style: Aftr.cuerpo(13,
+                  c: (elegida == null ? o.$2 == null : o.$2 != null && _mismoDia(elegida!, o.$2!)) ? Aftr.texto : Aftr.texto3,
+                  w: FontWeight.w500)),
               ),
-          ]),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 450),
-            curve: Aftr.curva,
-            left: centro - 9,
-            bottom: 0,
-            child: Container(width: 18, height: 2, decoration: BoxDecoration(color: Aftr.texto, borderRadius: BorderRadius.circular(1))),
+            ),
           ),
-        ]),
-      ),
-    );
-  }
-}
-
-class _Dia extends StatelessWidget {
-  const _Dia({required this.ancho, required this.arriba, required this.numero, required this.elegido, required this.hay, required this.onTap});
-
-  final double ancho;
-  final String arriba;
-  final String numero;
-  final bool elegido;
-  final bool hay;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = elegido ? Aftr.texto : (hay ? Aftr.texto2 : Aftr.texto3);
-    final esTodo = arriba.isEmpty;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: SizedBox(
-        width: ancho,
-        child: Padding(
-          padding: const EdgeInsets.only(top: 18, bottom: 10),
-          child: Column(children: [
-            Text(arriba, style: TextStyle(fontFamily: Aftr.sans, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 1.4, color: color)),
-            const SizedBox(height: 2),
-            AnimatedScale(
-              duration: Aftr.medio,
-              curve: Curves.easeOutBack,
-              scale: elegido ? 1.12 : 1,
-              child: Text(
-                numero,
-                style: esTodo
-                    ? TextStyle(fontFamily: Aftr.sans, fontSize: 15, fontWeight: FontWeight.w700, color: color, height: 1.9)
-                    : TextStyle(fontFamily: Aftr.serif, fontSize: 26, color: color, height: 1.1),
-              ),
-            ),
-            const SizedBox(height: 3),
-            Container(
-              width: 4,
-              height: 4,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: hay ? Aftr.acento : Colors.transparent),
-            ),
-          ]),
-        ),
+        ],
       ),
     );
   }

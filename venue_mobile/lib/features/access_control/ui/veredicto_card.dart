@@ -20,6 +20,8 @@ IconData iconoDeVeredicto(Veredicto v) => switch (v) {
       Veredicto.eventoIncorrecto => Icons.event_busy_rounded,
       Veredicto.sinPermiso => Icons.lock_outline_rounded,
       Veredicto.noValido => Icons.close_rounded,
+      Veredicto.bloqueada => Icons.lock_clock_outlined,
+      Veredicto.reemplazada => Icons.qr_code_2_rounded,
       Veredicto.credencial => Icons.badge_outlined,
     };
 

@@ -1,0 +1,8 @@
+{
+  "nodeModulesDir": "none",
+  "tasks": {
+    "test": "deno test --no-remote tests/",
+    "check": "deno check --no-remote index.ts"
+  },
+  "importMap": "./import_map.json"
+}

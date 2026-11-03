@@ -65,8 +65,10 @@ class _ListaPuertaScreenState extends ConsumerState<ListaPuertaScreen> {
       final r = await ref.read(puertaRepositoryProvider).buscar(ev.id, texto);
       if (!mounted || n != _pedido) return; // llegó tarde: ya hay otra búsqueda
       setState(() {
-        _filas = PersonaPuerta.ordenar(r,
-            discreto: crudo.isNotEmpty && crudo[0] == ' ');
+        _filas = PersonaPuerta.ordenar(
+          r,
+          discreto: crudo.isNotEmpty && crudo[0] == ' ',
+        );
         _error = null;
         _cargando = false;
       });
@@ -89,32 +91,35 @@ class _ListaPuertaScreenState extends ConsumerState<ListaPuertaScreen> {
   }
 
   Future<void> _marcar(PersonaPuerta p, String eventoId) => _hacer(() async {
-        final repo = ref.read(puertaRepositoryProvider);
-        if (p.esEntrada) {
-          // Mismo camino que el escáner: aplica anulada, usada y horario.
-          final r = await repo.validar(eventoId: eventoId, crudo: p.codigo ?? '');
-          if (!mounted) return;
-          if (r.veredicto.dejaPasar) {
-            HapticFeedback.mediumImpact();
-            avisar(context, 'Ingreso: ${r.nombre ?? p.nombre}');
-          } else {
-            HapticFeedback.heavyImpact();
-            avisar(
-              context,
-              r.veredicto == Veredicto.yaIngreso && r.hora != null
-                  ? '${p.nombre} ya había ingresado ${horaCorta(r.hora!)}'
-                  : '${p.nombre}: ${r.detalle ?? r.veredicto.texto}',
-              tipo: TipoAviso.aviso,
-            );
-          }
-        } else {
-          final entro = await repo.ingresoDeLista(p.id!);
-          if (!mounted) return;
-          HapticFeedback.mediumImpact();
-          avisar(context, entro ? 'Ingreso: ${p.nombre}' : 'Ya había ingresado',
-              tipo: entro ? TipoAviso.ok : TipoAviso.aviso);
-        }
-      });
+    final repo = ref.read(puertaRepositoryProvider);
+    if (p.esEntrada) {
+      // Mismo camino que el escáner: aplica anulada, usada y horario.
+      final r = await repo.validar(eventoId: eventoId, crudo: p.codigo ?? '');
+      if (!mounted) return;
+      if (r.veredicto.dejaPasar) {
+        HapticFeedback.mediumImpact();
+        avisar(context, 'Ingreso: ${r.nombre ?? p.nombre}');
+      } else {
+        HapticFeedback.heavyImpact();
+        avisar(
+          context,
+          r.veredicto == Veredicto.yaIngreso && r.hora != null
+              ? '${p.nombre} ya había ingresado ${horaCorta(r.hora!)}'
+              : '${p.nombre}: ${r.detalle ?? r.veredicto.texto}',
+          tipo: TipoAviso.aviso,
+        );
+      }
+    } else {
+      final entro = await repo.ingresoDeLista(p.id!);
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      avisar(
+        context,
+        entro ? 'Ingreso: ${p.nombre}' : 'Ya había ingresado',
+        tipo: entro ? TipoAviso.ok : TipoAviso.aviso,
+      );
+    }
+  });
 
   void _desmarcar(PersonaPuerta p, String eventoId) {
     final clave = p.esEntrada ? 'e:${p.codigo}' : 'r:${p.id}';
@@ -124,8 +129,11 @@ class _ListaPuertaScreenState extends ConsumerState<ListaPuertaScreen> {
       _desarmar = Timer(const Duration(milliseconds: 2500), () {
         if (mounted) setState(() => _armada = null);
       });
-      avisar(context, 'Tocá de nuevo para desmarcar el ingreso',
-          tipo: TipoAviso.aviso);
+      avisar(
+        context,
+        'Tocá de nuevo para desmarcar el ingreso',
+        tipo: TipoAviso.aviso,
+      );
       return;
     }
     setState(() => _armada = null);
@@ -137,24 +145,28 @@ class _ListaPuertaScreenState extends ConsumerState<ListaPuertaScreen> {
         await repo.desmarcarLista(p.id!);
       }
       if (mounted) {
-        avisar(context, 'Ingreso desmarcado a ${p.nombre}', tipo: TipoAviso.aviso);
+        avisar(
+          context,
+          'Ingreso desmarcado a ${p.nombre}',
+          tipo: TipoAviso.aviso,
+        );
       }
     });
   }
 
   Future<void> _filtro(PersonaPuerta p, String eventoId) => _hacer(() async {
-        final r = await ref
-            .read(puertaRepositoryProvider)
-            .alternarFiltro(eventoId, p);
-        if (!mounted) return;
-        avisar(
-          context,
-          r.marcado
-              ? '${r.nombre} marcado: no pasó el filtro${r.rrpp.isEmpty ? '' : ' · lo trajo ${r.rrpp}'}'
-              : 'Marca quitada a ${r.nombre}',
-          tipo: r.marcado ? TipoAviso.aviso : TipoAviso.ok,
-        );
-      });
+    final r = await ref
+        .read(puertaRepositoryProvider)
+        .alternarFiltro(eventoId, p);
+    if (!mounted) return;
+    avisar(
+      context,
+      r.marcado
+          ? '${r.nombre} marcado: no pasó el filtro${r.rrpp.isEmpty ? '' : ' · lo trajo ${r.rrpp}'}'
+          : 'Marca quitada a ${r.nombre}',
+      tipo: r.marcado ? TipoAviso.aviso : TipoAviso.ok,
+    );
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -203,40 +215,41 @@ class _ListaPuertaScreenState extends ConsumerState<ListaPuertaScreen> {
                   icono: esFallaDeRed(_error!)
                       ? Icons.wifi_off_rounded
                       : Icons.error_outline,
-                  titulo: esFallaDeRed(_error!) ? 'Sin conexión' : 'No se pudo buscar',
+                  titulo: esFallaDeRed(_error!)
+                      ? 'Sin conexión'
+                      : 'No se pudo buscar',
                   detalle: mensajeDeError(_error!),
                   accion: 'Reintentar',
                   alTocar: _buscar,
                 )
               : filas == null
-                  ? const MensajeVista(
-                      icono: Icons.person_search_rounded,
-                      titulo: 'Escribí al menos 2 letras',
-                      detalle:
-                          'Buscá por nombre y marcá el ingreso. Sirve para los de lista y para quien compró manilla y no tiene el QR a mano.',
-                    )
-                  : filas.isEmpty
-                      ? const MensajeVista(
-                          icono: Icons.search_off_rounded,
-                          titulo: 'Sin resultados',
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                          itemCount: filas.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 8),
-                          itemBuilder: (context, i) {
-                            final p = filas[i];
-                            final clave =
-                                p.esEntrada ? 'e:${p.codigo}' : 'r:${p.id}';
-                            return _Fila(
-                              persona: p,
-                              armada: _armada == clave,
-                              alMarcar: () => _marcar(p, ev.id),
-                              alDesmarcar: () => _desmarcar(p, ev.id),
-                              alFiltrar: () => _filtro(p, ev.id),
-                            );
-                          },
-                        ),
+              ? const MensajeVista(
+                  icono: Icons.person_search_rounded,
+                  titulo: 'Escribí al menos 2 letras',
+                  detalle:
+                      'Buscá por nombre y marcá el ingreso. Sirve para los de lista y para quien compró manilla y no tiene el QR a mano.',
+                )
+              : filas.isEmpty
+              ? const MensajeVista(
+                  icono: Icons.search_off_rounded,
+                  titulo: 'Sin resultados',
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                  itemCount: filas.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, i) {
+                    final p = filas[i];
+                    final clave = p.esEntrada ? 'e:${p.codigo}' : 'r:${p.id}';
+                    return _Fila(
+                      persona: p,
+                      armada: _armada == clave,
+                      alMarcar: () => _marcar(p, ev.id),
+                      alDesmarcar: () => _desmarcar(p, ev.id),
+                      alFiltrar: () => _filtro(p, ev.id),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -262,7 +275,10 @@ class _Fila extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = persona;
     final sub = p.esEntrada
-        ? [p.lista ?? 'Prepagada', if (p.codigo != null) '#${p.codigo}'].join(' · ')
+        ? [
+            p.lista ?? 'Prepagada',
+            if (p.codigo != null) '#${p.codigo}',
+          ].join(' · ')
         : [
             if (p.lista?.isNotEmpty ?? false) p.lista!,
             if (p.rrpp?.isNotEmpty ?? false) 'lo anotó ${p.rrpp}',
@@ -279,8 +295,8 @@ class _Fila extends StatelessWidget {
             color: p.sinTope
                 ? const Color(0xFFE8B530)
                 : p.ingreso
-                    ? VenueColors.ok.withValues(alpha: .5)
-                    : VenueColors.linea,
+                ? VenueColors.ok.withValues(alpha: .5)
+                : VenueColors.linea,
           ),
         ),
         child: Row(
@@ -292,22 +308,32 @@ class _Fila extends StatelessWidget {
                   Text(
                     p.nombre,
                     style: const TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.w700),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 2),
-                  Text(sub,
-                      style: TextStyle(
-                          color: VenueColors.textoSuave, fontSize: 13)),
+                  Text(
+                    sub,
+                    style: TextStyle(
+                      color: VenueColors.textoSuave,
+                      fontSize: 13,
+                    ),
+                  ),
                   if (p.sinTope || p.filtrada || p.anulada)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Wrap(spacing: 6, children: [
-                        if (p.sinTope)
-                          const _Chip('de la casa', Color(0xFFE8B530)),
-                        if (p.filtrada)
-                          _Chip('no pasó filtro', VenueColors.mal),
-                        if (p.anulada) _Chip('anulada', VenueColors.mal),
-                      ]),
+                      child: Wrap(
+                        spacing: 6,
+                        children: [
+                          if (p.sinTope)
+                            const _EstadoTexto('de la casa', Color(0xFFE8B530)),
+                          if (p.filtrada)
+                            _EstadoTexto('no pasó filtro', VenueColors.mal),
+                          if (p.anulada)
+                            _EstadoTexto('anulada', VenueColors.mal),
+                        ],
+                      ),
                     ),
                 ],
               ),
@@ -324,10 +350,13 @@ class _Fila extends StatelessWidget {
             if (p.anulada)
               const SizedBox(width: 56)
             else if (p.ingreso) ...[
-              Text(horaCorta(p.ingresoAt!),
-                  style: TextStyle(
-                      color: VenueColors.textoSuave,
-                      fontWeight: FontWeight.w600)),
+              Text(
+                horaCorta(p.ingresoAt!),
+                style: TextStyle(
+                  color: VenueColors.textoSuave,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(width: 6),
               _Caja(
                 marcada: true,
@@ -379,27 +408,29 @@ class _Caja extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: color, width: 2),
           ),
-          child: marcada ? Icon(Icons.check_rounded, color: color, size: 30) : null,
+          child: marcada
+              ? Icon(Icons.check_rounded, color: color, size: 30)
+              : null,
         ),
       ),
     );
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip(this.texto, this.color);
+class _EstadoTexto extends StatelessWidget {
+  const _EstadoTexto(this.texto, this.color);
   final String texto;
   final Color color;
-
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: .16),
-          borderRadius: BorderRadius.circular(7),
-        ),
-        child: Text(texto,
-            style: TextStyle(
-                color: color, fontSize: 11.5, fontWeight: FontWeight.w700)),
-      );
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Text(
+      texto,
+      style: TextStyle(
+        color: color,
+        fontSize: 11.5,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 }

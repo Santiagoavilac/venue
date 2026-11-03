@@ -44,7 +44,8 @@ class PermisosLista {
           esMio(i) ||
           (rol == Rol.jefe && miTeam != null && teamDe(i.rrppId) == miTeam));
 
-  bool generarQr(Invitado i) => anota && !i.ingreso && (rol == Rol.admin || esMio(i));
+  bool generarQr(Invitado i) =>
+      anota && !i.ingreso && (rol == Rol.admin || esMio(i));
   bool quitar(Invitado i) => anota && (rol == Rol.admin || esMio(i));
 
   /// Marcar el ingreso a mano desde Listas es del admin con `puede_tickear`.
@@ -53,7 +54,11 @@ class PermisosLista {
 
 /// Anota uno o varios nombres en [l] (con "a nombre de" si la persona puede).
 /// Devuelve true si anotó a alguien.
-Future<bool> anotarEnLista(BuildContext context, WidgetRef ref, ListaTipo l) async {
+Future<bool> anotarEnLista(
+  BuildContext context,
+  WidgetRef ref,
+  ListaTipo l,
+) async {
   final permisos = ref.read(permisosEventoProvider).value;
   final vendedores = (permisos?.aNombreDe ?? false)
       ? (ref.read(vendedoresProvider).value ?? const <Miembro>[])
@@ -67,7 +72,9 @@ Future<bool> anotarEnLista(BuildContext context, WidgetRef ref, ListaTipo l) asy
   );
   if (r == null || r.nombres.isEmpty) return false;
   try {
-    final x = await ref.read(listasRepositoryProvider).anotar(l.id, r.nombres, aNombreDe: r.de);
+    final x = await ref
+        .read(listasRepositoryProvider)
+        .anotar(l.id, r.nombres, aNombreDe: r.de);
     ref.invalidate(listasProvider);
     ref.invalidate(invitadosProvider);
     ref.invalidate(misCuposProvider);
@@ -82,7 +89,8 @@ Future<bool> anotarEnLista(BuildContext context, WidgetRef ref, ListaTipo l) asy
     }
     return true;
   } catch (e) {
-    if (context.mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+    if (context.mounted)
+      avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
     return false;
   }
 }
@@ -92,14 +100,21 @@ Future<void> nuevoCliente(BuildContext context, WidgetRef ref) async {
   final ahora = DateTime.now();
   List<ListaTipo> ls;
   try {
-    ls = (await ref.read(listasProvider.future)).where((l) => l.abierta(ahora)).toList();
+    ls = (await ref.read(
+      listasProvider.future,
+    )).where((l) => l.abierta(ahora)).toList();
   } catch (e) {
-    if (context.mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+    if (context.mounted)
+      avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
     return;
   }
   if (!context.mounted) return;
   if (ls.isEmpty) {
-    avisar(context, 'No hay ninguna lista abierta para anotar', tipo: TipoAviso.aviso);
+    avisar(
+      context,
+      'No hay ninguna lista abierta para anotar',
+      tipo: TipoAviso.aviso,
+    );
     return;
   }
   final l = ls.length == 1
@@ -112,17 +127,25 @@ Future<void> nuevoCliente(BuildContext context, WidgetRef ref) async {
             shrinkWrap: true,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             children: [
-              const Text('Nuevo cliente · elegí la lista',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              const Text(
+                'Nuevo cliente · elegí la lista',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 8),
               for (final l in ls)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(l.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text([
-                    (l.precio ?? 0) > 0 ? '${l.precio} Bs' : 'Free',
-                    if (l.ingresoHasta != null) 'entran hasta ${l.ingresoHasta}',
-                  ].join(' · ')),
+                  title: Text(
+                    l.nombre,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    [
+                      (l.precio ?? 0) > 0 ? '${l.precio} Bs' : 'Free',
+                      if (l.ingresoHasta != null)
+                        'entran hasta ${l.ingresoHasta}',
+                    ].join(' · '),
+                  ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.pop(c, l),
                 ),
@@ -205,47 +228,56 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
         var codigo = i.codigo;
         if (codigo == null) {
           if (!p.generarQr(i)) {
-            avisar(context, 'Este invitado todavía no tiene QR', tipo: TipoAviso.aviso);
+            avisar(
+              context,
+              'Este invitado todavía no tiene QR',
+              tipo: TipoAviso.aviso,
+            );
             return;
           }
           codigo = await ref.read(listasRepositoryProvider).generarQr(i.id);
           ref.invalidate(invitadosProvider);
         }
-        if (mounted) await mostrarTicket(context, _ticket(i, codigo, ev, lista));
+        if (mounted)
+          await mostrarTicket(context, _ticket(i, codigo, ev, lista));
       });
 
   Future<void> _tickear(Invitado i) => _hacer(() async {
-        final r = await ref
-            .read(pendientesProvider.notifier)
-            .ejecutar('checkin_registro', {'p_registro': i.id}, 'Ingreso de ${i.nombre}');
-        ref.invalidate(invitadosProvider);
-        if (!mounted) return;
-        avisar(
-          context,
-          r.encolada
-              ? 'Sin señal: el ingreso de ${i.nombre} se envía cuando vuelva'
-              : (r.dato as Map?)?['resultado'] == 'ok'
-                  ? 'Ingreso: ${i.nombre}'
-                  : 'Ya había ingresado',
-          tipo: r.encolada ? TipoAviso.aviso : TipoAviso.ok,
-        );
-      });
+    final r = await ref.read(pendientesProvider.notifier).ejecutar(
+      'checkin_registro',
+      {'p_registro': i.id},
+      'Ingreso de ${i.nombre}',
+    );
+    ref.invalidate(invitadosProvider);
+    if (!mounted) return;
+    avisar(
+      context,
+      r.encolada
+          ? 'Sin señal: el ingreso de ${i.nombre} se envía cuando vuelva'
+          : (r.dato as Map?)?['resultado'] == 'ok'
+          ? 'Ingreso: ${i.nombre}'
+          : 'Ya había ingresado',
+      tipo: r.encolada ? TipoAviso.aviso : TipoAviso.ok,
+    );
+  });
 
-  Future<void> _enviarTanda(List<Invitado> todos, Evento ev,
-          Map<String, String> nombreLista) =>
-      _hacer(() async {
-        final repo = ref.read(listasRepositoryProvider);
-        final elegidos = todos.where((i) => _marcados.contains(i.id)).toList();
-        final tickets = <TicketDatos>[];
-        for (final i in elegidos) {
-          final codigo = i.codigo ?? await repo.generarQr(i.id);
-          tickets.add(_ticket(i, codigo, ev, nombreLista[i.listaId] ?? 'Lista'));
-        }
-        ref.invalidate(invitadosProvider);
-        if (!mounted) return;
-        await compartirTanda(context, tickets);
-        if (mounted) setState(_marcados.clear);
-      });
+  Future<void> _enviarTanda(
+    List<Invitado> todos,
+    Evento ev,
+    Map<String, String> nombreLista,
+  ) => _hacer(() async {
+    final repo = ref.read(listasRepositoryProvider);
+    final elegidos = todos.where((i) => _marcados.contains(i.id)).toList();
+    final tickets = <TicketDatos>[];
+    for (final i in elegidos) {
+      final codigo = i.codigo ?? await repo.generarQr(i.id);
+      tickets.add(_ticket(i, codigo, ev, nombreLista[i.listaId] ?? 'Lista'));
+    }
+    ref.invalidate(invitadosProvider);
+    if (!mounted) return;
+    await compartirTanda(context, tickets);
+    if (mounted) setState(_marcados.clear);
+  });
 
   Future<void> _anotar(ListaTipo l) async {
     if (await anotarEnLista(context, ref, l) && mounted) {
@@ -260,7 +292,9 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
     final perfil = ref.watch(perfilProvider).value;
     if (ev == null || rol == null || perfil == null) {
       return const MensajeVista(
-          icono: Icons.event_busy_rounded, titulo: 'No hay evento activo');
+        icono: Icons.event_busy_rounded,
+        titulo: 'No hay evento activo',
+      );
     }
     final listas = ref.watch(listasProvider);
     final invitados = ref.watch(invitadosProvider);
@@ -287,18 +321,20 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
         reintentar: _recargar,
         datos: (ls) {
           if (ls.isEmpty) {
-            return ListView(children: [
-              const SizedBox(height: 90),
-              MensajeVista(
-                icono: Icons.list_alt_rounded,
-                titulo: 'Todavía no hay listas para este evento',
-                detalle: rol == Rol.admin
-                    ? 'Creálas en Eventos → Listas.'
-                    : 'Pedile al admin que las cree.',
-                accion: 'Reintentar',
-                alTocar: _recargar,
-              ),
-            ]);
+            return ListView(
+              children: [
+                const SizedBox(height: 90),
+                MensajeVista(
+                  icono: Icons.list_alt_rounded,
+                  titulo: 'Todavía no hay listas para este evento',
+                  detalle: rol == Rol.admin
+                      ? 'Creálas en Eventos → Listas.'
+                      : 'Pedile al admin que las cree.',
+                  accion: 'Reintentar',
+                  alTocar: _recargar,
+                ),
+              ],
+            );
           }
           final todos = invitados.value ?? const <Invitado>[];
           final nombreLista = {for (final l in ls) l.id: l.nombre};
@@ -307,7 +343,10 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
           bool pasaTeam(Invitado i) =>
               _team == null || (equipo[i.rrppId]?.teamId ?? '') == _team;
           final filtrados = todos
-              .where((i) => pasaTeam(i) && (_vendedor == null || i.rrppId == _vendedor))
+              .where(
+                (i) =>
+                    pasaTeam(i) && (_vendedor == null || i.rrppId == _vendedor),
+              )
               .toList();
           final q = normalizar(_q.trim());
           final ahora = DateTime.now();
@@ -326,7 +365,10 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
             children: [
               Text(
                 '${filtrados.length} anotados · ${filtrados.where((i) => i.ingreso).length} ingresaron',
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
               ),
               if (rol == Rol.jefe) ...[
                 const SizedBox(height: 10),
@@ -348,47 +390,53 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
               ),
               if (esAdmin && todos.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(
-                    child: _Desplegable(
-                      valor: _team,
-                      vacio: 'Todos los teams',
-                      opciones: teams,
-                      alCambiar: (v) => setState(() {
-                        _team = v;
-                        _vendedor = null;
-                      }),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _Desplegable(
+                        valor: _team,
+                        vacio: 'Todos los teams',
+                        opciones: teams,
+                        alCambiar: (v) => setState(() {
+                          _team = v;
+                          _vendedor = null;
+                        }),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _Desplegable(
-                      valor: _vendedor,
-                      vacio: 'Todos los relacionadores',
-                      opciones: vendedores,
-                      alCambiar: (v) => setState(() => _vendedor = v),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _Desplegable(
+                        valor: _vendedor,
+                        vacio: 'Todos los relacionadores',
+                        opciones: vendedores,
+                        alCambiar: (v) => setState(() => _vendedor = v),
+                      ),
                     ),
-                  ),
-                ]),
+                  ],
+                ),
               ],
               const SizedBox(height: 12),
               if (invitados.isLoading && todos.isEmpty)
                 const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()))
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
               else if (q.length >= 2) ...[
                 // buscador global: encuentra al anotado en cualquier lista
-                for (final i in filtrados
-                    .where((i) => normalizar(i.nombre).contains(q))
-                    .take(40))
+                for (final i
+                    in filtrados
+                        .where((i) => normalizar(i.nombre).contains(q))
+                        .take(40))
                   _FilaInvitado(
                     invitado: i,
-                    sub: '${nombreLista[i.listaId] ?? '?'} · lo anotó ${i.rrppNombre}',
+                    sub:
+                        '${nombreLista[i.listaId] ?? '?'} · lo anotó ${i.rrppNombre}',
                     permisos: p,
                     marcado: _marcados.contains(i.id),
                     armado: _armado,
                     alMarcar: null,
-                    alVerQr: () => _verQr(i, ev, nombreLista[i.listaId] ?? 'Lista', p),
+                    alVerQr: () =>
+                        _verQr(i, ev, nombreLista[i.listaId] ?? 'Lista', p),
                     alTickear: null,
                     alDesmarcar: null,
                     alQuitar: null,
@@ -396,14 +444,23 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                 if (!filtrados.any((i) => normalizar(i.nombre).contains(q)))
                   Padding(
                     padding: EdgeInsets.all(24),
-                    child: Text('Nadie anotado con ese nombre.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: VenueColors.textoSuave)),
+                    child: Text(
+                      'Nadie anotado con ese nombre.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: VenueColors.textoSuave),
+                    ),
                   ),
               ] else
                 for (final l in ls)
-                  _tarjetaLista(l, ev, p, filtrados, cupos[l.id], l.abierta(ahora),
-                      nombreLista),
+                  _tarjetaLista(
+                    l,
+                    ev,
+                    p,
+                    filtrados,
+                    cupos[l.id],
+                    l.abierta(ahora),
+                    nombreLista,
+                  ),
             ],
           );
         },
@@ -411,17 +468,26 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
     );
   }
 
-  Widget _tarjetaLista(ListaTipo l, Evento ev, PermisosLista p,
-      List<Invitado> filtrados, int? cupo, bool abiertaParaAnotar,
-      Map<String, String> nombreLista) {
+  Widget _tarjetaLista(
+    ListaTipo l,
+    Evento ev,
+    PermisosLista p,
+    List<Invitado> filtrados,
+    int? cupo,
+    bool abiertaParaAnotar,
+    Map<String, String> nombreLista,
+  ) {
     var rs = filtrados.where((i) => i.listaId == l.id).toList();
     final propios = rs.where(p.esMio).length;
     final lleno = cupo != null && propios >= cupo;
     final on = _abierta == l.id;
     if (_ingresaronArriba) {
-      rs = [...rs]..sort((a, b) {
+      rs = [...rs]
+        ..sort((a, b) {
           if (a.ingreso != b.ingreso) return a.ingreso ? -1 : 1;
-          final c = a.rrppNombre.toLowerCase().compareTo(b.rrppNombre.toLowerCase());
+          final c = a.rrppNombre.toLowerCase().compareTo(
+            b.rrppNombre.toLowerCase(),
+          );
           return c != 0 ? c : a.nombre.compareTo(b.nombre);
         });
     }
@@ -438,31 +504,53 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
               onTap: () => setState(() => _abierta = on ? null : l.id),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-                child: Row(children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(l.nombre,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l.nombre,
                             style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 6),
-                        // lo que la puerta necesita de un vistazo, sin abrir la lista
-                        Wrap(spacing: 6, runSpacing: 6, children: [
-                          _Chip('${rs.length} anotados'),
-                          _Chip('${rs.where((i) => i.ingreso).length} ingresaron',
-                              color: VenueColors.ok),
-                          if (l.ingresoHasta != null)
-                            _Chip('hasta ${l.ingresoHasta}', color: VenueColors.aviso),
-                          _Chip((l.precio ?? 0) > 0 ? '${l.precio} Bs' : 'Free',
-                              color: const Color(0xFFE8B530), borde: true),
-                        ]),
-                      ],
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          // lo que la puerta necesita de un vistazo, sin abrir la lista
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _EstadoTexto('${rs.length} anotados'),
+                              _EstadoTexto(
+                                '${rs.where((i) => i.ingreso).length} ingresaron',
+                                color: VenueColors.ok,
+                              ),
+                              if (l.ingresoHasta != null)
+                                _EstadoTexto(
+                                  'hasta ${l.ingresoHasta}',
+                                  color: VenueColors.aviso,
+                                ),
+                              _EstadoTexto(
+                                (l.precio ?? 0) > 0 ? '${l.precio} Bs' : 'Free',
+                                color: const Color(0xFFE8B530),
+                                borde: true,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  Icon(on ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                      color: VenueColors.textoSuave),
-                ]),
+                    Icon(
+                      on
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      color: VenueColors.textoSuave,
+                    ),
+                  ],
+                ),
               ),
             ),
             if (on) ...[
@@ -478,65 +566,84 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              cupo != null ? '$propios / $cupo' : '$propios',
-                              style: TextStyle(
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                cupo != null ? '$propios / $cupo' : '$propios',
+                                style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w800,
-                                  color: lleno ? VenueColors.aviso : VenueColors.texto),
-                            ),
-                            Text(
-                              cupo != null
-                                  ? (lleno ? 'tuyos · cupo lleno' : 'tuyos · quedan ${cupo - propios}')
-                                  : 'tuyos${p.rol == Rol.admin ? ' · sin límite' : ''}',
-                              style: TextStyle(
-                                  color: VenueColors.textoSuave, fontSize: 13),
-                            ),
-                          ],
+                                  color: lleno
+                                      ? VenueColors.aviso
+                                      : VenueColors.texto,
+                                ),
+                              ),
+                              Text(
+                                cupo != null
+                                    ? (lleno
+                                          ? 'tuyos · cupo lleno'
+                                          : 'tuyos · quedan ${cupo - propios}')
+                                    : 'tuyos${p.rol == Rol.admin ? ' · sin límite' : ''}',
+                                style: TextStyle(
+                                  color: VenueColors.textoSuave,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      if (p.rol == Rol.admin)
-                        IconButton(
-                          tooltip: 'Límites y horarios de la lista',
-                          onPressed: () async {
-                            await abrirEditarLista(context, ref, ev.id, l.id);
-                            _recargar();
-                          },
-                          icon: Icon(Icons.tune_rounded,
-                              color: VenueColors.textoSuave),
-                        ),
-                      if (rs.length > 1)
-                        IconButton(
-                          tooltip: _ingresaronArriba
-                              ? 'Orden normal'
-                              : 'Los que ingresaron arriba',
-                          onPressed: () =>
-                              setState(() => _ingresaronArriba = !_ingresaronArriba),
-                          icon: Icon(Icons.vertical_align_top_rounded,
+                        if (p.rol == Rol.admin)
+                          IconButton(
+                            tooltip: 'Límites y horarios de la lista',
+                            onPressed: () async {
+                              await abrirEditarLista(context, ref, ev.id, l.id);
+                              _recargar();
+                            },
+                            icon: Icon(
+                              Icons.tune_rounded,
+                              color: VenueColors.textoSuave,
+                            ),
+                          ),
+                        if (rs.length > 1)
+                          IconButton(
+                            tooltip: _ingresaronArriba
+                                ? 'Orden normal'
+                                : 'Los que ingresaron arriba',
+                            onPressed: () => setState(
+                              () => _ingresaronArriba = !_ingresaronArriba,
+                            ),
+                            icon: Icon(
+                              Icons.vertical_align_top_rounded,
                               color: _ingresaronArriba
                                   ? Theme.of(context).colorScheme.primary
-                                  : VenueColors.textoSuave),
-                        ),
-                    ]),
+                                  : VenueColors.textoSuave,
+                            ),
+                          ),
+                      ],
+                    ),
                     if (p.anota) ...[
                       const SizedBox(height: 10),
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: FilledButton.icon(
-                          onPressed:
-                              abiertaParaAnotar && !lleno ? () => _anotar(l) : null,
-                          style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
+                          onPressed: abiertaParaAnotar && !lleno
+                              ? () => _anotar(l)
+                              : null,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 46),
+                          ),
                           icon: const Icon(Icons.add_rounded, size: 20),
-                          label: Text(lleno
-                              ? 'Cupo lleno'
-                              : abiertaParaAnotar
-                                  ? 'Agregar invitados'
-                                  : 'Cerrada'),
+                          label: Text(
+                            lleno
+                                ? 'Cupo lleno'
+                                : abiertaParaAnotar
+                                ? 'Agregar invitados'
+                                : 'Cerrada',
+                          ),
                         ),
                       ),
                     ],
@@ -546,9 +653,11 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
               if (rs.isEmpty)
                 Padding(
                   padding: EdgeInsets.all(20),
-                  child: Text('Nadie anotado todavía.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: VenueColors.textoSuave)),
+                  child: Text(
+                    'Nadie anotado todavía.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: VenueColors.textoSuave),
+                  ),
                 ),
               for (final i in rs)
                 Padding(
@@ -563,42 +672,62 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                     marcado: _marcados.contains(i.id),
                     armado: _armado,
                     alMarcar: p.mandar(i)
-                        ? (v) => setState(() =>
-                            v ? _marcados.add(i.id) : _marcados.remove(i.id))
+                        ? (v) => setState(
+                            () => v
+                                ? _marcados.add(i.id)
+                                : _marcados.remove(i.id),
+                          )
                         : null,
                     alVerQr: () => _verQr(i, ev, l.nombre, p),
-                    alTickear: p.tickea && !i.ingreso ? () => _tickear(i) : null,
+                    alTickear: p.tickea && !i.ingreso
+                        ? () => _tickear(i)
+                        : null,
                     alDesmarcar: p.tickea && i.ingreso
                         ? () {
-                            if (!_confirmado('des:${i.id}',
-                                'Tocá de nuevo para desmarcar el ingreso')) {
+                            if (!_confirmado(
+                              'des:${i.id}',
+                              'Tocá de nuevo para desmarcar el ingreso',
+                            )) {
                               return;
                             }
                             _hacer(() async {
                               await ref
                                   .read(supabaseProvider)
-                                  .rpc('descheckin_registro', params: {'p_registro': i.id});
+                                  .rpc(
+                                    'descheckin_registro',
+                                    params: {'p_registro': i.id},
+                                  );
                               ref.invalidate(invitadosProvider);
                               if (mounted) {
-                                avisar(context, 'Ingreso desmarcado',
-                                    tipo: TipoAviso.aviso);
+                                avisar(
+                                  context,
+                                  'Ingreso desmarcado',
+                                  tipo: TipoAviso.aviso,
+                                );
                               }
                             });
                           }
                         : null,
                     alQuitar: p.quitar(i)
                         ? () {
-                            if (!_confirmado('del:${i.id}',
-                                'Tocá de nuevo para quitar a ${i.nombre}')) {
+                            if (!_confirmado(
+                              'del:${i.id}',
+                              'Tocá de nuevo para quitar a ${i.nombre}',
+                            )) {
                               return;
                             }
                             _hacer(() async {
-                              await ref.read(listasRepositoryProvider).eliminar(i.id);
+                              await ref
+                                  .read(listasRepositoryProvider)
+                                  .eliminar(i.id);
                               _marcados.remove(i.id);
                               _recargar();
                               if (mounted) {
-                                avisar(context, '${i.nombre} eliminado de la lista',
-                                    tipo: TipoAviso.aviso);
+                                avisar(
+                                  context,
+                                  '${i.nombre} eliminado de la lista',
+                                  tipo: TipoAviso.aviso,
+                                );
                               }
                             });
                           }
@@ -608,23 +737,31 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
               if (marcadosAca > 0 || _marcados.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                  child: Row(children: [
-                    Expanded(
-                        child: Text('${_marcados.length} marcados',
-                            style: const TextStyle(fontWeight: FontWeight.w700))),
-                    TextButton(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${_marcados.length} marcados',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      TextButton(
                         onPressed: () => setState(_marcados.clear),
-                        child: const Text('Limpiar')),
-                    const SizedBox(width: 6),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
+                        child: const Text('Limpiar'),
+                      ),
+                      const SizedBox(width: 6),
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
                           minimumSize: const Size(0, 44),
-                          padding: const EdgeInsets.symmetric(horizontal: 14)),
-                      onPressed: () => _enviarTanda(filtrados, ev, nombreLista),
-                      icon: const Icon(Icons.send_rounded, size: 18),
-                      label: const Text('Enviar QRs'),
-                    ),
-                  ]),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                        ),
+                        onPressed: () =>
+                            _enviarTanda(filtrados, ev, nombreLista),
+                        icon: const Icon(Icons.send_rounded, size: 18),
+                        label: const Text('Enviar QRs'),
+                      ),
+                    ],
+                  ),
                 )
               else
                 const SizedBox(height: 8),
@@ -636,25 +773,23 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip(this.texto, {Color? color, this.borde = false}) : _color = color;
+class _EstadoTexto extends StatelessWidget {
+  const _EstadoTexto(this.texto, {this.color, this.borde = false});
   final String texto;
-  final Color? _color;
+  final Color? color;
   final bool borde;
-
-  Color get color => _color ?? VenueColors.textoSuave;
-
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-        decoration: BoxDecoration(
-          color: borde ? Colors.transparent : color.withValues(alpha: .12),
-          borderRadius: BorderRadius.circular(99),
-          border: borde ? Border.all(color: color.withValues(alpha: .7)) : null,
-        ),
-        child: Text(texto,
-            style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w700)),
-      );
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    child: Text(
+      texto,
+      style: TextStyle(
+        color: color ?? VenueColors.textoSuave,
+        fontSize: 12.5,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 }
 
 class _FilaInvitado extends StatelessWidget {
@@ -699,13 +834,22 @@ class _FilaInvitado extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(i.nombre,
-                      style: const TextStyle(
-                          fontSize: 15.5, fontWeight: FontWeight.w600)),
+                  Text(
+                    i.nombre,
+                    style: const TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   if (sub != null)
-                    Text(sub!,
-                        style: TextStyle(
-                            fontSize: 12.5, color: VenueColors.textoSuave, height: 1.3)),
+                    Text(
+                      sub!,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: VenueColors.textoSuave,
+                        height: 1.3,
+                      ),
+                    ),
                   if (i.ingreso || i.codigo != null)
                     Text(
                       [
@@ -713,8 +857,11 @@ class _FilaInvitado extends StatelessWidget {
                         if (i.codigo != null) 'QR',
                       ].join(' · '),
                       style: TextStyle(
-                          fontSize: 12.5,
-                          color: i.ingreso ? VenueColors.ok : VenueColors.textoSuave),
+                        fontSize: 12.5,
+                        color: i.ingreso
+                            ? VenueColors.ok
+                            : VenueColors.textoSuave,
+                      ),
                     ),
                 ],
               ),
@@ -726,20 +873,26 @@ class _FilaInvitado extends StatelessWidget {
             tooltip: i.ingreso ? 'Desmarcar ingreso' : 'Marcar ingreso',
             onPressed: alTickear ?? alDesmarcar,
             icon: Icon(
-              i.ingreso ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+              i.ingreso
+                  ? Icons.check_box_rounded
+                  : Icons.check_box_outline_blank_rounded,
               color: armado == 'des:${i.id}'
                   ? VenueColors.mal
                   : i.ingreso
-                      ? VenueColors.ok
-                      : VenueColors.textoSuave,
+                  ? VenueColors.ok
+                  : VenueColors.textoSuave,
             ),
           ),
         if (alQuitar != null)
           IconButton(
             tooltip: 'Quitar de la lista',
             onPressed: alQuitar,
-            icon: Icon(Icons.close_rounded,
-                color: armado == 'del:${i.id}' ? VenueColors.mal : VenueColors.textoSuave),
+            icon: Icon(
+              Icons.close_rounded,
+              color: armado == 'del:${i.id}'
+                  ? VenueColors.mal
+                  : VenueColors.textoSuave,
+            ),
           ),
       ],
     );
@@ -765,17 +918,26 @@ class _Desplegable extends StatelessWidget {
     return DropdownButtonFormField<String?>(
       borderRadius: BorderRadius.circular(12),
       dropdownColor: VenueColors.superficie,
-      icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+      icon: Icon(
+        Icons.keyboard_arrow_down_rounded,
+        color: VenueColors.textoSuave,
+      ),
       menuMaxHeight: 420,
       initialValue: opciones.containsKey(valor) ? valor : null,
       isExpanded: true,
       decoration: const InputDecoration(
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
       items: [
-        DropdownMenuItem<String?>(value: null, child: Text(vacio, overflow: TextOverflow.ellipsis)),
+        DropdownMenuItem<String?>(
+          value: null,
+          child: Text(vacio, overflow: TextOverflow.ellipsis),
+        ),
         for (final e in orden)
           DropdownMenuItem<String?>(
-              value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis)),
+            value: e.key,
+            child: Text(e.value, overflow: TextOverflow.ellipsis),
+          ),
       ],
       onChanged: alCambiar,
     );
@@ -805,16 +967,24 @@ class _AnotarSheetState extends State<_AnotarSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.fromLTRB(
-          20, 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+        20,
+        0,
+        20,
+        20 + MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Anotar en ${widget.lista.nombre}',
-              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+          Text(
+            'Anotar en ${widget.lista.nombre}',
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+          ),
           const SizedBox(height: 4),
-          Text('Un nombre completo por línea.',
-              style: TextStyle(color: VenueColors.textoSuave)),
+          Text(
+            'Un nombre completo por línea.',
+            style: TextStyle(color: VenueColors.textoSuave),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _texto,
@@ -829,27 +999,39 @@ class _AnotarSheetState extends State<_AnotarSheet> {
             DropdownButtonFormField<String?>(
               borderRadius: BorderRadius.circular(12),
               dropdownColor: VenueColors.superficie,
-              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: VenueColors.textoSuave,
+              ),
               menuMaxHeight: 420,
               initialValue: _de,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'A nombre de'),
               items: [
-                const DropdownMenuItem<String?>(value: null, child: Text('Mío')),
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Mío'),
+                ),
                 for (final v in widget.vendedores)
                   DropdownMenuItem<String?>(
-                      value: v.id,
-                      child: Text(
-                          v.team == 'Sin team' ? v.nombre : '${v.nombre} · ${v.team}',
-                          overflow: TextOverflow.ellipsis)),
+                    value: v.id,
+                    child: Text(
+                      v.team == 'Sin team'
+                          ? v.nombre
+                          : '${v.nombre} · ${v.team}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
               ],
               onChanged: (v) => setState(() => _de = v),
             ),
           ],
           const SizedBox(height: 14),
           FilledButton(
-            onPressed: () => Navigator.pop(
-                context, (nombres: separarNombres(_texto.text), de: _de)),
+            onPressed: () => Navigator.pop(context, (
+              nombres: separarNombres(_texto.text),
+              de: _de,
+            )),
             child: const Text('Anotar'),
           ),
         ],

@@ -3475,6 +3475,9 @@ async function validar(raw) {
       nota: "Esta entrada ya fue usada. No vuelve a entrar."
     }, esLista ? null : code);
     feedback("warn"); scans.unshift({ cls: "warn", code: r.code, nm: r.cliente, t: hora(new Date().toISOString()) });
+  } else if (["bloqueada","reemplazada"].includes(r.resultado)) {
+    pintarRes("bad",{nombre:esc(r.cliente),titulo:r.resultado==="bloqueada"?"Entrada bloqueada por reventa":"QR reemplazado",nota:r.resultado==="bloqueada"?"No permitir ingreso mientras la reventa esté activa.":"Este QR fue invalidado definitivamente. El comprador tiene otro código."});
+    feedback("bad");
   } else if (r.resultado === "anulada") {
     pintarRes("bad", { nombre: esc(r.cliente), titulo: "Entrada anulada",
       nota: "El vendedor anuló esta entrada." });

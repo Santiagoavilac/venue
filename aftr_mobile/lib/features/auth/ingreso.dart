@@ -16,9 +16,17 @@ class IngresoCancelado implements Exception {}
 /// Ingreso con Apple o Google: el token del proveedor se cambia por una
 /// sesión de Supabase (signInWithIdToken). No hay contraseñas en AFTR.
 class Ingreso {
-  Ingreso(this._sb);
+  Ingreso(
+    this._sb, {
+    this.googleIosClientId = Env.googleIosClientId,
+    this.googleWebClientId = Env.googleWebClientId,
+  });
   final SupabaseClient _sb;
-  bool _googleListo = false;
+  final String googleIosClientId;
+  final String googleWebClientId;
+  // google_sign_in 7 inicializa el SDK una sola vez por proceso.
+  static final String _googleNonce = _nonce();
+  static Future<void>? _googleInicializacion;
 
   static String _nonce([int largo = 32]) {
     const c = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
@@ -49,14 +57,15 @@ class Ingreso {
   }
 
   Future<void> conGoogle() async {
-    if (Env.googleIosClientId.isEmpty) {
+    if (googleIosClientId.isEmpty) {
       throw const AuthException('El ingreso con Google todavía no está configurado.');
     }
     final g = GoogleSignIn.instance;
-    if (!_googleListo) {
-      await g.initialize(clientId: Env.googleIosClientId, serverClientId: Env.googleWebClientId);
-      _googleListo = true;
-    }
+    await (_googleInicializacion ??= g.initialize(
+      clientId: googleIosClientId,
+      serverClientId: googleWebClientId,
+      nonce: sha256.convert(utf8.encode(_googleNonce)).toString(),
+    ));
     final GoogleSignInAccount cuenta;
     try {
       cuenta = await g.authenticate();
@@ -66,7 +75,7 @@ class Ingreso {
     }
     final token = cuenta.authentication.idToken;
     if (token == null) throw const AuthException('Google no devolvió el token.');
-    await _sb.auth.signInWithIdToken(provider: OAuthProvider.google, idToken: token);
+    await _sb.auth.signInWithIdToken(provider: OAuthProvider.google, idToken: token, nonce: _googleNonce);
   }
 
   /// El nombre que dio el proveedor, para proponerlo en el onboarding.
@@ -78,7 +87,7 @@ class Ingreso {
 
   Future<void> salir() async {
     try {
-      if (_googleListo) await GoogleSignIn.instance.signOut();
+      if (_googleInicializacion != null) await GoogleSignIn.instance.signOut();
     } catch (_) {}
     await _sb.auth.signOut();
   }

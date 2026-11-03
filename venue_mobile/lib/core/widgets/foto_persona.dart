@@ -22,8 +22,8 @@ class FotoPersona extends StatelessWidget {
         width: tam,
         height: tam,
         fit: BoxFit.cover,
+        gaplessPlayback: true,
         cacheWidth: (tam * MediaQuery.devicePixelRatioOf(context)).round(),
-        loadingBuilder: (_, child, progreso) => progreso == null ? child : inicial,
         errorBuilder: (_, _, _) => inicial,
       ),
     );

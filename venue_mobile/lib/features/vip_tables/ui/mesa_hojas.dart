@@ -1,3 +1,4 @@
+import '../../../core/widgets/opcion_texto.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -16,7 +17,8 @@ import '../../tickets/data/entradas.dart';
 import '../../tickets/ui/ticket_sheet.dart';
 import '../data/mesas.dart';
 
-Future<T?> _hoja<T>(BuildContext context, Widget child) => showModalBottomSheet<T>(
+Future<T?> _hoja<T>(BuildContext context, Widget child) =>
+    showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -31,7 +33,11 @@ Future<T?> _hoja<T>(BuildContext context, Widget child) => showModalBottomSheet<
 /// Imagen de un comprobante: pide la URL firmada y la muestra. Si la persona
 /// no tiene permiso, lo dice en vez de mostrar una imagen rota.
 class ImagenComprobante extends ConsumerWidget {
-  const ImagenComprobante({super.key, required this.referencia, this.ancho = 240});
+  const ImagenComprobante({
+    super.key,
+    required this.referencia,
+    this.ancho = 240,
+  });
   final String referencia;
   final double ancho;
 
@@ -42,11 +48,16 @@ class ImagenComprobante extends ConsumerWidget {
       builder: (context, s) {
         if (s.connectionState != ConnectionState.done) {
           return SizedBox(
-              width: ancho, height: 120, child: const Center(child: CircularProgressIndicator()));
+            width: ancho,
+            height: 120,
+            child: const Center(child: CircularProgressIndicator()),
+          );
         }
         if (s.data == null) {
-          return Text('No tenés permiso para ver este comprobante.',
-              style: TextStyle(color: VenueColors.textoSuave));
+          return Text(
+            'No tenés permiso para ver este comprobante.',
+            style: TextStyle(color: VenueColors.textoSuave),
+          );
         }
         return ClipRRect(
           borderRadius: BorderRadius.circular(12),
@@ -59,7 +70,8 @@ class ImagenComprobante extends ConsumerWidget {
 
 // ───────────────────────── seguridad ─────────────────────────
 /// El portero ve el nombre y el combo. Nada de plata.
-Future<void> hojaMesaSeguridad(BuildContext context, Mesa m, Combo? combo) => _hoja(
+Future<void> hojaMesaSeguridad(BuildContext context, Mesa m, Combo? combo) =>
+    _hoja(
       context,
       Padding(
         padding: const EdgeInsets.fromLTRB(22, 0, 22, 26),
@@ -67,14 +79,21 @@ Future<void> hojaMesaSeguridad(BuildContext context, Mesa m, Combo? combo) => _h
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${m.tipo.nombre} ${m.etiqueta}',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            Text(
+              '${m.tipo.nombre} ${m.etiqueta}',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 10),
             if (m.libre)
               Text('Libre', style: TextStyle(color: VenueColors.textoSuave))
             else ...[
-              Text(m.cliente ?? '—',
-                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+              Text(
+                m.cliente ?? '—',
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
               const SizedBox(height: 4),
               Text(
                 [
@@ -170,24 +189,33 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
     };
     final validos = combos.where((c) => c.valePara(cats)).toList();
     if (_combo != null && !validos.any((c) => c.id == _combo)) _combo = null;
-    _combo ??= ev.comboObligatorio && validos.isNotEmpty ? validos.first.id : _combo;
+    _combo ??= ev.comboObligatorio && validos.isNotEmpty
+        ? validos.first.id
+        : _combo;
     final combo = validos.where((c) => c.id == _combo).firstOrNull;
     // solo se ofrecen las libres que están cerca de la mesa o de alguna ya
     // sumada: así se arma una fila de mesas, pero no se junta con una lejana
-    final sumadas = [m, for (final x in todas) if (_extra.contains(x.id)) x];
+    final sumadas = [
+      m,
+      for (final x in todas)
+        if (_extra.contains(x.id)) x,
+    ];
     final libresPiso = todas
-        .where((x) =>
-            x.planta == m.planta &&
-            x.libre &&
-            x.id != m.id &&
-            (_extra.contains(x.id) ||
-                sumadas.any((s) => distanciaMesas(s, x) <= radioJuntarMesas)))
+        .where(
+          (x) =>
+              x.planta == m.planta &&
+              x.libre &&
+              x.id != m.id &&
+              (_extra.contains(x.id) ||
+                  sumadas.any((s) => distanciaMesas(s, x) <= radioJuntarMesas)),
+        )
         .toList();
     // una cortesía no se cobra: queda pagada, sin estado ni método que elegir
     final pagada = _estado == 'pagada' || _cortesia;
     final transferencia = pagada && !_cortesia && _metodo == 'transferencia';
     final pideFoto = transferencia && !esAdmin;
-    final incluidas = (combo?.incluyeManillas ?? 0) * _cantidad +
+    final incluidas =
+        (combo?.incluyeManillas ?? 0) * _cantidad +
         (int.tryParse(_manillas.text) ?? 0);
     final total = _cortesia ? 0 : (combo?.precio ?? 0) * _cantidad;
 
@@ -198,9 +226,11 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
         return;
       }
       if (_combo == null && ev.comboObligatorio) {
-        avisar(context,
-            'No hay ningún combo habilitado para este tipo de mesa. Pedile al admin que habilite uno.',
-            tipo: TipoAviso.aviso);
+        avisar(
+          context,
+          'No hay ningún combo habilitado para este tipo de mesa. Pedile al admin que habilite uno.',
+          tipo: TipoAviso.aviso,
+        );
         return;
       }
       setState(() => _enviando = true);
@@ -229,8 +259,16 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
         var manillas = 0;
         for (final n in separarNombres(_nombres.text)) {
           try {
-            await ref.read(supabaseProvider).rpc('generar_entrada',
-                params: {'p_evento': ev.id, 'p_cliente': n, 'p_mesa': r.primaria});
+            await ref
+                .read(supabaseProvider)
+                .rpc(
+                  'generar_entrada',
+                  params: {
+                    'p_evento': ev.id,
+                    'p_cliente': n,
+                    'p_mesa': r.primaria,
+                  },
+                );
             manillas++;
           } catch (_) {}
         }
@@ -245,9 +283,11 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
               : _estado == 'reservada'
               ? '${r.etiqueta} reservada$extra — tenés ${ev.horasReserva} h para confirmar el pago o se libera sola'
               : esAdmin
-                  ? '${r.etiqueta} vendida · ${r.precio} Bs$extra'
-                  : '${r.etiqueta} pagada en $_metodo · por verificar$extra',
-          tipo: _cortesia || (_estado == 'pagada' && esAdmin) ? TipoAviso.ok : TipoAviso.aviso,
+              ? '${r.etiqueta} vendida · ${r.precio} Bs$extra'
+              : '${r.etiqueta} pagada en $_metodo · por verificar$extra',
+          tipo: _cortesia || (_estado == 'pagada' && esAdmin)
+              ? TipoAviso.ok
+              : TipoAviso.aviso,
         );
       } catch (e) {
         if (context.mounted) {
@@ -261,8 +301,10 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
-        Text('Vender ${m.etiqueta} · ${m.tipo.nombre}',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        Text(
+          'Vender ${m.etiqueta} · ${m.tipo.nombre}',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 14),
         TextField(
           controller: _cliente,
@@ -273,21 +315,29 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
         DropdownButtonFormField<String?>(
           borderRadius: BorderRadius.circular(12),
           dropdownColor: VenueColors.superficie,
-          icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: VenueColors.textoSuave,
+          ),
           menuMaxHeight: 420,
           initialValue: _combo,
           isExpanded: true,
           decoration: InputDecoration(
-              labelText: ev.comboObligatorio ? 'Combo' : 'Combo (opcional)'),
+            labelText: ev.comboObligatorio ? 'Combo' : 'Combo (opcional)',
+          ),
           items: [
             if (!ev.comboObligatorio)
-              const DropdownMenuItem<String?>(value: null, child: Text('Sin combo — 0 Bs')),
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('Sin combo — 0 Bs'),
+              ),
             for (final c in validos)
               DropdownMenuItem<String?>(
                 value: c.id,
                 child: Text(
-                    '${c.nombre} · ${c.precio} Bs${c.incluyeManillas > 0 ? ' · ${c.incluyeManillas} manillas' : ''}',
-                    overflow: TextOverflow.ellipsis),
+                  '${c.nombre} · ${c.precio} Bs${c.incluyeManillas > 0 ? ' · ${c.incluyeManillas} manillas' : ''}',
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
           ],
           onChanged: (v) => setState(() => _combo = v),
@@ -295,49 +345,71 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
         if (validos.isEmpty && ev.comboObligatorio)
           Padding(
             padding: EdgeInsets.only(top: 6),
-            child: Text('Ningún combo habilitado para este tipo de mesa.',
-                style: TextStyle(color: VenueColors.aviso)),
+            child: Text(
+              'Ningún combo habilitado para este tipo de mesa.',
+              style: TextStyle(color: VenueColors.aviso),
+            ),
           ),
         const SizedBox(height: 12),
-        Row(children: [
-          const Expanded(child: Text('Cantidad de combos')),
-          IconButton.filledTonal(
-              onPressed: () => setState(() => _cantidad = (_cantidad - 1).clamp(1, 20)),
-              icon: const Icon(Icons.remove_rounded)),
-          SizedBox(
+        Row(
+          children: [
+            const Expanded(child: Text('Cantidad de combos')),
+            IconButton.filledTonal(
+              onPressed: () =>
+                  setState(() => _cantidad = (_cantidad - 1).clamp(1, 20)),
+              icon: const Icon(Icons.remove_rounded),
+            ),
+            SizedBox(
               width: 44,
-              child: Text('$_cantidad',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
-          IconButton.filledTonal(
-              onPressed: () => setState(() => _cantidad = (_cantidad + 1).clamp(1, 20)),
-              icon: const Icon(Icons.add_rounded)),
-        ]),
-        Text(_cortesia ? 'Total: 0 Bs (cortesía)' : 'Total: $total Bs',
-            style: const TextStyle(fontWeight: FontWeight.w700)),
+              child: Text(
+                '$_cantidad',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            IconButton.filledTonal(
+              onPressed: () =>
+                  setState(() => _cantidad = (_cantidad + 1).clamp(1, 20)),
+              icon: const Icon(Icons.add_rounded),
+            ),
+          ],
+        ),
+        Text(
+          _cortesia ? 'Total: 0 Bs (cortesía)' : 'Total: $total Bs',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
         if (libresPiso.isNotEmpty && ev.permiteAgrupar) ...[
           const SizedBox(height: 14),
           const Text('Sumar mesas cercanas al mismo combo (opcional)'),
           const SizedBox(height: 6),
-          Wrap(spacing: 8, runSpacing: 4, children: [
-            for (final x in libresPiso)
-              FilterChip(
-                label: Text(x.etiqueta),
-                selected: _extra.contains(x.id),
-                onSelected: (v) => setState(() {
-                  if (v) {
-                    _extra.add(x.id);
-                  } else {
-                    // al sacar una del medio, las que solo estaban unidas
-                    // a través de ella también salen
-                    _extra.remove(x.id);
-                    final unidas = mesasEncadenadas(
-                        m, todas.where((t) => _extra.contains(t.id)));
-                    _extra.retainAll(unidas);
-                  }
-                }),
-              ),
-          ]),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final x in libresPiso)
+                OpcionTexto(
+                  label: Text(x.etiqueta),
+                  selected: _extra.contains(x.id),
+                  onSelected: (v) => setState(() {
+                    if (v) {
+                      _extra.add(x.id);
+                    } else {
+                      // al sacar una del medio, las que solo estaban unidas
+                      // a través de ella también salen
+                      _extra.remove(x.id);
+                      final unidas = mesasEncadenadas(
+                        m,
+                        todas.where((t) => _extra.contains(t.id)),
+                      );
+                      _extra.retainAll(unidas);
+                    }
+                  }),
+                ),
+            ],
+          ),
           Text(
             ev.comboPorMesa
                 ? 'Cada mesa paga su propio combo.'
@@ -346,27 +418,33 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
           ),
         ],
         const SizedBox(height: 12),
-        Row(children: [
-          Expanded(
-            child: TextField(
-              controller: _botellas,
-              decoration: const InputDecoration(
-                  labelText: 'Botellas (opcional)', hintText: 'Vodka, Fernet'),
-            ),
-          ),
-          if (rol != Rol.rrpp) ...[
-            const SizedBox(width: 10),
-            SizedBox(
-              width: 120,
+        Row(
+          children: [
+            Expanded(
               child: TextField(
-                controller: _manillas,
-                keyboardType: TextInputType.number,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(labelText: 'Manillas extra'),
+                controller: _botellas,
+                decoration: const InputDecoration(
+                  labelText: 'Botellas (opcional)',
+                  hintText: 'Vodka, Fernet',
+                ),
               ),
             ),
+            if (rol != Rol.rrpp) ...[
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 120,
+                child: TextField(
+                  controller: _manillas,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: 'Manillas extra',
+                  ),
+                ),
+              ),
+            ],
           ],
-        ]),
+        ),
         const SizedBox(height: 12),
         TextField(
           controller: _nombres,
@@ -376,7 +454,8 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
           decoration: InputDecoration(
             labelText: 'Nombres de las manillas (incluye $incluidas)',
             hintText: 'Uno por línea. Podés cargarlos después.',
-            helperText: 'Cada nombre genera su entrada con QR, incluida en el combo.',
+            helperText:
+                'Cada nombre genera su entrada con QR, incluida en el combo.',
           ),
         ),
         if (permisos?.aNombreDe ?? false) ...[
@@ -384,7 +463,10 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
           DropdownButtonFormField<String?>(
             borderRadius: BorderRadius.circular(12),
             dropdownColor: VenueColors.superficie,
-            icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
+            icon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: VenueColors.textoSuave,
+            ),
             menuMaxHeight: 420,
             initialValue: _aNombreDe,
             isExpanded: true,
@@ -396,10 +478,12 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
               const DropdownMenuItem<String?>(value: null, child: Text('Vos')),
               for (final v in vendedores.where((v) => v.id != yo))
                 DropdownMenuItem<String?>(
-                    value: v.id,
-                    child: Text(
-                        v.team == 'Sin team' ? v.nombre : '${v.nombre} · ${v.team}',
-                        overflow: TextOverflow.ellipsis)),
+                  value: v.id,
+                  child: Text(
+                    v.team == 'Sin team' ? v.nombre : '${v.nombre} · ${v.team}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
             ],
             onChanged: (v) => setState(() => _aNombreDe = v),
           ),
@@ -425,30 +509,34 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
         if (!_cortesia) ...[
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-          borderRadius: BorderRadius.circular(12),
-          dropdownColor: VenueColors.superficie,
-          icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
-          menuMaxHeight: 420,
-          initialValue: _estado,
-          decoration: InputDecoration(
-            labelText: 'Estado',
-            helperText: !ev.permiteReserva
-                ? 'En este evento las mesas se venden solo pagadas.'
-                : !pagada
-                    ? 'Si en ${ev.horasReserva} horas no se confirma el pago, la reserva se libera sola.'
-                    : esAdmin
-                        ? 'Queda pagada y verificada.'
-                        : 'Queda como pagada · por verificar, hasta que el admin confirme.',
-            helperMaxLines: 2,
-          ),
-          items: [
-            if (ev.permiteReserva)
-              DropdownMenuItem(
+            borderRadius: BorderRadius.circular(12),
+            dropdownColor: VenueColors.superficie,
+            icon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: VenueColors.textoSuave,
+            ),
+            menuMaxHeight: 420,
+            initialValue: _estado,
+            decoration: InputDecoration(
+              labelText: 'Estado',
+              helperText: !ev.permiteReserva
+                  ? 'En este evento las mesas se venden solo pagadas.'
+                  : !pagada
+                  ? 'Si en ${ev.horasReserva} horas no se confirma el pago, la reserva se libera sola.'
+                  : esAdmin
+                  ? 'Queda pagada y verificada.'
+                  : 'Queda como pagada · por verificar, hasta que el admin confirme.',
+              helperMaxLines: 2,
+            ),
+            items: [
+              if (ev.permiteReserva)
+                DropdownMenuItem(
                   value: 'reservada',
-                  child: Text('Reservada — ${ev.horasReserva} h para pagar')),
-            const DropdownMenuItem(value: 'pagada', child: Text('Ya pagó')),
-          ],
-          onChanged: (v) => setState(() => _estado = v!),
+                  child: Text('Reservada — ${ev.horasReserva} h para pagar'),
+                ),
+              const DropdownMenuItem(value: 'pagada', child: Text('Ya pagó')),
+            ],
+            onChanged: (v) => setState(() => _estado = v!),
           ),
         ],
         if (pagada && !_cortesia) ...[
@@ -456,7 +544,10 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
           SegmentedButton<String>(
             showSelectedIcon: false,
             segments: const [
-              ButtonSegment(value: 'transferencia', label: Text('Transferencia')),
+              ButtonSegment(
+                value: 'transferencia',
+                label: Text('Transferencia'),
+              ),
               ButtonSegment(value: 'efectivo', label: Text('Efectivo')),
             ],
             selected: {_metodo},
@@ -476,37 +567,43 @@ class _VenderMesaState extends ConsumerState<_VenderMesa> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Center(
                   child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.memory(_vista!, width: 200)),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(_vista!, width: 200),
+                  ),
                 ),
               ),
-            Row(children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _subiendo ? null : () => _foto(camara: true),
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('Foto'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _subiendo ? null : () => _foto(camara: true),
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: const Text('Foto'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _subiendo ? null : () => _foto(camara: false),
-                  icon: const Icon(Icons.image_outlined),
-                  label: Text(_comprobante == null ? 'Galería' : 'Cambiar'),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _subiendo ? null : () => _foto(camara: false),
+                    icon: const Icon(Icons.image_outlined),
+                    label: Text(_comprobante == null ? 'Galería' : 'Cambiar'),
+                  ),
                 ),
-              ),
-            ]),
+              ],
+            ),
           ],
         ],
         const SizedBox(height: 18),
         FilledButton(
-          onPressed: _enviando || _subiendo || (pideFoto && _comprobante == null)
+          onPressed:
+              _enviando || _subiendo || (pideFoto && _comprobante == null)
               ? null
               : confirmar,
-          child: Text(pideFoto && _comprobante == null
-              ? 'Subí el comprobante para confirmar'
-              : 'Confirmar venta'),
+          child: Text(
+            pideFoto && _comprobante == null
+                ? 'Subí el comprobante para confirmar'
+                : 'Confirmar venta',
+          ),
         ),
       ],
     );
@@ -526,30 +623,39 @@ class QrDeCobro extends ConsumerWidget {
       builder: (context, s) {
         if (s.connectionState != ConnectionState.done) {
           return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()));
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
         }
         final q = s.data;
         if (q == null) {
           return Padding(
             padding: EdgeInsets.all(12),
-            child: Text('El admin todavía no cargó ningún QR de cobro.',
-                style: TextStyle(color: VenueColors.aviso)),
+            child: Text(
+              'El admin todavía no cargó ningún QR de cobro.',
+              style: TextStyle(color: VenueColors.aviso),
+            ),
           );
         }
-        return Column(children: [
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-                color: Colors.white, borderRadius: BorderRadius.circular(12)),
-            child: Image.network(q.url, width: 230, fit: BoxFit.contain),
-          ),
-          const SizedBox(height: 6),
-          Text('La plata de las mesas entra siempre a ${q.nombre}.',
+        return Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Image.network(q.url, width: 230, fit: BoxFit.contain),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'La plata de las mesas entra siempre a ${q.nombre}.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: VenueColors.textoSuave, fontSize: 13)),
-        ]);
+              style: TextStyle(color: VenueColors.textoSuave, fontSize: 13),
+            ),
+          ],
+        );
       },
     );
   }
@@ -559,16 +665,18 @@ class QrDeCobro extends ConsumerWidget {
 Future<void> hojaMesaVendida(BuildContext context, Mesa mesa) =>
     _hoja(context, _MesaVendida(mesa: mesa));
 
-final _manillasMesaProvider =
-    FutureProvider.autoDispose.family<List<Entrada>, String>((ref, mesaId) async {
-  final r = await ref
-      .watch(supabaseProvider)
-      .from('entradas')
-      .select('id, code, cliente, precio, estado, used_at, rrpp_id, fase_id, filtro_at')
-      .eq('mesa_id', mesaId)
-      .order('created_at', ascending: true);
-  return r.map(Entrada.desde).toList();
-});
+final _manillasMesaProvider = FutureProvider.autoDispose
+    .family<List<Entrada>, String>((ref, mesaId) async {
+      final r = await ref
+          .watch(supabaseProvider)
+          .from('entradas')
+          .select(
+            'id, code, cliente, precio, estado, used_at, rrpp_id, fase_id, filtro_at',
+          )
+          .eq('mesa_id', mesaId)
+          .order('created_at', ascending: true);
+      return r.map(Entrada.desde).toList();
+    });
 
 class _MesaVendida extends ConsumerStatefulWidget {
   const _MesaVendida({required this.mesa});
@@ -600,7 +708,11 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
     super.dispose();
   }
 
-  Future<void> _hacer(Future<void> Function() f, {String? ok, bool cerrar = true}) async {
+  Future<void> _hacer(
+    Future<void> Function() f, {
+    String? ok,
+    bool cerrar = true,
+  }) async {
     setState(() => _ocupado = true);
     try {
       await f();
@@ -622,7 +734,8 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
     final yo = ref.watch(usuarioIdProvider);
     final equipo = ref.watch(equipoProvider).value ?? const <String, Miembro>{};
     final combos = {
-      for (final c in ref.watch(combosProvider).value ?? const <Combo>[]) c.id: c
+      for (final c in ref.watch(combosProvider).value ?? const <Combo>[])
+        c.id: c,
     };
     final grupo = _grupo ?? [m];
     // la mesa primaria (precio > 0) lleva el combo y las manillas del grupo
@@ -636,7 +749,8 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
     final gestiona = esAdmin || mia;
     final repo = ref.read(mesasRepositoryProvider);
     final manillas = ref.watch(_manillasMesaProvider(prim.id));
-    final incluidas = (combo?.incluyeManillas ?? 0) * prim.comboQty + prim.manillas;
+    final incluidas =
+        (combo?.incluyeManillas ?? 0) * prim.comboQty + prim.manillas;
     final vendedor = equipo[m.vendidoPor];
     final vence = m.vence(ev.horasReserva);
     final club = ref.watch(clubActivoProvider);
@@ -646,12 +760,16 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
         Text(
-          esGrupo ? grupo.map((x) => x.etiqueta).join(' + ') : '${m.tipo.nombre} ${m.etiqueta}',
+          esGrupo
+              ? grupo.map((x) => x.etiqueta).join(' + ')
+              : '${m.tipo.nombre} ${m.etiqueta}',
           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 6),
-        Text(prim.cliente ?? '—',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+        Text(
+          prim.cliente ?? '—',
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 4),
         Text(
           [
@@ -662,69 +780,98 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
           style: TextStyle(color: VenueColors.textoSuave, fontSize: 15),
         ),
         if (vendedor != null)
-          Text('La vendió ${vendedor.nombre} · ${vendedor.team}',
-              style: TextStyle(color: VenueColors.textoSuave)),
+          Text(
+            'La vendió ${vendedor.nombre} · ${vendedor.team}',
+            style: TextStyle(color: VenueColors.textoSuave),
+          ),
         if (prim.botellas.isNotEmpty)
-          Text('Botellas: ${prim.botellas.join(', ')}',
-              style: TextStyle(color: VenueColors.textoSuave)),
+          Text(
+            'Botellas: ${prim.botellas.join(', ')}',
+            style: TextStyle(color: VenueColors.textoSuave),
+          ),
         if (m.estado == 'reservada' && vence != null)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text('Reserva sin pago · vence ${horaCorta(vence)}',
-                style: TextStyle(
-                    color: VenueColors.aviso, fontWeight: FontWeight.w700)),
+            child: Text(
+              'Reserva sin pago · vence ${horaCorta(vence)}',
+              style: TextStyle(
+                color: VenueColors.aviso,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
-        if (m.estado == 'pagada' && !prim.pagoVerificado && !prim.cortesia && prim.precio > 0)
+        if (m.estado == 'pagada' &&
+            !prim.pagoVerificado &&
+            !prim.cortesia &&
+            prim.precio > 0)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-                'Pago por verificar${prim.metodoPago == null ? '' : ' · cobrado en ${prim.metodoPago}'} — falta que el admin lo confirme',
-                style: TextStyle(
-                    color: VenueColors.aviso, fontWeight: FontWeight.w700)),
+              'Pago por verificar${prim.metodoPago == null ? '' : ' · cobrado en ${prim.metodoPago}'} — falta que el admin lo confirme',
+              style: TextStyle(
+                color: VenueColors.aviso,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         if (m.estado == 'pagada' && (prim.pagoVerificado || prim.cortesia))
           Padding(
             padding: EdgeInsets.only(top: 6),
-            child: Text(prim.cortesia ? 'Cortesía · no se cobra' : 'Pago verificado',
-                style: TextStyle(color: VenueColors.ok, fontWeight: FontWeight.w700)),
+            child: Text(
+              prim.cortesia ? 'Cortesía · no se cobra' : 'Pago verificado',
+              style: TextStyle(
+                color: VenueColors.ok,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         if (prim.comprobanteUrl != null && (gestiona || rol == Rol.jefe)) ...[
           const SizedBox(height: 10),
           Center(child: ImagenComprobante(referencia: prim.comprobanteUrl!)),
         ],
         const Divider(height: 28),
-        Text('Manillas (${manillas.value?.length ?? 0} de $incluidas)',
-            style: const TextStyle(fontWeight: FontWeight.w800)),
+        Text(
+          'Manillas (${manillas.value?.length ?? 0} de $incluidas)',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
         for (final e in manillas.value ?? const <Entrada>[])
           ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
             title: Text(e.cliente),
-            subtitle: Text('#${e.codigo} · ${e.estado == 'usada' ? 'ingresó' : e.estado}'),
+            subtitle: Text(
+              '#${e.codigo} · ${e.estado == 'usada' ? 'ingresó' : e.estado}',
+            ),
             onTap: e.estado == 'anulada'
                 ? null
                 : () => mostrarTicket(
-                      context,
-                      TicketDatos(
-                        payload: payloadEntrada(ev.id, e.codigo),
-                        codigo: e.codigo,
-                        cliente: e.cliente,
-                        boliche: club?.nombre ?? '',
-                        evento: ev.nombre,
-                        fecha: ev.fechaCorta,
-                        tipo: 'Manilla · ${prim.etiqueta}',
-                        color: club?.primario,
-                        arteUrl: ev.ticketUrl,
-                      ),
+                    context,
+                    TicketDatos(
+                      payload: payloadEntrada(ev.id, e.codigo),
+                      codigo: e.codigo,
+                      cliente: e.cliente,
+                      boliche: club?.nombre ?? '',
+                      evento: ev.nombre,
+                      fecha: ev.fechaCorta,
+                      tipo: 'Manilla · ${prim.etiqueta}',
+                      color: club?.primario,
+                      arteUrl: ev.ticketUrl,
                     ),
+                  ),
             trailing: gestiona && e.estado == 'valida'
                 ? IconButton(
                     tooltip: 'Eliminar manilla',
                     icon: const Icon(Icons.close_rounded),
-                    onPressed: () => _hacer(() async {
-                      await ref.read(entradasRepositoryProvider).eliminar(e.id);
-                      ref.invalidate(_manillasMesaProvider(prim.id));
-                    }, ok: 'Manilla de ${e.cliente} eliminada', cerrar: false),
+                    onPressed: () => _hacer(
+                      () async {
+                        await ref
+                            .read(entradasRepositoryProvider)
+                            .eliminar(e.id);
+                        ref.invalidate(_manillasMesaProvider(prim.id));
+                      },
+                      ok: 'Manilla de ${e.cliente} eliminada',
+                      cerrar: false,
+                    ),
                   )
                 : const Icon(Icons.qr_code_2_rounded),
           ),
@@ -735,24 +882,39 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
             maxLines: 4,
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
-                hintText: 'Nombres de manillas, uno por línea'),
+              hintText: 'Nombres de manillas, uno por línea',
+            ),
           ),
           const SizedBox(height: 8),
           OutlinedButton(
             onPressed: _ocupado
                 ? null
-                : () => _hacer(() async {
+                : () => _hacer(
+                    () async {
                       var n = 0;
                       for (final nm in separarNombres(_nuevas.text)) {
-                        await ref.read(supabaseProvider).rpc('generar_entrada', params: {
-                          'p_evento': ev.id, 'p_cliente': nm, 'p_mesa': prim.id,
-                        });
+                        await ref
+                            .read(supabaseProvider)
+                            .rpc(
+                              'generar_entrada',
+                              params: {
+                                'p_evento': ev.id,
+                                'p_cliente': nm,
+                                'p_mesa': prim.id,
+                              },
+                            );
                         n++;
                       }
                       _nuevas.clear();
                       ref.invalidate(_manillasMesaProvider(prim.id));
-                      if (n == 0) throw const FormatException('Escribí al menos un nombre');
-                    }, ok: 'Manillas generadas', cerrar: false),
+                      if (n == 0)
+                        throw const FormatException(
+                          'Escribí al menos un nombre',
+                        );
+                    },
+                    ok: 'Manillas generadas',
+                    cerrar: false,
+                  ),
             child: const Text('Generar QR de esas manillas'),
           ),
         ],
@@ -760,15 +922,22 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
           const Divider(height: 28),
           if (gestiona || rol == Rol.jefe)
             OutlinedButton.icon(
-              onPressed: _ocupado ? null : () => _editar(prim, combos.values.toList()),
+              onPressed: _ocupado
+                  ? null
+                  : () => _editar(prim, combos.values.toList()),
               icon: const Icon(Icons.edit_outlined),
               label: const Text('Editar nombre y combo'),
             ),
           if (m.estado != 'pagada' && !prim.cortesia) ...[
             const SizedBox(height: 9),
             OutlinedButton.icon(
-              onPressed: () => _hoja(context,
-                  const Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 26), child: QrDeCobro())),
+              onPressed: () => _hoja(
+                context,
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 26),
+                  child: QrDeCobro(),
+                ),
+              ),
               icon: const Icon(Icons.qr_code_rounded),
               label: const Text('Mostrar QR de cobro'),
             ),
@@ -779,12 +948,18 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
               label: Text('Marcar pagada${esGrupo ? ' (grupo)' : ''}'),
             ),
           ],
-          if (esAdmin && m.estado == 'pagada' && !prim.pagoVerificado && !prim.cortesia) ...[
+          if (esAdmin &&
+              m.estado == 'pagada' &&
+              !prim.pagoVerificado &&
+              !prim.cortesia) ...[
             const SizedBox(height: 9),
             FilledButton.icon(
               onPressed: _ocupado
                   ? null
-                  : () => _hacer(() => repo.verificar(m.id, true), ok: 'Pago confirmado'),
+                  : () => _hacer(
+                      () => repo.verificar(m.id, true),
+                      ok: 'Pago confirmado',
+                    ),
               icon: const Icon(Icons.check_rounded),
               label: const Text('Confirmar que el pago entró'),
             ),
@@ -792,8 +967,10 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
             OutlinedButton(
               onPressed: _ocupado
                   ? null
-                  : () => _hacer(() => repo.verificar(m.id, false),
-                      ok: 'Pago rechazado: la mesa volvió a reservada'),
+                  : () => _hacer(
+                      () => repo.verificar(m.id, false),
+                      ok: 'Pago rechazado: la mesa volvió a reservada',
+                    ),
               style: OutlinedButton.styleFrom(foregroundColor: VenueColors.mal),
               child: const Text('Rechazar — volver a reservada'),
             ),
@@ -803,7 +980,10 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
             OutlinedButton(
               onPressed: _ocupado
                   ? null
-                  : () => _hacer(() => repo.estado(m.id, 'ocupada'), ok: 'Mesa ocupada'),
+                  : () => _hacer(
+                      () => repo.estado(m.id, 'ocupada'),
+                      ok: 'Mesa ocupada',
+                    ),
               child: const Text('Marcar ocupada (llegaron)'),
             ),
           ],
@@ -816,29 +996,38 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
                       context: context,
                       builder: (c) => AlertDialog(
                         title: Text(
-                            'Liberar ${esGrupo ? 'las ${grupo.length} mesas' : m.etiqueta}'),
+                          'Liberar ${esGrupo ? 'las ${grupo.length} mesas' : m.etiqueta}',
+                        ),
                         content: Text(
-                            'Se borra la venta de ${prim.cliente ?? 'esta mesa'}'
-                            '${prim.precio > 0 ? ' (${prim.precio} Bs)' : ''} y sus manillas dejan de valer. No se puede deshacer.'),
+                          'Se borra la venta de ${prim.cliente ?? 'esta mesa'}'
+                          '${prim.precio > 0 ? ' (${prim.precio} Bs)' : ''} y sus manillas dejan de valer. No se puede deshacer.',
+                        ),
                         actions: [
                           TextButton(
-                              onPressed: () => Navigator.pop(c, false),
-                              child: const Text('Cancelar')),
+                            onPressed: () => Navigator.pop(c, false),
+                            child: const Text('Cancelar'),
+                          ),
                           TextButton(
-                              onPressed: () => Navigator.pop(c, true),
-                              style: TextButton.styleFrom(
-                                  foregroundColor: VenueColors.mal),
-                              child: const Text('Liberar mesa')),
+                            onPressed: () => Navigator.pop(c, true),
+                            style: TextButton.styleFrom(
+                              foregroundColor: VenueColors.mal,
+                            ),
+                            child: const Text('Liberar mesa'),
+                          ),
                         ],
                       ),
                     );
                     if (si == true) {
-                      await _hacer(() => repo.estado(m.id, 'disponible'),
-                          ok: 'Mesa liberada');
+                      await _hacer(
+                        () => repo.estado(m.id, 'disponible'),
+                        ok: 'Mesa liberada',
+                      );
                     }
                   },
             style: OutlinedButton.styleFrom(foregroundColor: VenueColors.mal),
-            child: Text('Liberar ${esGrupo ? 'las ${grupo.length} mesas' : 'mesa'}'),
+            child: Text(
+              'Liberar ${esGrupo ? 'las ${grupo.length} mesas' : 'mesa'}',
+            ),
           ),
         ],
       ],
@@ -853,47 +1042,63 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
       builder: (c) => StatefulBuilder(
         builder: (c, set) => AlertDialog(
           title: const Text('Editar venta'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
                 controller: cli,
                 textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(labelText: 'Cliente')),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String?>(
-              borderRadius: BorderRadius.circular(12),
-              dropdownColor: VenueColors.superficie,
-              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
-              menuMaxHeight: 420,
-              initialValue: combos.any((x) => x.id == combo) ? combo : null,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Combo'),
-              items: [
-                for (final x in combos.where((x) => x.activo || x.id == combo))
-                  DropdownMenuItem<String?>(
+                decoration: const InputDecoration(labelText: 'Cliente'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                borderRadius: BorderRadius.circular(12),
+                dropdownColor: VenueColors.superficie,
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: VenueColors.textoSuave,
+                ),
+                menuMaxHeight: 420,
+                initialValue: combos.any((x) => x.id == combo) ? combo : null,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Combo'),
+                items: [
+                  for (final x in combos.where(
+                    (x) => x.activo || x.id == combo,
+                  ))
+                    DropdownMenuItem<String?>(
                       value: x.id,
-                      child: Text('${x.nombre} · ${x.precio} Bs',
-                          overflow: TextOverflow.ellipsis)),
-              ],
-              onChanged: (v) => set(() => combo = v),
-            ),
-          ]),
+                      child: Text(
+                        '${x.nombre} · ${x.precio} Bs',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (v) => set(() => combo = v),
+              ),
+            ],
+          ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Cancelar'),
+            ),
             FilledButton(
-                onPressed: () => Navigator.pop(c, true),
-                style: FilledButton.styleFrom(minimumSize: const Size(100, 44)),
-                child: const Text('Guardar')),
+              onPressed: () => Navigator.pop(c, true),
+              style: FilledButton.styleFrom(minimumSize: const Size(100, 44)),
+              child: const Text('Guardar'),
+            ),
           ],
         ),
       ),
     );
     if (ok == true) {
       await _hacer(
-          () => ref
-              .read(mesasRepositoryProvider)
-              .editarVenta(prim.id, cli.text.trim(), combo),
-          ok: 'Mesa actualizada');
+        () => ref
+            .read(mesasRepositoryProvider)
+            .editarVenta(prim.id, cli.text.trim(), combo),
+        ok: 'Mesa actualizada',
+      );
     }
     cli.dispose();
   }
@@ -907,41 +1112,56 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
         title: const Text('¿Cómo pagó?'),
         children: [
           SimpleDialogOption(
-              onPressed: () => Navigator.pop(c, 'foto'),
-              child: const Text('Transferencia · sacar foto del comprobante')),
+            onPressed: () => Navigator.pop(c, 'foto'),
+            child: const Text('Transferencia · sacar foto del comprobante'),
+          ),
           SimpleDialogOption(
-              onPressed: () => Navigator.pop(c, 'galeria'),
-              child: const Text('Transferencia · elegir de la galería')),
+            onPressed: () => Navigator.pop(c, 'galeria'),
+            child: const Text('Transferencia · elegir de la galería'),
+          ),
           SimpleDialogOption(
-              onPressed: () => Navigator.pop(c, 'efectivo'),
-              child: const Text('Efectivo')),
+            onPressed: () => Navigator.pop(c, 'efectivo'),
+            child: const Text('Efectivo'),
+          ),
           if (esAdmin)
             SimpleDialogOption(
-                onPressed: () => Navigator.pop(c, 'sin'),
-                child: const Text('Transferencia · sin comprobante (admin)')),
+              onPressed: () => Navigator.pop(c, 'sin'),
+              child: const Text('Transferencia · sin comprobante (admin)'),
+            ),
         ],
       ),
     );
     if (metodo == null) return;
-    await _hacer(() async {
-      String? comp;
-      if (metodo == 'foto' || metodo == 'galeria') {
-        final b = await elegirImagen(camara: metodo == 'foto');
-        if (b == null) throw const FormatException('No se eligió ninguna imagen');
-        comp = await ref
-            .read(archivosProvider)
-            .subirComprobante(b, 'mesa-${widget.mesa.id}');
-      }
-      await ref
-          .read(mesasRepositoryProvider)
-          .pagar(widget.mesa.id, comprobante: comp, efectivo: metodo == 'efectivo');
-    }, ok: esAdmin ? 'Mesa pagada y verificada' : 'Mesa pagada · por verificar');
+    await _hacer(
+      () async {
+        String? comp;
+        if (metodo == 'foto' || metodo == 'galeria') {
+          final b = await elegirImagen(camara: metodo == 'foto');
+          if (b == null)
+            throw const FormatException('No se eligió ninguna imagen');
+          comp = await ref
+              .read(archivosProvider)
+              .subirComprobante(b, 'mesa-${widget.mesa.id}');
+        }
+        await ref
+            .read(mesasRepositoryProvider)
+            .pagar(
+              widget.mesa.id,
+              comprobante: comp,
+              efectivo: metodo == 'efectivo',
+            );
+      },
+      ok: esAdmin ? 'Mesa pagada y verificada' : 'Mesa pagada · por verificar',
+    );
   }
 }
 
 // ───────────────────────── editor de plano ─────────────────────────
-Future<void> hojaEditarMesa(BuildContext context, Mesa mesa, List<String> pisos) =>
-    _hoja(context, _EditarMesa(mesa: mesa, pisos: pisos));
+Future<void> hojaEditarMesa(
+  BuildContext context,
+  Mesa mesa,
+  List<String> pisos,
+) => _hoja(context, _EditarMesa(mesa: mesa, pisos: pisos));
 
 class _EditarMesa extends ConsumerStatefulWidget {
   const _EditarMesa({required this.mesa, required this.pisos});
@@ -971,7 +1191,8 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
   @override
   Widget build(BuildContext context) {
     final m = widget.mesa;
-    final teams = ref.watch(teamsClubProvider).value ?? const <String, String>{};
+    final teams =
+        ref.watch(teamsClubProvider).value ?? const <String, String>{};
     final repo = ref.read(mesasRepositoryProvider);
     // los pisos del evento, el de la mesa y, al final, "Nuevo piso…"
     final pisos = {...widget.pisos, _planta}.toList();
@@ -984,7 +1205,8 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
         Navigator.pop(context);
         avisar(context, ok);
       } catch (e) {
-        if (context.mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+        if (context.mounted)
+          avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
       }
     }
 
@@ -992,101 +1214,147 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
-        Text('Editar ${m.etiqueta}',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        Text(
+          'Editar ${m.etiqueta}',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 14),
-        Row(children: [
-          Expanded(
-            child: TextField(
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
                 controller: _etiqueta,
-                decoration: const InputDecoration(labelText: 'Etiqueta')),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: DropdownButtonFormField<String>(
-              borderRadius: BorderRadius.circular(12),
-              dropdownColor: VenueColors.superficie,
-              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
-              menuMaxHeight: 420,
-              initialValue: _cat,
-              decoration: const InputDecoration(labelText: 'Tipo'),
-              items: [
-                for (final t in {...tiposMesa, tipoMesa(_cat)})
-                  DropdownMenuItem(value: t.id, child: Text(t.nombre)),
-              ],
-              onChanged: (v) => setState(() => _cat = v!),
+                decoration: const InputDecoration(labelText: 'Etiqueta'),
+              ),
             ),
-          ),
-        ]),
+            const SizedBox(width: 10),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                borderRadius: BorderRadius.circular(12),
+                dropdownColor: VenueColors.superficie,
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: VenueColors.textoSuave,
+                ),
+                menuMaxHeight: 420,
+                initialValue: _cat,
+                decoration: const InputDecoration(labelText: 'Tipo'),
+                items: [
+                  for (final t in {...tiposMesa, tipoMesa(_cat)})
+                    DropdownMenuItem(value: t.id, child: Text(t.nombre)),
+                ],
+                onChanged: (v) => setState(() => _cat = v!),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 14),
         Text('Ancho: ${_w.round()} %'),
         Slider(
-            value: _w, min: 8, max: 30, divisions: 22,
-            onChanged: (v) => setState(() => _w = v)),
+          value: _w,
+          min: 8,
+          max: 30,
+          divisions: 22,
+          onChanged: (v) => setState(() => _w = v),
+        ),
         Text('Alto: ${_h.round()} %'),
         Slider(
-            value: _h, min: 8, max: 45, divisions: 37,
-            onChanged: (v) => setState(() => _h = v)),
-        Row(children: [
-          Expanded(
-            child: DropdownButtonFormField<String?>(
-              borderRadius: BorderRadius.circular(12),
-              dropdownColor: VenueColors.superficie,
-              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
-              menuMaxHeight: 420,
-              initialValue: teams.containsKey(_team) ? _team : null,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Team asignado'),
-              items: [
-                const DropdownMenuItem<String?>(value: null, child: Text('— libre —')),
-                for (final t in teams.entries)
-                  DropdownMenuItem<String?>(
-                      value: t.key, child: Text(t.value, overflow: TextOverflow.ellipsis)),
-              ],
-              onChanged: (v) => setState(() => _team = v),
+          value: _h,
+          min: 8,
+          max: 45,
+          divisions: 37,
+          onChanged: (v) => setState(() => _h = v),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String?>(
+                borderRadius: BorderRadius.circular(12),
+                dropdownColor: VenueColors.superficie,
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: VenueColors.textoSuave,
+                ),
+                menuMaxHeight: 420,
+                initialValue: teams.containsKey(_team) ? _team : null,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Team asignado'),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('— libre —'),
+                  ),
+                  for (final t in teams.entries)
+                    DropdownMenuItem<String?>(
+                      value: t.key,
+                      child: Text(t.value, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (v) => setState(() => _team = v),
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: DropdownButtonFormField<String>(
-              borderRadius: BorderRadius.circular(12),
-              dropdownColor: VenueColors.superficie,
-              icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
-              menuMaxHeight: 420,
-              initialValue: _planta,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Piso'),
-              items: [
-                for (final p in pisos)
-                  DropdownMenuItem(value: p, child: Text(nombrePiso(p), overflow: TextOverflow.ellipsis)),
-                const DropdownMenuItem(value: '__nuevo', child: Text('Nuevo piso…')),
-              ],
-              onChanged: (v) => setState(() => _planta = v!),
+            const SizedBox(width: 10),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                borderRadius: BorderRadius.circular(12),
+                dropdownColor: VenueColors.superficie,
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: VenueColors.textoSuave,
+                ),
+                menuMaxHeight: 420,
+                initialValue: _planta,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Piso'),
+                items: [
+                  for (final p in pisos)
+                    DropdownMenuItem(
+                      value: p,
+                      child: Text(
+                        nombrePiso(p),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  const DropdownMenuItem(
+                    value: '__nuevo',
+                    child: Text('Nuevo piso…'),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _planta = v!),
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
         if (_planta == '__nuevo') ...[
           const SizedBox(height: 10),
           TextField(
             controller: _pisoNuevo,
-            decoration: const InputDecoration(labelText: 'Nombre del piso nuevo', hintText: 'Terraza, Piso 2…'),
+            decoration: const InputDecoration(
+              labelText: 'Nombre del piso nuevo',
+              hintText: 'Terraza, Piso 2…',
+            ),
           ),
         ],
         const SizedBox(height: 18),
         FilledButton(
           onPressed: () => hacer(
-              () => repo.editarForma(
-                    m.id,
-                    etiqueta: _etiqueta.text.trim().isEmpty ? m.etiqueta : _etiqueta.text.trim(),
-                    categoria: _cat,
-                    w: _w.round(),
-                    h: _h.round(),
-                    teamId: _team,
-                    planta: _planta == '__nuevo'
-                        ? (idDePiso(_pisoNuevo.text).isEmpty ? m.planta : idDePiso(_pisoNuevo.text))
-                        : _planta,
-                  ),
-              'Mesa actualizada'),
+            () => repo.editarForma(
+              m.id,
+              etiqueta: _etiqueta.text.trim().isEmpty
+                  ? m.etiqueta
+                  : _etiqueta.text.trim(),
+              categoria: _cat,
+              w: _w.round(),
+              h: _h.round(),
+              teamId: _team,
+              planta: _planta == '__nuevo'
+                  ? (idDePiso(_pisoNuevo.text).isEmpty
+                        ? m.planta
+                        : idDePiso(_pisoNuevo.text))
+                  : _planta,
+            ),
+            'Mesa actualizada',
+          ),
           child: const Text('Guardar'),
         ),
         const SizedBox(height: 9),
@@ -1097,21 +1365,28 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
               context: context,
               builder: (c) => AlertDialog(
                 title: Text('Eliminar ${m.etiqueta}'),
-                content: Text(m.libre
-                    ? 'Libre, sin venta asociada.'
-                    : 'Esta mesa tiene una venta asociada (${m.cliente ?? ''}, ${m.estado}). Al eliminarla se pierde su registro en el plano y en los reportes.'),
+                content: Text(
+                  m.libre
+                      ? 'Libre, sin venta asociada.'
+                      : 'Esta mesa tiene una venta asociada (${m.cliente ?? ''}, ${m.estado}). Al eliminarla se pierde su registro en el plano y en los reportes.',
+                ),
                 actions: [
                   TextButton(
-                      onPressed: () => Navigator.pop(c, false),
-                      child: const Text('Cancelar')),
+                    onPressed: () => Navigator.pop(c, false),
+                    child: const Text('Cancelar'),
+                  ),
                   TextButton(
-                      onPressed: () => Navigator.pop(c, true),
-                      style: TextButton.styleFrom(foregroundColor: VenueColors.mal),
-                      child: const Text('Eliminar mesa')),
+                    onPressed: () => Navigator.pop(c, true),
+                    style: TextButton.styleFrom(
+                      foregroundColor: VenueColors.mal,
+                    ),
+                    child: const Text('Eliminar mesa'),
+                  ),
                 ],
               ),
             );
-            if (si == true) await hacer(() => repo.borrar(m.id), '${m.etiqueta} eliminada');
+            if (si == true)
+              await hacer(() => repo.borrar(m.id), '${m.etiqueta} eliminada');
           },
           child: const Text('Eliminar mesa'),
         ),
@@ -1121,7 +1396,8 @@ class _EditarMesaState extends ConsumerState<_EditarMesa> {
 }
 
 // ───────────────────────── combos (admin) ─────────────────────────
-Future<void> hojaCombos(BuildContext context) => _hoja(context, const _Combos());
+Future<void> hojaCombos(BuildContext context) =>
+    _hoja(context, const _Combos());
 
 class _Combos extends ConsumerWidget {
   const _Combos();
@@ -1133,22 +1409,30 @@ class _Combos extends ConsumerWidget {
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
-        const Text('Combos',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        const Text(
+          'Combos',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
         for (final c in combos)
           ListTile(
             contentPadding: EdgeInsets.zero,
-            title: Text(c.nombre,
-                style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: c.activo ? null : VenueColors.textoSuave)),
-            subtitle: Text([
-              '${c.precio} Bs',
-              if (c.incluyeManillas > 0) '${c.incluyeManillas} manillas',
-              'comisión ${c.comisionRrpp}+${c.comisionJefe}',
-              if (c.categorias.isNotEmpty) 'solo ${c.categorias.map((k) => tipoMesa(k).plural.toLowerCase()).join(', ')}',
-              if (!c.activo) 'inactivo',
-            ].join(' · ')),
+            title: Text(
+              c.nombre,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: c.activo ? null : VenueColors.textoSuave,
+              ),
+            ),
+            subtitle: Text(
+              [
+                '${c.precio} Bs',
+                if (c.incluyeManillas > 0) '${c.incluyeManillas} manillas',
+                'comisión ${c.comisionRrpp}+${c.comisionJefe}',
+                if (c.categorias.isNotEmpty)
+                  'solo ${c.categorias.map((k) => tipoMesa(k).plural.toLowerCase()).join(', ')}',
+                if (!c.activo) 'inactivo',
+              ].join(' · '),
+            ),
             trailing: const Icon(Icons.edit_outlined),
             onTap: () => _hoja(context, _ComboForm(combo: c)),
           ),
@@ -1175,7 +1459,9 @@ class _ComboFormState extends ConsumerState<_ComboForm> {
   late final c = widget.combo;
   late final _nombre = TextEditingController(text: c?.nombre ?? '');
   late final _precio = TextEditingController(text: '${c?.precio ?? ''}');
-  late final _productos = TextEditingController(text: c?.productos.join(', ') ?? '');
+  late final _productos = TextEditingController(
+    text: c?.productos.join(', ') ?? '',
+  );
   late final _comR = TextEditingController(text: '${c?.comisionRrpp ?? 0}');
   late final _comJ = TextEditingController(text: '${c?.comisionJefe ?? 0}');
   late final _man = TextEditingController(text: '${c?.incluyeManillas ?? 0}');
@@ -1202,44 +1488,70 @@ class _ComboFormState extends ConsumerState<_ComboForm> {
         Navigator.pop(context);
         avisar(context, ok);
       } catch (e) {
-        if (context.mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+        if (context.mounted)
+          avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
       }
     }
 
     Widget num(String l, TextEditingController t) => Expanded(
-          child: TextField(
-              controller: t,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: l)),
-        );
+      child: TextField(
+        controller: t,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(labelText: l),
+      ),
+    );
 
     return ListView(
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
-        Text(c == null ? 'Nuevo combo' : 'Editar combo',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        Text(
+          c == null ? 'Nuevo combo' : 'Editar combo',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 14),
-        TextField(controller: _nombre, decoration: const InputDecoration(labelText: 'Nombre')),
+        TextField(
+          controller: _nombre,
+          decoration: const InputDecoration(labelText: 'Nombre'),
+        ),
         const SizedBox(height: 12),
         TextField(
-            controller: _productos,
-            decoration: const InputDecoration(
-                labelText: 'Productos', hintText: 'Vodka 750, 6 energizantes')),
+          controller: _productos,
+          decoration: const InputDecoration(
+            labelText: 'Productos',
+            hintText: 'Vodka 750, 6 energizantes',
+          ),
+        ),
         const SizedBox(height: 12),
-        Row(children: [num('Precio (Bs)', _precio), const SizedBox(width: 10), num('Manillas incluidas', _man)]),
+        Row(
+          children: [
+            num('Precio (Bs)', _precio),
+            const SizedBox(width: 10),
+            num('Manillas incluidas', _man),
+          ],
+        ),
         const SizedBox(height: 12),
-        Row(children: [num('Comisión RRPP', _comR), const SizedBox(width: 10), num('Comisión jefe', _comJ)]),
+        Row(
+          children: [
+            num('Comisión RRPP', _comR),
+            const SizedBox(width: 10),
+            num('Comisión jefe', _comJ),
+          ],
+        ),
         const SizedBox(height: 12),
         const Text('Se vende en (sin marcar = en todas)'),
-        Wrap(spacing: 8, children: [
-          for (final t in tiposMesa)
-            FilterChip(
-              label: Text(t.plural),
-              selected: _cats.contains(t.id),
-              onSelected: (v) => setState(() => v ? _cats.add(t.id) : _cats.remove(t.id)),
-            ),
-        ]),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final t in tiposMesa)
+              OpcionTexto(
+                label: Text(t.plural),
+                selected: _cats.contains(t.id),
+                onSelected: (v) =>
+                    setState(() => v ? _cats.add(t.id) : _cats.remove(t.id)),
+              ),
+          ],
+        ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Activo'),
@@ -1256,7 +1568,11 @@ class _ComboFormState extends ConsumerState<_ComboForm> {
               id: c?.id ?? '',
               nombre: _nombre.text.trim(),
               precio: int.tryParse(_precio.text) ?? 0,
-              productos: _productos.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
+              productos: _productos.text
+                  .split(',')
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList(),
               comisionRrpp: int.tryParse(_comR.text) ?? 0,
               comisionJefe: int.tryParse(_comJ.text) ?? 0,
               incluyeManillas: int.tryParse(_man.text) ?? 0,
@@ -1264,7 +1580,10 @@ class _ComboFormState extends ConsumerState<_ComboForm> {
               categorias: _cats.toList(),
               descripcion: c?.descripcion,
             );
-            hacer(() => repo.guardarCombo(club, nuevo, nuevo: c == null), 'Combo guardado');
+            hacer(
+              () => repo.guardarCombo(club, nuevo, nuevo: c == null),
+              'Combo guardado',
+            );
           },
           child: const Text('Guardar'),
         ),
@@ -1272,7 +1591,8 @@ class _ComboFormState extends ConsumerState<_ComboForm> {
           const SizedBox(height: 9),
           OutlinedButton(
             style: OutlinedButton.styleFrom(foregroundColor: VenueColors.mal),
-            onPressed: () => hacer(() => repo.borrarCombo(c!.id), 'Combo eliminado'),
+            onPressed: () =>
+                hacer(() => repo.borrarCombo(c!.id), 'Combo eliminado'),
             child: const Text('Eliminar combo'),
           ),
         ],
@@ -1300,12 +1620,17 @@ class _ConfirmarPagos extends ConsumerWidget {
         await repo.verificar(m.id, ok);
         ref.invalidate(mesasProvider);
         if (context.mounted) {
-          avisar(context,
-              ok ? '${m.etiqueta}: pago confirmado' : '${m.etiqueta}: rechazado, volvió a reservada',
-              tipo: ok ? TipoAviso.ok : TipoAviso.aviso);
+          avisar(
+            context,
+            ok
+                ? '${m.etiqueta}: pago confirmado'
+                : '${m.etiqueta}: rechazado, volvió a reservada',
+            tipo: ok ? TipoAviso.ok : TipoAviso.aviso,
+          );
         }
       } catch (e) {
-        if (context.mounted) avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+        if (context.mounted)
+          avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
       }
     }
 
@@ -1313,51 +1638,71 @@ class _ConfirmarPagos extends ConsumerWidget {
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
-        Text('Confirmar pagos (${pend.length})',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        Text(
+          'Confirmar pagos (${pend.length})',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 4),
-        Text('Mesas cobradas que esperan que confirmes que la plata entró.',
-            style: TextStyle(color: VenueColors.textoSuave)),
+        Text(
+          'Mesas cobradas que esperan que confirmes que la plata entró.',
+          style: TextStyle(color: VenueColors.textoSuave),
+        ),
         if (pend.isEmpty)
           const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('No hay pagos por confirmar.', textAlign: TextAlign.center)),
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'No hay pagos por confirmar.',
+              textAlign: TextAlign.center,
+            ),
+          ),
         for (final m in pend) ...[
           const Divider(height: 24),
-          Text('${m.etiqueta} · ${m.cliente ?? ''}',
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
           Text(
-              '${m.precio} Bs · ${m.metodoPago ?? 'sin método'} · la vendió ${equipo[m.vendidoPor]?.nombre ?? '?'}',
-              style: TextStyle(color: VenueColors.textoSuave)),
+            '${m.etiqueta} · ${m.cliente ?? ''}',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+          Text(
+            '${m.precio} Bs · ${m.metodoPago ?? 'sin método'} · la vendió ${equipo[m.vendidoPor]?.nombre ?? '?'}',
+            style: TextStyle(color: VenueColors.textoSuave),
+          ),
           if (m.comprobanteUrl != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: ImagenComprobante(referencia: m.comprobanteUrl!, ancho: 200),
+              child: ImagenComprobante(
+                referencia: m.comprobanteUrl!,
+                ancho: 200,
+              ),
             )
           else
             Padding(
               padding: EdgeInsets.symmetric(vertical: 6),
-              child: Text('Sin comprobante adjunto',
-                  style: TextStyle(color: VenueColors.aviso)),
-            ),
-          Row(children: [
-            Expanded(
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                    foregroundColor: VenueColors.mal, minimumSize: const Size(0, 46)),
-                onPressed: () => hacer(m, false),
-                child: const Text('Rechazar'),
+              child: Text(
+                'Sin comprobante adjunto',
+                style: TextStyle(color: VenueColors.aviso),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: FilledButton(
-                style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
-                onPressed: () => hacer(m, true),
-                child: const Text('Entró'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: VenueColors.mal,
+                    minimumSize: const Size(0, 46),
+                  ),
+                  onPressed: () => hacer(m, false),
+                  child: const Text('Rechazar'),
+                ),
               ),
-            ),
-          ]),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
+                  onPressed: () => hacer(m, true),
+                  child: const Text('Entró'),
+                ),
+              ),
+            ],
+          ),
         ],
       ],
     );

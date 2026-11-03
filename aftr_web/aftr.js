@@ -73,8 +73,10 @@ function avisar(t) {
 }
 
 /* ── hoja de abajo ──────────────────────────────────────────────────── */
-let alCerrarHoja = null;
+let alCerrarHoja = null, versionHoja = 0;
 function abrirHoja(html, alCerrar) {
+  alCerrarHoja?.();
+  versionHoja++;
   $("#hoja-cuerpo").innerHTML = html;
   alCerrarHoja = alCerrar || null;
   const h = $("#hoja"), f = $("#hoja-fondo");
@@ -85,7 +87,8 @@ function abrirHoja(html, alCerrar) {
 function cerrarHoja() {
   const h = $("#hoja"), f = $("#hoja-fondo");
   h.classList.remove("si"); f.classList.remove("si");
-  setTimeout(() => { h.hidden = f.hidden = true; $("#hoja-cuerpo").innerHTML = ""; }, 420);
+  const version = ++versionHoja;
+  setTimeout(() => { if (version === versionHoja) { h.hidden = f.hidden = true; $("#hoja-cuerpo").innerHTML = ""; } }, 420);
   const cb = alCerrarHoja; alCerrarHoja = null; cb?.();
 }
 $("#hoja-fondo").addEventListener("click", cerrarHoja);
@@ -163,13 +166,19 @@ async function cargarLugares(forzar) {
   return (E.lugares = (await rpc("aftr_lugares")) || []);
 }
 async function cargarPerfil() {
-  E.perfil = E.sesion ? await rpc("aftr_mi_perfil").catch(() => null) : null;
+  const uid = E.sesion?.user.id;
+  const perfil = uid ? await rpc("aftr_mi_perfil").catch(() => null) : null;
+  if (E.sesion?.user.id !== uid) return null;
+  if (perfil) await resolverFotoPerfil(perfil);
+  if (E.sesion?.user.id !== uid) return null;
+  E.perfil = perfil;
   pintarAvatar();
   return E.perfil;
 }
 function pintarAvatar() {
   const a = $("#avatar");
-  a.innerHTML = E.perfil ? esc(E.perfil.nombre.slice(0, 1).toUpperCase()) : ICO.persona;
+  const contenido = E.perfil ? fotoPerfilHtml(E.perfil) : ICO.persona;
+  if(a.innerHTML !== contenido) a.innerHTML = contenido;
 }
 
 // billetera con realtime: Venue confirma o la puerta marca usado y se recarga sola
@@ -211,7 +220,7 @@ function aplanar(j) {
 }
 function proximos(j) {
   const ayer = new Date(hoy0() - 864e5);
-  return aplanar(j).filter((a) => (a.estado === "valida" || a.estado === "pendiente") && dia(a.evento.fecha) >= ayer)
+  return aplanar(j).filter((a) => (a.estado === "valida" || a.estado === "pendiente" || a.estado === "bloqueada") && dia(a.evento.fecha) >= ayer)
     .sort((a, b) => new Date(a.evento.inicio) - new Date(b.evento.inicio));
 }
 function pasados(j) {
@@ -286,7 +295,7 @@ function abrirBienvenida() {
       sig.innerHTML = `<span class="giro"></span>`;
       try {
         E.perfil = await rpc("aftr_crear_perfil", { p_usuario: campo.value.trim().toLowerCase(), p_nombre: nombre });
-        pintarAvatar(); d.remove(); pintar();
+        pintarAvatar(); d.remove(); pintar(); iniciarSaldoFijo(); ofrecerGuia();
       } catch (e) { usuario = campo.value; pintarPaso(mensaje(e)); }
     };
   };
@@ -295,15 +304,17 @@ function abrirBienvenida() {
 
 /* ── rutas ──────────────────────────────────────────────────────────── */
 function ruta() {
-  const p = location.hash.replace(/^#\/?/, "").split("/");
+  const p = location.hash.replace(/^#\/?/, "").split("?")[0].split("/");
   if (p[0] === "evento") return { nombre: "evento", id: p[1] };
   if (p[0] === "lugar") return { nombre: "lugar", id: decodeURIComponent(p[1] || "") };
-  if (["mapa", "accesos", "cuenta"].includes(p[0])) return { nombre: p[0] };
+  if (p[0] === "mi-mesa") return { nombre: "mi-mesa", id: p[1] };
+  if (["reventa", "pulse", "mis-mesas", "mapa", "accesos", "cuenta"].includes(p[0])) return { nombre: p[0] };
   return { nombre: "descubrir" };
 }
 let limpiar = null;
 async function pintar() {
   limpiar?.(); limpiar = null;
+  socialAftr().cleanup();
   const r = ruta();
   document.body.classList.toggle("en-mapa", r.nombre === "mapa");
   document.body.classList.remove("con-compra");
@@ -311,11 +322,15 @@ async function pintar() {
   $("#barra").hidden = r.nombre === "evento" || r.nombre === "lugar";
   window.scrollTo(0, 0);
   try {
+    if (r.nombre === "reventa") return await socialAftr().market(vista);
     if (r.nombre === "evento") return await pintarEvento(r.id);
     if (r.nombre === "lugar") return await pintarLugar(r.id);
     if (r.nombre === "mapa") return await pintarMapa();
     if (r.nombre === "accesos") return await pintarAccesos();
     if (r.nombre === "cuenta") return pintarCuenta();
+    if (r.nombre === "pulse") return pintarPulse();
+    if (r.nombre === "mis-mesas") return pintarMisMesas();
+    if (r.nombre === "mi-mesa") return pintarMiMesa(r.id);
     return await pintarDescubrir();
   } catch (e) {
     vista.innerHTML = `<div class="vacio"><img src="img/marca.svg" alt=""><p>${esc(mensaje(e))}</p><button class="pildora" onclick="location.reload()">Reintentar</button></div>`;
@@ -340,25 +355,16 @@ function rango(c) {
    nombre chico arriba, el número grande, un punto si hay algo esa noche y una
    línea que se desliza hasta el elegido. */
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-let tiraScroll = 0, lineaAntes = null;
-function tiraFechas(todos) {
-  const con = new Set(todos.map((e) => e.fecha));
+let tiraScroll = 0;
+function tiraFechas() {
   const h = hoy0();
-  const dias = Array.from({ length: 21 }, (_, i) => new Date(+h + i * 864e5));
-  return `<div class="tira" id="tira"><button class="dia todo ${E.cuando === "todo" ? "si" : ""}" data-cuando="todo"><small>&nbsp;</small><b>Todo</b><i></i></button>
-    ${dias.map((d, i) => { const k = iso(d); return `<button class="dia ${E.cuando === k ? "si" : ""} ${con.has(k) ? "hay" : ""}" data-cuando="${k}">
-      <small>${i === 0 ? "Hoy" : i === 1 ? "Mañ" : DIAS[d.getDay()]}</small><b>${d.getDate()}</b><i></i></button>`; }).join("")}
-    <span class="linea" id="linea"></span></div>`;
+  const dias = Array.from({ length: 21 }, (_, i) => new Date(h.getFullYear(), h.getMonth(), h.getDate() + i));
+  return `<div class="tira" id="tira"><button class="dia todo ${E.cuando === "todo" ? "si" : ""}" aria-pressed="${E.cuando === "todo"}" data-cuando="todo">Todo</button>
+    ${dias.map((d, i) => { const k = iso(d); return `<button class="dia ${E.cuando === k ? "si" : ""}" aria-pressed="${E.cuando === k}" data-cuando="${k}">${i === 0 ? "Hoy" : i === 1 ? "Mañana" : `${DIAS[d.getDay()]} ${d.getDate()}`}</button>`; }).join("")}</div>`;
 }
 function moverLinea() {
-  const t = $("#tira"), sel = $(".dia.si", t), l = $("#linea");
-  if (!t || !sel) return;
-  t.scrollLeft = tiraScroll;
-  const destino = { x: sel.offsetLeft + sel.offsetWidth / 2 - 9, w: 18 };
-  if (lineaAntes) { l.style.transition = "none"; l.style.transform = `translateX(${lineaAntes.x}px)`; l.offsetWidth; l.style.transition = ""; }
-  l.style.transform = `translateX(${destino.x}px)`;
-  lineaAntes = destino;
-  t.onscroll = () => (tiraScroll = t.scrollLeft);
+  const t = $("#tira");
+  if (t) { t.scrollLeft = tiraScroll; t.onscroll = () => (tiraScroll = t.scrollLeft); }
 }
 const enRango = (lista, c) => { const [a, b] = rango(c); return lista.filter((e) => dia(e.fecha) >= a && dia(e.fecha) <= b); };
 const tarjeta = (e, i) => `<a class="tarjeta presionable aparecer" style="--o:${i}" href="#/evento/${e.id}">
@@ -375,33 +381,35 @@ async function pintarDescubrir() {
   const cuerpo = () => {
     const todos = E.eventos || [];
     const lista = enRango(todos, E.cuando);
-    let html = `<div class="envoltura"><h1 class="titular saludo aparecer">Discover<br>the night.</h1>
-      ${tiraFechas(todos)}`;
+    let html = `<div class="envoltura"><h1 class="titular saludo aparecer">Descubrir</h1>
+      <div id="historias-aftr"></div><a class="pildora" style="margin:12px 20px" href="#/reventa">Reventa oficial ↗</a>${tiraFechas(todos)}`;
     if (!E.eventos) {
       html += `<div style="padding:12px 20px"><div class="esq" style="aspect-ratio:.82;border-radius:24px;max-height:74vh"></div></div>`;
     } else if (!lista.length) {
       html += `<div class="vacio"><img src="img/marca.svg" alt=""><p>${todos.length ? "Esa noche no hay nada publicado todavía. Probá otro día." : "Todavía no hay eventos publicados. Volvé más tarde."}</p></div>`;
     } else {
-      const d = lista[0], ahora = esAhora(d);
-      html += `<a class="destacado img presionable aparecer" style="--o:1;--c:${esc(d.club?.color || "#26262a")}" href="#/evento/${d.id}">
+      const d = lista[0];
+      html += `<a class="destacado img presionable aparecer" style="--o:1;--c:#26262a" href="#/evento/${d.id}">
         ${d.flyer ? `<img src="${esc(d.flyer)}" alt="" onload="this.classList.add('cargada')">` : ""}<div class="degrade"></div>
-        <div class="info"><div style="display:flex;align-items:center">${ahora ? `<span class="punto-vivo"></span><span class="etq vivo">Esta noche</span>` : `<span class="etq oro">${esc(d.club?.nombre)}</span>`}</div>
+        <div class="info"><div style="display:flex;align-items:center"><span class="suave">${esc(d.club?.nombre)}</span></div>
         <h2 class="titular">${esc(d.nombre)}</h2><div>${esc(linea(d))}</div>
-        ${precioDesde(d) ? `<span class="pildora densa activa" style="margin-top:14px">${esc(precioDesde(d))}</span>` : ""}</div></a>`;
-      const hoy = enRango(todos, "hoy"), finde = enRango(todos, "finde");
-      const gratis = lista.filter((e) => e.desde_precio === 0 || e.tiene_lista), mesas = lista.filter((e) => e.mesas_libres > 0);
+        ${precioDesde(d) ? `<span class="precio-destacado">${esc(precioDesde(d))}</span>` : ""}</div></a>`;
+      const restantes = todos.filter(e => e.id !== d.id);
+      const hoy = enRango(restantes, "hoy"), finde = enRango(restantes, "finde");
+      const gratis = lista.slice(1).filter((e) => e.desde_precio === 0 || e.tiene_lista), mesas = lista.slice(1).filter((e) => e.mesas_libres > 0);
       if (E.cuando === "todo" && hoy.length) html += carrusel("Esta noche", hoy);
       if (E.cuando === "todo" && finde.length) html += carrusel("Este fin de semana", finde);
       if (E.cuando !== "todo" && lista.length > 1) html += carrusel("También", lista.slice(1));
       if (gratis.length) html += carrusel("Gratis con lista", gratis);
       if (mesas.length) html += carrusel("Con mesas disponibles", mesas);
       const gen = {};
-      lista.forEach((e) => (e.generos || []).forEach((g) => (gen[g] ||= []).push(e)));
+      lista.slice(1).forEach((e) => (e.generos || []).forEach((g) => (gen[g] ||= []).push(e)));
       Object.entries(gen).slice(0, 3).forEach(([g, l]) => (html += carrusel(g, l)));
       if (E.cuando === "todo" && lista.length > 1) html += `<div class="titulo-sec"><h3>Próximos</h3></div>${lista.map(filaEvento).join("")}`;
     }
     if (E.lugares?.length) html += `<div class="titulo-sec"><h3>Lugares</h3></div>${E.lugares.map(filaLugar).join("")}`;
     vista.innerHTML = html + "</div>";
+    socialAftr().mountFeed($("#historias-aftr")).catch(e=>avisar(mensaje(e)));
     moverLinea();
     $$("[data-cuando]").forEach((b) => (b.onclick = () => { E.cuando = b.dataset.cuando; cuerpo(); }));
   };
@@ -514,23 +522,77 @@ function hojaCompra(d, fase) {
       <div class="suave">${esc(d.club.nombre)} · ${esc(fechaCorta(d.fecha))} · ${esc(d.hora_inicio)}</div>
       <div class="caja" style="margin-top:22px;background:none;border:1px solid var(--borde)"><div class="cuerpo"><b>${esc(fase?.nombre || "Entrada general")}</b><small>${bs(precio)} c/u</small></div>
         <div class="contador"><button data-menos ${n <= 1 ? "disabled" : ""}>−</button><output>${n}</output><button data-mas ${n >= max ? "disabled" : ""}>+</button></div></div>
-      ${pasoPago}<div class="total"><span>Total</span><b>${bs(precio * n)}</b></div><button class="boton" data-ok>Confirmar pedido</button>`;
+      ${pasoPago}<div class="total"><span>Total</span><b>${bs(precio * n)}</b></div><button class="boton" data-ok>Pagar</button>`;
     $("[data-menos]", c).onclick = () => { n--; render(); };
     $("[data-mas]", c).onclick = () => { n++; render(); };
     $("[data-ok]", c).onclick = async (ev) => {
+      ev.currentTarget.disabled = true;
       ev.currentTarget.innerHTML = `<span class="giro"></span>`;
       try {
-        await rpc("aftr_comprar", { p_evento: d.id, p_fase: fase?.id || null, p_cantidad: n });
-        c.innerHTML = listo("Pedido enviado", `${d.club.nombre} lo confirma y tus ${n === 1 ? "entrada aparece" : `${n} entradas aparecen`} en Accesos.`, "Ver en Accesos");
-        ligarListo(c, () => (location.hash = "#/accesos"));
+        const historia=historiaCompra(d.id,"entrada");
+        const orden = await rpc(historia?"aftr_comprar_historia":"aftr_comprar", { p_evento:d.id, ...(historia?{p_historia:historia}:{}), p_fase: fase?.id || null, p_cantidad: n });
+        hojaMetodoPago(orden.id, d.nombre);
         cargarAccesos().catch(() => {});
       } catch (e) { avisar(mensaje(e)); render(); }
     };
   };
   render();
 }
-// el paso de pago: hoy el boliche confirma desde Venue; la pasarela va acá
-const pasoPago = `<div class="paso-pago">${ICO.ok}<span>El boliche confirma tu pedido y tus QR aparecen en Accesos. Te avisamos ahí mismo.</span></div>`;
+const pasoPago = `<div class="paso-pago">${ICO.ok}<span>Elegí PULSE para comprar con tu saldo o pagá con QR desde tu banco. Tus accesos aparecen al confirmarse el pago.</span></div>`;
+
+// El QR bancario sirve para pagar; el QR de la entrada se emite después.
+async function cobroBanco(accion, orden, tipo = "orden") {
+  const { data, error } = await sb.functions.invoke("baneco", { body: { accion, orden, tipo } });
+  if (error) {
+    let texto = "No pudimos conectar con el cobro. Tu pedido quedó guardado en Accesos.";
+    try { texto = (await error.context?.json())?.error || texto; } catch {}
+    throw new Error(texto);
+  }
+  return data;
+}
+function hojaPago(orden, titulo, tipo = "orden") {
+  let cerrada = false, reloj = null;
+  const c = abrirHoja(`<p class="suave">Preparando el QR…</p>`, () => { cerrada = true; clearTimeout(reloj); });
+  const problema = (texto) => {
+    if (cerrada) return;
+    clearTimeout(reloj);
+    c.innerHTML = `<h2 class="fuerte">Revisá tu pedido</h2><p>${esc(texto)}</p>
+      <p class="suave">Tu pedido quedó guardado en Accesos.</p><button class="boton" data-accesos>Ver en Accesos</button>`;
+    $("[data-accesos]", c).onclick = () => { cerrarHoja(); location.hash = "#/accesos"; };
+  };
+  const pagado = () => {
+    if (cerrada) return;
+    clearTimeout(reloj);
+    c.innerHTML = listo("Pago confirmado", tipo === "recarga" ? "Tu saldo PULSE ya está disponible." : tipo === "pedido" ? "Tu pedido está pagado y fue recibido por la barra." : `Tus accesos para ${titulo} ya están disponibles.`, tipo === "orden" ? "Ver mis accesos" : "Volver");
+    ligarListo(c, () => { if(tipo === "orden") location.hash = "#/accesos"; else pintar(); });
+    cargarAccesos().catch(() => {});
+  };
+  const revisar = async () => {
+    if (cerrada) return;
+    try {
+      const r = await cobroBanco("estado", orden, tipo);
+      if (cerrada) return;
+      if (r.pago?.estado === "pagado" && (r.orden === "confirmada" || tipo === "pedido" && ["recibido","en_preparacion","listo","entregado"].includes(r.orden))) return pagado();
+      if (r.pago?.estado === "revisar") return problema("Este cobro necesita revisión. No vuelvas a pagar; contactá al boliche con tu pedido.");
+      if (["anulado", "vencido"].includes(r.pago?.estado) || ["cancelada", "vencida"].includes(r.orden)) return problema("Este pedido ya no está disponible para pagar.");
+    } catch { /* Se reintenta sin abrir otra consulta en paralelo. */ }
+    if (!cerrada) reloj = setTimeout(revisar, 4000);
+  };
+  cobroBanco("qr", orden, tipo).then((r) => {
+    if (cerrada) return;
+    const q = r.pago;
+    if (q?.estado === "pagado") return pagado();
+    if (q?.estado === "revisar") return problema("Este cobro necesita revisión. No vuelvas a pagar.");
+    const imagen = typeof q?.imagen === "string" ? q.imagen.replace(/\s/g, "") : "";
+    if (q?.estado !== "activo" || !/^[A-Za-z0-9+/]+={0,2}$/.test(imagen)) return problema("El QR todavía no está disponible. Podés volver a abrir el pedido desde Accesos.");
+    c.innerHTML = `<h2 class="fuerte">${esc(titulo)}</h2><p class="fuerte" style="font-size:28px">Bs ${Number(q.monto).toFixed(2)}</p>
+      <div class="qr" style="background:white;padding:18px;border-radius:20px;max-width:280px;margin:20px auto"><img style="display:block;width:100%" alt="QR de pago" src="data:image/png;base64,${imagen}"></div>
+      <p>Escanealo con tu app bancaria. Si usás este celular, guardá el QR y abrilo desde tu banco.</p>
+      <p class="suave">Esperando confirmación del banco. Válido hasta ${esc(q.vence)}.</p>
+      <a class="boton" download="qr-pago-aftr.png" href="data:image/png;base64,${imagen}">Guardar QR</a><p class="tenue">Cobro procesado por Banco Económico</p>`;
+    reloj = setTimeout(revisar, 4000);
+  }).catch((e) => problema(mensaje(e)));
+}
 
 function hojaMesa(d) {
   let mesa = null, combo = null;
@@ -552,8 +614,8 @@ function hojaMesa(d) {
     $("[data-ok]", c).onclick = async (ev) => {
       ev.currentTarget.innerHTML = `<span class="giro"></span>`;
       try {
-        await rpc("aftr_reservar_mesa", { p_evento: d.id, p_mesa: mesa.id, p_combo: combo?.id || null });
-        c.innerHTML = listo(`Mesa ${mesa.etiqueta} reservada`, `La guardamos para vos mientras ${d.club.nombre} confirma. Las manillas llegan a Accesos.`, "Ver en Accesos");
+        await rpc(historiaCompra(d.id,"mesa")?"aftr_reservar_historia":"aftr_reservar_mesa", { p_evento:d.id, ...(historiaCompra(d.id,"mesa")?{p_historia:historiaCompra(d.id,"mesa")}:{}), p_mesa: mesa.id, p_combo: combo?.id || null });
+        c.innerHTML = listo(`Mesa ${mesa.etiqueta} reservada`, `La guardamos para vos. Abrí el pedido en Accesos para pagar con QR.`, "Ver en Accesos");
         ligarListo(c, () => (location.hash = "#/accesos"));
       } catch (e) { avisar(mensaje(e)); render(); }
     };
@@ -738,13 +800,13 @@ async function pintarAccesos() {
   if (ruta().nombre !== "accesos") return;
   const prox = proximos(E.accesos), pas = pasados(E.accesos);
   if (!prox.find((a) => a.id === abierta)) abierta = null;
-  vista.innerHTML = `<div class="pagina"><h1 class="titular">Accesos ${abierta ? `<button class="pildora densa" data-cerrar-t>Cerrar</button>` : ""}</h1>
+  vista.innerHTML = `<div class="pagina"><a class="texto-accion" href="#/mis-mesas">Mis mesas y pedidos</a><button class="texto-accion" style="margin-left:16px" onclick="socialAftr().mineResale().catch(e=>avisar(mensaje(e)))">Reventa y mis operaciones ↗</button><h1 class="titular">Accesos ${abierta ? `<button class="pildora densa" data-cerrar-t>Cerrar</button>` : ""}</h1>
     ${prox.length ? `<div class="pila" id="pila">${prox.map((a, i) => tarjetaWallet(a, i)).join("")}</div>`
       : `<div class="vacio-caja"><img src="img/marca.svg" alt=""><h3 class="fuerte" style="font-size:20px;margin:0 0 6px">Tu próxima noche va acá</h3>
         <p class="suave" style="margin:0 0 20px">Las entradas, listas y mesas que consigas aparecen con su QR.</p><a class="boton" href="#/">Explorar eventos</a></div>`}
     ${pas.length && !abierta ? `<h3 class="fuerte" style="font-size:20px;margin:34px 4px 8px">Historial</h3>${pas.slice(0, 30).map((a) => `<div class="fila" style="padding:8px 4px">${img(a.evento.flyer, a.evento.club?.color).replace('class="img ', 'style="width:48px;height:48px;border-radius:12px;flex:none" class="img ')}
       <div class="cuerpo"><b style="font-size:15px">${esc(a.evento.nombre)}</b><span class="suave">${esc(a.titulo)} · ${esc(fechaCorta(a.evento.fecha))}</span></div>
-      <span class="tenue" style="font-size:13px">${{ usada: "Usada", anulada: "Anulada", valida: "Sin usar", pendiente: "Pendiente" }[a.estado]}</span></div>`).join("")}` : ""}</div>`;
+      <span class="tenue" style="font-size:13px">${{ usada: "Usada", anulada: "Anulada", bloqueada: "En reventa", reemplazada: "Reemplazada", valida: "Sin usar", pendiente: "Pendiente" }[a.estado]}</span></div>`).join("")}` : ""}</div>`;
   apilar(prox);
   $("[data-cerrar-t]")?.addEventListener("click", () => { abierta = null; pintarAccesos(); });
 }
@@ -759,6 +821,7 @@ function tarjetaWallet(a, i) {
     </div></div>`;
 }
 function abiertaHtml(a) {
+  if(a.estado==="bloqueada")return `<div class="tw-abierta"><b class="fuerte">Entrada en reventa</b><p>El QR está bloqueado para ingreso y transferencias.</p><button class="boton" onclick="socialAftr().mineResale()">Ver mis operaciones</button></div>`;
   const club = a.evento.club || {};
   if (a.qr && a.estado === "valida") {
     const q = qrcode(0, "M"); q.addData(a.qr); q.make();
@@ -768,9 +831,9 @@ function abiertaHtml(a) {
       ${club.lat != null ? `<a class="circ" target="_blank" rel="noopener" href="${comoLlegar(club)}">${ICO.ir}</a>` : ""}</div></div>`;
   }
   return `<div class="tw-abierta"><b class="fuerte" style="font-size:20px">${esc(a.titulo)}</b>
-    <p style="margin:6px 0 10px">${esc(club.nombre)} tiene que confirmar tu pedido. Cuando lo haga, tus QR aparecen acá solos.</p>
+    <p style="margin:6px 0 10px">Pagá el pedido con PULSE o QR. Tus entradas aparecen cuando se confirma el pago.</p>
     ${a.total != null ? `<b class="fuerte" style="font-size:24px">${bs(a.total)}</b>` : ""}
-    <div class="acciones">${a.tipo === "pedido" ? `<button class="boton sec" data-cancelar>Cancelar pedido</button>` : ""}</div></div>`;
+    <div class="acciones">${a.tipo === "pedido" ? `<button class="boton" data-pagar>Pagar</button><button class="boton sec" data-cancelar>Cancelar pedido</button>` : ""}</div></div>`;
 }
 function apilar(prox) {
   const pila = $("#pila");
@@ -788,6 +851,7 @@ function apilar(prox) {
       pintarAccesos();
     };
     $("[data-enviar]", t)?.addEventListener("click", () => hojaEnviar(prox[i]));
+    $("[data-pagar]", t)?.addEventListener("click", () => hojaMetodoPago(prox[i].id, prox[i].evento.nombre));
     $("[data-cancelar]", t)?.addEventListener("click", async (e) => {
       e.currentTarget.innerHTML = `<span class="giro"></span>`;
       try { await rpc("aftr_cancelar_mi_orden", { p_orden: prox[i].id }); abierta = null; await cargarAccesos(); pintarAccesos(); } catch (er) { avisar(mensaje(er)); pintarAccesos(); }
@@ -849,16 +913,20 @@ async function pintarCuenta() {
   if (ruta().nombre !== "cuenta") return;
   const p = E.perfil;
   vista.innerHTML = `<div class="pagina"><h1 class="titular">Cuenta</h1>
-    <div class="perfil aparecer"><span class="avatar">${esc((p?.nombre || "?").slice(0, 1).toUpperCase())}</span><div><b class="fuerte" style="font-size:24px">${esc(p?.nombre || "")}</b>
+    <div class="perfil aparecer"><button class="avatar" data-foto aria-label="Cambiar foto de perfil">${fotoPerfilHtml(p)}</button><div><b class="fuerte" style="font-size:24px">${esc(p?.nombre || "")}</b>
       ${p ? `<div class="suave">@${esc(p.usuario)}</div>` : ""}</div></div>
     ${!p ? `<button class="boton" style="margin-top:20px" onclick="abrirBienvenida()">Completar perfil</button>` : ""}
     ${g.eventos?.length ? `<h3 class="fuerte" style="font-size:22px;margin:30px 4px 14px">Guardados</h3><div class="carrusel" style="padding:0 4px">${g.eventos.map(tarjeta).join("")}</div>` : ""}
     ${g.lugares?.length ? `<h3 class="fuerte" style="font-size:22px;margin:30px 4px 6px">Siguiendo</h3>${g.lugares.map((l, i) => filaLugar(l, i).replace('class="fila ', 'style="padding:8px 4px" class="fila ')).join("")}` : ""}
     <h3 class="fuerte" style="font-size:22px;margin:30px 4px 6px">Ajustes</h3>
+    <button class="opcion" data-foto-editar>Cambiar foto de perfil</button><button class="opcion" data-guia>Ver guía de AFTR</button>
+    <a class="opcion" href="#/pulse">PULSE · Saldo y recargas</a><a class="opcion" href="#/mis-mesas">Mis mesas y pedidos</a>
     <a class="opcion" href="#/accesos">${ICO.ticket}Mis accesos</a>
     <button class="opcion" data-salir>${ICO.salir}Cerrar sesión</button>
     <button class="opcion mal" data-borrar>${ICO.borrar}Eliminar cuenta</button>
     <img src="img/marca.svg" style="height:26px;margin:30px auto 8px;opacity:.35" alt=""><p class="tenue" style="text-align:center;font-size:12px;margin:0">AFTR · Nightlife &amp; Events</p></div>`;
+  $$("[data-foto], [data-foto-editar]").forEach(b => b.onclick = () => editarFotoWeb());
+  $("[data-guia]").onclick = () => abrirGuiaAftr();
   $("[data-salir]").onclick = async () => { await sb.auth.signOut(); };
   $("[data-borrar]").onclick = () => {
     const c = abrirHoja(`<h2 class="fuerte" style="font-size:22px;margin:14px 0 8px">¿Eliminar tu cuenta?</h2>
@@ -884,9 +952,13 @@ async function alCambiarSesion(sesion) {
   if (antes === sesion?.user?.id && antes !== undefined) return;
   if (canal) { sb.removeChannel(canal); canal = null; }
   E.accesos = null;
+  E.perfil = null;
+  iniciarSaldoFijo();
+  if (guiaActual) guiaActual.dispatchEvent(new Event("cerrar-guia"));
   await cargarPerfil();
   if (sesion && !E.perfil) abrirBienvenida();
-  if (sesion) cargarAccesos().catch(() => {});
+  iniciarSaldoFijo();
+  if (sesion) { cargarAccesos().catch(() => {}); ofrecerGuia(); }
   else $("#globo").hidden = true;
   pintar();
 }

@@ -44,7 +44,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Venue usa la cámara para escanear el QR de las entradas en la puerta.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Venue usa tus fotos para adjuntar comprobantes de pago y el arte de los eventos.</string>
+	<string>Venue usa tus fotos y videos para publicar historias en AFTR, adjuntar comprobantes y cargar artes de eventos.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

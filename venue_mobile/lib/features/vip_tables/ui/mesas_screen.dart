@@ -1,3 +1,4 @@
+import '../../../core/widgets/opcion_texto.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -75,23 +76,31 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
     if (!mounted) return;
     if (mias.isNotEmpty) {
       ref.invalidate(mesasProvider);
-      avisar(context, 'Se liberó ${mias.join(', ')} — la reserva venció sin pago',
-          tipo: TipoAviso.aviso);
+      avisar(
+        context,
+        'Se liberó ${mias.join(', ')} — la reserva venció sin pago',
+        tipo: TipoAviso.aviso,
+      );
     }
   }
 
   Future<void> _guardarImagen(Evento ev, String planta) async {
     try {
-      final b = _planoKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      final b =
+          _planoKey.currentContext!.findRenderObject()!
+              as RenderRepaintBoundary;
       final img = await b.toImage(pixelRatio: 3);
       final png = await img.toByteData(format: ui.ImageByteFormat.png);
       final f = File(
-          '${Directory.systemTemp.path}/plano-${ev.nombre.replaceAll(RegExp(r'\s+'), '-')}-$planta.png');
+        '${Directory.systemTemp.path}/plano-${ev.nombre.replaceAll(RegExp(r'\s+'), '-')}-$planta.png',
+      );
       await f.writeAsBytes(png!.buffer.asUint8List());
-      await SharePlus.instance
-          .share(ShareParams(files: [XFile(f.path, mimeType: 'image/png')]));
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(f.path, mimeType: 'image/png')]),
+      );
     } catch (_) {
-      if (mounted) avisar(context, 'No se pudo generar la imagen', tipo: TipoAviso.aviso);
+      if (mounted)
+        avisar(context, 'No se pudo generar la imagen', tipo: TipoAviso.aviso);
     }
   }
 
@@ -111,20 +120,25 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
         title: const Text('Copiar el plano de…'),
         children: [
           SimpleDialogOption(
-              onPressed: () => Navigator.pop(c, '__ultimo__'),
-              child: const Text('El evento anterior del boliche')),
+            onPressed: () => Navigator.pop(c, '__ultimo__'),
+            child: const Text('El evento anterior del boliche'),
+          ),
           for (final o in otros)
             SimpleDialogOption(
-                onPressed: () => Navigator.pop(c, o['id'] as String),
-                child: Text('${o['nombre']} · ${o['fecha']}')),
+              onPressed: () => Navigator.pop(c, o['id'] as String),
+              child: Text('${o['nombre']} · ${o['fecha']}'),
+            ),
         ],
       ),
     );
     if (desde == null) return;
     final repo = ref.read(mesasRepositoryProvider);
     await _hacer(
-        () => desde == '__ultimo__' ? repo.heredar(ev.id) : repo.copiar(desde, ev.id),
-        ok: 'Plano copiado');
+      () => desde == '__ultimo__'
+          ? repo.heredar(ev.id)
+          : repo.copiar(desde, ev.id),
+      ok: 'Plano copiado',
+    );
   }
 
   @override
@@ -135,9 +149,12 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
     final club = ref.watch(clubActivoIdProvider);
     if (ev == null || rol == null || club == null) {
       return const MensajeVista(
-          icono: Icons.event_busy_rounded, titulo: 'No hay evento activo');
+        icono: Icons.event_busy_rounded,
+        titulo: 'No hay evento activo',
+      );
     }
-    if (!_barrido) WidgetsBinding.instance.addPostFrameCallback((_) => _barrer(ev));
+    if (!_barrido)
+      WidgetsBinding.instance.addPostFrameCallback((_) => _barrer(ev));
 
     // Otro vendió o cobró una mesa: el plano se actualiza solo. Mientras el
     // admin arrastra mesas no se repinta, para no moverle el piso.
@@ -149,10 +166,12 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
 
     final mesas = ref.watch(mesasProvider);
     final combos = {
-      for (final c in ref.watch(combosProvider).value ?? const <Combo>[]) c.id: c
+      for (final c in ref.watch(combosProvider).value ?? const <Combo>[])
+        c.id: c,
     };
     final fondos = ref.watch(fondosProvider).value ?? const <String, String>{};
-    final teams = ref.watch(teamsClubProvider).value ?? const <String, String>{};
+    final teams =
+        ref.watch(teamsClubProvider).value ?? const <String, String>{};
     final esAdmin = rol == Rol.admin;
     final esPortero = rol == Rol.portero;
     final repo = ref.read(mesasRepositoryProvider);
@@ -163,14 +182,22 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
       datos: (todas) {
         // Los pisos con mesas, más el que se eligió a mano: un piso nuevo
         // todavía no tiene mesas y aun así hay que poder pararse en él.
-        final pisos = pisosDe(todas, extra: [...fondos.keys, ..._pisosNuevos, ?_planta]);
+        final pisos = pisosDe(
+          todas,
+          extra: [...fondos.keys, ..._pisosNuevos, ?_planta],
+        );
         final planta = pisos.contains(_planta) ? _planta! : pisos.first;
         final enLista = _vista[planta] ?? fondos[planta] == null;
         final enPlanta = todas.where((m) => m.planta == planta).toList();
         final vendidas = todas.where((m) => !m.libre).toList();
         final porVerif = todas.where((m) => m.porVerificar).toList();
         final misReservas = todas
-            .where((m) => m.estado == 'reservada' && m.vendidoPor == yo && m.reservadaAt != null)
+            .where(
+              (m) =>
+                  m.estado == 'reservada' &&
+                  m.vendidoPor == yo &&
+                  m.reservadaAt != null,
+            )
             .toList();
         final total = vendidas.fold<num>(0, (a, m) => a + m.precio);
 
@@ -182,7 +209,11 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
           } else if (m.libre) {
             if (!rol.vende) return;
             if (!combos.values.any((c) => c.activo) && ev.comboObligatorio) {
-              avisar(context, 'El admin debe crear combos primero', tipo: TipoAviso.aviso);
+              avisar(
+                context,
+                'El admin debe crear combos primero',
+                tipo: TipoAviso.aviso,
+              );
               return;
             }
             hojaVenderMesa(context, m);
@@ -203,7 +234,10 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
               Text(
                 '${vendidas.length} de ${todas.length} ${esPortero ? 'ocupadas' : 'vendidas'}'
                 '${!esPortero && vendidas.isNotEmpty ? ' · $total Bs' : ''}',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               if (misReservas.isNotEmpty)
                 Padding(
@@ -217,84 +251,137 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
               if (pisos.length > 1)
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: Row(children: [
-                    for (final p in pisos)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(nombrePiso(p)),
-                          selected: p == planta,
-                          showCheckmark: false,
-                          onSelected: (_) => setState(() => _planta = p),
+                  child: Row(
+                    children: [
+                      for (final p in pisos)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: OpcionTexto(
+                            label: Text(nombrePiso(p)),
+                            selected: p == planta,
+                            showCheckmark: false,
+                            onSelected: (_) => setState(() => _planta = p),
+                          ),
                         ),
-                      ),
-                  ]),
+                    ],
+                  ),
                 ),
               const SizedBox(height: 10),
-              Wrap(spacing: 8, runSpacing: 6, children: [
-                if (!_editando && esAdmin && porVerif.isNotEmpty)
-                  FilledButton.tonalIcon(
-                    style: FilledButton.styleFrom(
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  if (!_editando && esAdmin && porVerif.isNotEmpty)
+                    FilledButton.tonalIcon(
+                      style: FilledButton.styleFrom(
                         minimumSize: const Size(0, 42),
-                        backgroundColor: VenueColors.aviso.withValues(alpha: .22)),
-                    onPressed: () => hojaConfirmarPagos(context),
-                    icon: const Icon(Icons.verified_outlined, size: 18),
-                    label: Text('Confirmar pagos (${porVerif.length})'),
-                  ),
-                if (!_editando && vendidas.isNotEmpty && !esPortero)
-                  _Accion('Registro de combos', Icons.copy_rounded, () async {
-                    await Clipboard.setData(ClipboardData(
-                        text: registroDeCombos(ev.nombre, ev.fechaCorta, vendidas, combos)));
-                    if (context.mounted) {
-                      avisar(context, 'Registro copiado — precios ya sin comisión');
-                    }
-                  }),
-                if (!_editando && !enLista)
-                  _Accion('Guardar imagen', Icons.image_outlined,
-                      () => _guardarImagen(ev, planta)),
-                _Accion(enLista ? 'Ver plano' : 'Ver lista',
-                    enLista ? Icons.map_outlined : Icons.view_list_rounded,
-                    () => setState(() => _vista[planta] = !enLista)),
-                if (esAdmin && !_editando) ...[
-                  _Accion(enLista ? 'Editar mesas' : 'Editar plano', Icons.edit_location_alt_outlined,
-                      () => setState(() {
-                            _editando = true;
-                            _mover = false;
-                          })),
-                  _Accion('Combos', Icons.local_bar_outlined, () => hojaCombos(context)),
-                ],
-                if (esAdmin && _editando) ...[
-                  FilledButton(
-                    style: FilledButton.styleFrom(minimumSize: const Size(0, 42)),
-                    onPressed: () => setState(() {
-                      _editando = false;
-                      _mover = false;
-                      ref.invalidate(mesasProvider);
+                        backgroundColor: VenueColors.aviso.withValues(
+                          alpha: .22,
+                        ),
+                      ),
+                      onPressed: () => hojaConfirmarPagos(context),
+                      icon: const Icon(Icons.verified_outlined, size: 18),
+                      label: Text('Confirmar pagos (${porVerif.length})'),
+                    ),
+                  if (!_editando && vendidas.isNotEmpty && !esPortero)
+                    _Accion('Registro de combos', Icons.copy_rounded, () async {
+                      await Clipboard.setData(
+                        ClipboardData(
+                          text: registroDeCombos(
+                            ev.nombre,
+                            ev.fechaCorta,
+                            vendidas,
+                            combos,
+                          ),
+                        ),
+                      );
+                      if (context.mounted) {
+                        avisar(
+                          context,
+                          'Registro copiado — precios ya sin comisión',
+                        );
+                      }
                     }),
-                    child: const Text('Listo'),
+                  if (!_editando && !enLista)
+                    _Accion(
+                      'Guardar imagen',
+                      Icons.image_outlined,
+                      () => _guardarImagen(ev, planta),
+                    ),
+                  _Accion(
+                    enLista ? 'Ver plano' : 'Ver lista',
+                    enLista ? Icons.map_outlined : Icons.view_list_rounded,
+                    () => setState(() => _vista[planta] = !enLista),
                   ),
-                  FilterChip(
-                    label: Text(_mover ? 'Mover: activado' : 'Posiciones bloqueadas'),
-                    selected: _mover,
-                    onSelected: (v) => setState(() => _mover = v),
-                  ),
-                  _Accion('Agregar mesas', Icons.add_rounded,
+                  if (esAdmin && !_editando) ...[
+                    _Accion(
+                      enLista ? 'Editar mesas' : 'Editar plano',
+                      Icons.edit_location_alt_outlined,
+                      () => setState(() {
+                        _editando = true;
+                        _mover = false;
+                      }),
+                    ),
+                    _Accion(
+                      'Combos',
+                      Icons.local_bar_outlined,
+                      () => hojaCombos(context),
+                    ),
+                  ],
+                  if (esAdmin && _editando) ...[
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 42),
+                      ),
+                      onPressed: () => setState(() {
+                        _editando = false;
+                        _mover = false;
+                        ref.invalidate(mesasProvider);
+                      }),
+                      child: const Text('Listo'),
+                    ),
+                    OpcionTexto(
+                      label: Text(
+                        _mover ? 'Mover: activado' : 'Posiciones bloqueadas',
+                      ),
+                      selected: _mover,
+                      onSelected: (v) => setState(() => _mover = v),
+                    ),
+                    _Accion(
+                      'Agregar mesas',
+                      Icons.add_rounded,
                       _ocupado
                           ? null
                           : () async {
-                              final r = await _hojaNuevasMesas(context, pisos, planta, todas);
+                              final r = await _hojaNuevasMesas(
+                                context,
+                                pisos,
+                                planta,
+                                todas,
+                              );
                               if (r == null) return;
-                              final yaHay = todas.where((m) => m.tipo.id == r.tipo.id).length;
+                              final yaHay = todas
+                                  .where((m) => m.tipo.id == r.tipo.id)
+                                  .length;
                               await _hacer(
-                                  () => repo.crearVarias(ev.id, r.planta, r.tipo, r.cantidad,
-                                      desde: yaHay + 1,
-                                      ya: todas.where((m) => m.planta == r.planta).length),
-                                  ok: r.cantidad == 1
-                                      ? '${r.tipo.nombre} agregada'
-                                      : '${r.cantidad} ${r.tipo.plural.toLowerCase()} agregadas');
+                                () => repo.crearVarias(
+                                  ev.id,
+                                  r.planta,
+                                  r.tipo,
+                                  r.cantidad,
+                                  desde: yaHay + 1,
+                                  ya: todas
+                                      .where((m) => m.planta == r.planta)
+                                      .length,
+                                ),
+                                ok: r.cantidad == 1
+                                    ? '${r.tipo.nombre} agregada'
+                                    : '${r.cantidad} ${r.tipo.plural.toLowerCase()} agregadas',
+                              );
                               if (mounted) setState(() => _planta = r.planta);
-                            }),
-                  _Accion(
+                            },
+                    ),
+                    _Accion(
                       'Fondo${fondos[planta] != null ? ' ✓' : ''}',
                       Icons.wallpaper_rounded,
                       _ocupado
@@ -302,20 +389,35 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                           : () async {
                               final b = await elegirImagen(lado: 1400);
                               if (b == null) return;
-                              await _hacer(() async {
-                                final url = await ref
-                                    .read(archivosProvider)
-                                    .subirDiseno(b, 'fondo-$club-$planta.jpg');
-                                await repo.guardarFondo(club, planta, url);
-                                ref.invalidate(fondosProvider);
-                              }, ok: 'Fondo de ${nombrePiso(planta)} actualizado');
-                            }),
-                  if (todas.isEmpty)
-                    _Accion('Copiar de otro evento', Icons.content_copy_rounded,
-                        () => _copiarDeOtro(ev, club)),
-                  _Accion('Agregar piso', Icons.layers_outlined, () => _agregarPiso(pisos)),
+                              await _hacer(
+                                () async {
+                                  final url = await ref
+                                      .read(archivosProvider)
+                                      .subirDiseno(
+                                        b,
+                                        'fondo-$club-$planta.jpg',
+                                      );
+                                  await repo.guardarFondo(club, planta, url);
+                                  ref.invalidate(fondosProvider);
+                                },
+                                ok: 'Fondo de ${nombrePiso(planta)} actualizado',
+                              );
+                            },
+                    ),
+                    if (todas.isEmpty)
+                      _Accion(
+                        'Copiar de otro evento',
+                        Icons.content_copy_rounded,
+                        () => _copiarDeOtro(ev, club),
+                      ),
+                    _Accion(
+                      'Agregar piso',
+                      Icons.layers_outlined,
+                      () => _agregarPiso(pisos),
+                    ),
+                  ],
                 ],
-              ]),
+              ),
               const SizedBox(height: 12),
               if (enLista)
                 _ListaMesas(
@@ -323,78 +425,98 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                   teams: teams,
                   conPlata: !esPortero,
                   alTocar: tocar,
-                  vacio: 'No hay mesas en ${nombrePiso(planta)}.'
+                  vacio:
+                      'No hay mesas en ${nombrePiso(planta)}.'
                       '${esAdmin ? ' Agregalas con "Editar mesas".' : ''}',
                 ),
               // El plano se puede ampliar y desplazar con dos dedos. En modo
               // mover, un dedo arrastra la mesa y el plano queda quieto.
-              if (!enLista) Builder(builder: (context) {
-                // El visor necesita un alto propio: dentro de una lista no
-                // tiene de dónde sacarlo y el plano quedaba invisible.
-                final visible = MediaQuery.of(context).size.width - 32;
-                final ancho = visible < 640 ? 640.0 : visible;
-                final proporcion = ref.watch(proporcionPlanoProvider(fondos[planta])).value ??
-                    Plano.proporcion;
-                return SizedBox(
-                  height: ancho / proporcion,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: InteractiveViewer(
-                      minScale: 1,
-                      maxScale: 5,
-                      panEnabled: !_mover,
-                      constrained: false,
-                      child: SizedBox(
-                        width: ancho,
-                        child: RepaintBoundary(
-                          key: _planoKey,
-                          child: Plano(
-                            mesas: enPlanta,
-                            planta: planta,
-                            fondoUrl: fondos[planta],
-                            aspecto: proporcion,
-                            mover: _editando && _mover,
-                            teams: teams,
-                            alTocar: tocar,
-                            alMover: (m, x, y) async {
-                              try {
-                                await repo.mover(m.id, x, y);
-                                ref.invalidate(mesasProvider);
-                                return true;
-                              } catch (e) {
-                                if (context.mounted) {
-                                  avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
-                                }
-                                return false;
-                              }
-                            },
+              if (!enLista)
+                Builder(
+                  builder: (context) {
+                    // El visor necesita un alto propio: dentro de una lista no
+                    // tiene de dónde sacarlo y el plano quedaba invisible.
+                    final visible = MediaQuery.of(context).size.width - 32;
+                    final ancho = visible < 640 ? 640.0 : visible;
+                    final proporcion =
+                        ref
+                            .watch(proporcionPlanoProvider(fondos[planta]))
+                            .value ??
+                        Plano.proporcion;
+                    return SizedBox(
+                      height: ancho / proporcion,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: InteractiveViewer(
+                          minScale: 1,
+                          maxScale: 5,
+                          panEnabled: !_mover,
+                          constrained: false,
+                          child: SizedBox(
+                            width: ancho,
+                            child: RepaintBoundary(
+                              key: _planoKey,
+                              child: Plano(
+                                mesas: enPlanta,
+                                planta: planta,
+                                fondoUrl: fondos[planta],
+                                aspecto: proporcion,
+                                mover: _editando && _mover,
+                                teams: teams,
+                                alTocar: tocar,
+                                alMover: (m, x, y) async {
+                                  try {
+                                    await repo.mover(m.id, x, y);
+                                    ref.invalidate(mesasProvider);
+                                    return true;
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      avisar(
+                                        context,
+                                        mensajeDeError(e),
+                                        tipo: TipoAviso.aviso,
+                                      );
+                                    }
+                                    return false;
+                                  }
+                                },
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              }),
+                    );
+                  },
+                ),
               if (!enLista && (MediaQuery.of(context).size.width - 32) < 640)
                 Padding(
                   padding: EdgeInsets.only(top: 6),
-                  child: Text('← deslizá el plano de lado →',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: VenueColors.textoSuave, fontSize: 12)),
+                  child: Text(
+                    '← deslizá el plano de lado →',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: VenueColors.textoSuave,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               const SizedBox(height: 10),
               if (!enLista) const LeyendaPlano(),
               const SizedBox(height: 6),
-              if (!enLista) Text(
-                _editando
-                    ? (_mover
-                        ? 'Arrastrá una mesa para acomodarla · tocá para editarla'
-                        : 'Posiciones bloqueadas — activá Mover para arrastrar · tocá para editar')
-                    : esPortero
-                        ? 'Tocá una mesa para ver el nombre y su combo'
-                        : 'Tocá una mesa para venderla o ver su detalle · pellizcá para ampliar',
-                style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
-              ),
+              if (!enLista)
+                Text(
+                  _editando
+                      ? (_mover
+                            ? 'Arrastrá una mesa para acomodarla · tocá para editarla'
+                            : 'Posiciones bloqueadas — activá Mover para arrastrar · tocá para editar')
+                      : esPortero
+                      ? 'Tocá una mesa para ver el nombre y su combo'
+                      : 'Tocá una mesa para venderla o ver su detalle · pellizcá para ampliar',
+                  style: TextStyle(
+                    color: VenueColors.textoSuave,
+                    fontSize: 12.5,
+                  ),
+                ),
               if (todas.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 24),
@@ -422,58 +544,100 @@ class _Accion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-            minimumSize: const Size(0, 42),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        onPressed: alTocar,
-        icon: Icon(icono, size: 18),
-        label: Text(texto),
-      );
+    style: OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 42),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+    ),
+    onPressed: alTocar,
+    icon: Icon(icono, size: 18),
+    label: Text(texto),
+  );
 }
-
 
 /// Pedir el nombre de un piso nuevo, con sugerencias.
 Future<String?> _pedirPiso(BuildContext context, List<String> yaHay) {
   final c = TextEditingController();
-  final sugeridos = ['Planta baja', 'Planta alta', 'Piso 1', 'Piso 2', 'Piso 3', 'Terraza', 'Rooftop', 'Sector VIP']
-      .where((n) => !yaHay.any((p) => nombrePiso(p).toLowerCase() == n.toLowerCase()))
-      .toList();
+  final sugeridos =
+      [
+            'Planta baja',
+            'Planta alta',
+            'Piso 1',
+            'Piso 2',
+            'Piso 3',
+            'Terraza',
+            'Rooftop',
+            'Sector VIP',
+          ]
+          .where(
+            (n) => !yaHay.any(
+              (p) => nombrePiso(p).toLowerCase() == n.toLowerCase(),
+            ),
+          )
+          .toList();
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     backgroundColor: VenueColors.superficie,
     builder: (ctx) => Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + MediaQuery.of(ctx).viewInsets.bottom),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        24 + MediaQuery.of(ctx).viewInsets.bottom,
+      ),
       child: StatefulBuilder(
-        builder: (ctx, set) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('Agregar piso', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
-          TextField(
-            controller: c,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'Nombre del piso', hintText: 'Terraza, Piso 2, Sector VIP…'),
-            onChanged: (_) => set(() {}),
-          ),
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 6, children: [
-            for (final n in sugeridos)
-              ActionChip(label: Text(n), onPressed: () => set(() => c.text = n)),
-          ]),
-          const SizedBox(height: 10),
-          Text(
-            'El piso queda guardado cuando le agregás la primera mesa. Con el dibujo del piso '
-            '(Fondo) se ve como plano; sin dibujo, las mesas se ven como lista.',
-            style: TextStyle(color: VenueColors.textoSuave, fontSize: 13, height: 1.35),
-          ),
-          const SizedBox(height: 14),
-          FilledButton(
-            onPressed: c.text.trim().isEmpty ? null : () => Navigator.pop(ctx, c.text.trim()),
-            child: const Text('Agregar piso'),
-          ),
-        ]),
+        builder: (ctx, set) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Agregar piso',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: c,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Nombre del piso',
+                hintText: 'Terraza, Piso 2, Sector VIP…',
+              ),
+              onChanged: (_) => set(() {}),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                for (final n in sugeridos)
+                  OpcionTexto(
+                    label: Text(n),
+                    onPressed: () => set(() => c.text = n),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'El piso queda guardado cuando le agregás la primera mesa. Con el dibujo del piso '
+              '(Fondo) se ve como plano; sin dibujo, las mesas se ven como lista.',
+              style: TextStyle(
+                color: VenueColors.textoSuave,
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 14),
+            FilledButton(
+              onPressed: c.text.trim().isEmpty
+                  ? null
+                  : () => Navigator.pop(ctx, c.text.trim()),
+              child: const Text('Agregar piso'),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -481,7 +645,11 @@ Future<String?> _pedirPiso(BuildContext context, List<String> yaHay) {
 
 /// Agregar una o varias mesas de un tipo, en el piso que se elija.
 Future<({TipoMesa tipo, int cantidad, String planta})?> _hojaNuevasMesas(
-    BuildContext context, List<String> pisos, String planta, List<Mesa> todas) {
+  BuildContext context,
+  List<String> pisos,
+  String planta,
+  List<Mesa> todas,
+) {
   var tipo = tiposMesa.first;
   var cantidad = 1;
   var piso = planta;
@@ -493,76 +661,127 @@ Future<({TipoMesa tipo, int cantidad, String planta})?> _hojaNuevasMesas(
     showDragHandle: true,
     backgroundColor: VenueColors.superficie,
     builder: (ctx) => Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + MediaQuery.of(ctx).viewInsets.bottom),
-      child: StatefulBuilder(builder: (ctx, set) {
-        final desde = todas.where((m) => m.tipo.id == tipo.id).length + 1;
-        final destino = piso == otro ? idDePiso(nuevo.text) : piso;
-        return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('Agregar mesas', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
-          const Text('Tipo', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6),
-          Wrap(spacing: 8, runSpacing: 6, children: [
-            for (final t in tiposMesa)
-              ChoiceChip(
-                label: Text(t.nombre),
-                selected: t.id == tipo.id,
-                showCheckmark: false,
-                onSelected: (_) => set(() => tipo = t),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        24 + MediaQuery.of(ctx).viewInsets.bottom,
+      ),
+      child: StatefulBuilder(
+        builder: (ctx, set) {
+          final desde = todas.where((m) => m.tipo.id == tipo.id).length + 1;
+          final destino = piso == otro ? idDePiso(nuevo.text) : piso;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Agregar mesas',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
               ),
-          ]),
-          const SizedBox(height: 14),
-          Row(children: [
-            const Expanded(child: Text('Cuántas', style: TextStyle(fontWeight: FontWeight.w600))),
-            IconButton.outlined(
-                onPressed: cantidad > 1 ? () => set(() => cantidad--) : null,
-                icon: const Icon(Icons.remove_rounded)),
-            SizedBox(
-                width: 44,
-                child: Text('$cantidad',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
-            IconButton.outlined(
-                onPressed: cantidad < 40 ? () => set(() => cantidad++) : null,
-                icon: const Icon(Icons.add_rounded)),
-          ]),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            borderRadius: BorderRadius.circular(12),
-            dropdownColor: VenueColors.superficie,
-            icon: Icon(Icons.keyboard_arrow_down_rounded, color: VenueColors.textoSuave),
-            initialValue: piso,
-            decoration: const InputDecoration(labelText: 'Piso'),
-            items: [
-              for (final p in pisos) DropdownMenuItem(value: p, child: Text(nombrePiso(p))),
-              const DropdownMenuItem(value: otro, child: Text('Nuevo piso…')),
+              const SizedBox(height: 12),
+              const Text('Tipo', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final t in tiposMesa)
+                    OpcionTexto(
+                      label: Text(t.nombre),
+                      selected: t.id == tipo.id,
+                      showCheckmark: false,
+                      onSelected: (_) => set(() => tipo = t),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Cuántas',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton.outlined(
+                    onPressed: cantidad > 1
+                        ? () => set(() => cantidad--)
+                        : null,
+                    icon: const Icon(Icons.remove_rounded),
+                  ),
+                  SizedBox(
+                    width: 44,
+                    child: Text(
+                      '$cantidad',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton.outlined(
+                    onPressed: cantidad < 40
+                        ? () => set(() => cantidad++)
+                        : null,
+                    icon: const Icon(Icons.add_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                borderRadius: BorderRadius.circular(12),
+                dropdownColor: VenueColors.superficie,
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: VenueColors.textoSuave,
+                ),
+                initialValue: piso,
+                decoration: const InputDecoration(labelText: 'Piso'),
+                items: [
+                  for (final p in pisos)
+                    DropdownMenuItem(value: p, child: Text(nombrePiso(p))),
+                  const DropdownMenuItem(
+                    value: otro,
+                    child: Text('Nuevo piso…'),
+                  ),
+                ],
+                onChanged: (v) => set(() => piso = v!),
+              ),
+              if (piso == otro) ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: nuevo,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del piso nuevo',
+                    hintText: 'Terraza, Piso 2…',
+                  ),
+                  onChanged: (_) => set(() {}),
+                ),
+              ],
+              const SizedBox(height: 10),
+              Text(
+                cantidad == 1
+                    ? 'Se crea ${tipo.prefijo}$desde. Después le podés cambiar el nombre.'
+                    : 'Se crean ${tipo.prefijo}$desde a ${tipo.prefijo}${desde + cantidad - 1}. Después les podés cambiar el nombre.',
+                style: TextStyle(color: VenueColors.textoSuave, fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              FilledButton(
+                onPressed: destino.isEmpty
+                    ? null
+                    : () => Navigator.pop(ctx, (
+                        tipo: tipo,
+                        cantidad: cantidad,
+                        planta: destino,
+                      )),
+                child: const Text('Agregar'),
+              ),
             ],
-            onChanged: (v) => set(() => piso = v!),
-          ),
-          if (piso == otro) ...[
-            const SizedBox(height: 10),
-            TextField(
-              controller: nuevo,
-              decoration: const InputDecoration(labelText: 'Nombre del piso nuevo', hintText: 'Terraza, Piso 2…'),
-              onChanged: (_) => set(() {}),
-            ),
-          ],
-          const SizedBox(height: 10),
-          Text(
-            cantidad == 1
-                ? 'Se crea ${tipo.prefijo}$desde. Después le podés cambiar el nombre.'
-                : 'Se crean ${tipo.prefijo}$desde a ${tipo.prefijo}${desde + cantidad - 1}. Después les podés cambiar el nombre.',
-            style: TextStyle(color: VenueColors.textoSuave, fontSize: 13),
-          ),
-          const SizedBox(height: 14),
-          FilledButton(
-            onPressed: destino.isEmpty
-                ? null
-                : () => Navigator.pop(ctx, (tipo: tipo, cantidad: cantidad, planta: destino)),
-            child: const Text('Agregar'),
-          ),
-        ]);
-      }),
+          );
+        },
+      ),
     ),
   );
 }
@@ -583,18 +802,22 @@ class _ListaMesas extends StatelessWidget {
   final String vacio;
 
   Color _color(BuildContext context, String estado) => switch (estado) {
-        'reservada' => VenueColors.aviso,
-        'pagada' => VenueColors.ok,
-        'ocupada' => Theme.of(context).colorScheme.primary,
-        _ => VenueColors.textoSuave,
-      };
+    'reservada' => VenueColors.aviso,
+    'pagada' => VenueColors.ok,
+    'ocupada' => Theme.of(context).colorScheme.primary,
+    _ => VenueColors.textoSuave,
+  };
 
   @override
   Widget build(BuildContext context) {
     if (mesas.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 28),
-        child: Text(vacio, textAlign: TextAlign.center, style: TextStyle(color: VenueColors.textoSuave)),
+        child: Text(
+          vacio,
+          textAlign: TextAlign.center,
+          style: TextStyle(color: VenueColors.textoSuave),
+        ),
       );
     }
     final porTipo = <String, List<Mesa>>{};
@@ -605,82 +828,151 @@ class _ListaMesas extends StatelessWidget {
       final i = tiposMesa.indexWhere((t) => t.id == id);
       return i < 0 ? tiposMesa.length : i;
     }
-    final orden = porTipo.keys.toList()..sort((a, b) => pos(a).compareTo(pos(b)));
+
+    final orden = porTipo.keys.toList()
+      ..sort((a, b) => pos(a).compareTo(pos(b)));
     int natural(Mesa a, Mesa b) {
       final na = int.tryParse(a.etiqueta.replaceAll(RegExp(r'\D'), ''));
       final nb = int.tryParse(b.etiqueta.replaceAll(RegExp(r'\D'), ''));
-      return na != null && nb != null && na != nb ? na.compareTo(nb) : a.etiqueta.compareTo(b.etiqueta);
+      return na != null && nb != null && na != nb
+          ? na.compareTo(nb)
+          : a.etiqueta.compareTo(b.etiqueta);
     }
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      for (final t in orden) ...[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(2, 6, 2, 8),
-          child: Row(children: [
-            Text(tipoMesa(t).plural, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(width: 8),
-            Text('${porTipo[t]!.where((m) => m.libre).length} libres de ${porTipo[t]!.length}',
-                style: TextStyle(fontSize: 13, color: VenueColors.textoSuave)),
-          ]),
-        ),
-        LayoutBuilder(builder: (context, c) {
-          final cols = c.maxWidth >= 700 ? 4 : c.maxWidth >= 460 ? 3 : 2;
-          const gap = 10.0;
-          final ancho = (c.maxWidth - gap * (cols - 1)) / cols;
-          return Wrap(spacing: gap, runSpacing: gap, children: [
-            for (final m in porTipo[t]!..sort(natural))
-              SizedBox(
-                width: ancho,
-                child: Material(
-                  color: VenueColors.superficie,
-                  borderRadius: BorderRadius.circular(16),
-                  clipBehavior: Clip.antiAlias,
-                  elevation: 0,
-                  child: InkWell(
-                    onTap: () => alTocar(m),
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-                      decoration: BoxDecoration(
-                        border: Border(left: BorderSide(color: _color(context, m.estado), width: 4)),
-                      ),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Row(children: [
-                          Text(m.etiqueta, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: _color(context, m.estado).withValues(alpha: .14),
-                              borderRadius: BorderRadius.circular(99),
-                            ),
-                            child: Text(etiquetaEstado[m.estado] ?? m.estado,
-                                style: TextStyle(
-                                    fontSize: 11.5, fontWeight: FontWeight.w600, color: _color(context, m.estado))),
-                          ),
-                        ]),
-                        const SizedBox(height: 4),
-                        Text(m.libre ? 'Libre' : ((m.cliente ?? '').trim().isEmpty ? '—' : m.cliente!.trim()),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
-                        Text(
-                          [
-                            if (m.teamId != null && teams[m.teamId] != null) teams[m.teamId]!,
-                            if (conPlata && m.precio > 0) '${m.precio} Bs',
-                          ].join(' · '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12.5, color: VenueColors.textoSuave),
-                        ),
-                      ]),
-                    ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final t in orden) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 6, 2, 8),
+            child: Row(
+              children: [
+                Text(
+                  tipoMesa(t).plural,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-          ]);
-        }),
-        const SizedBox(height: 8),
+                const SizedBox(width: 8),
+                Text(
+                  '${porTipo[t]!.where((m) => m.libre).length} libres de ${porTipo[t]!.length}',
+                  style: TextStyle(fontSize: 13, color: VenueColors.textoSuave),
+                ),
+              ],
+            ),
+          ),
+          LayoutBuilder(
+            builder: (context, c) {
+              final cols = c.maxWidth >= 700
+                  ? 4
+                  : c.maxWidth >= 460
+                  ? 3
+                  : 2;
+              const gap = 10.0;
+              final ancho = (c.maxWidth - gap * (cols - 1)) / cols;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final m in porTipo[t]!..sort(natural))
+                    SizedBox(
+                      width: ancho,
+                      child: Material(
+                        color: VenueColors.superficie,
+                        borderRadius: BorderRadius.circular(16),
+                        clipBehavior: Clip.antiAlias,
+                        elevation: 0,
+                        child: InkWell(
+                          onTap: () => alTocar(m),
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                left: BorderSide(
+                                  color: _color(context, m.estado),
+                                  width: 4,
+                                ),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      m.etiqueta,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _color(
+                                          context,
+                                          m.estado,
+                                        ).withValues(alpha: .14),
+                                        borderRadius: BorderRadius.circular(99),
+                                      ),
+                                      child: Text(
+                                        etiquetaEstado[m.estado] ?? m.estado,
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: _color(context, m.estado),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  m.libre
+                                      ? 'Libre'
+                                      : ((m.cliente ?? '').trim().isEmpty
+                                            ? '—'
+                                            : m.cliente!.trim()),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  [
+                                    if (m.teamId != null &&
+                                        teams[m.teamId] != null)
+                                      teams[m.teamId]!,
+                                    if (conPlata && m.precio > 0)
+                                      '${m.precio} Bs',
+                                  ].join(' · '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: VenueColors.textoSuave,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
       ],
-    ]);
+    );
   }
 }
