@@ -20,6 +20,9 @@ class Evento {
     this.permiteAgrupar = true,
     this.comboObligatorio = true,
     this.comboPorMesa = false,
+    this.configV2 = false,
+    this.modoComision = 'jefes',
+    this.comisionManillas = true,
   });
 
   final String id;
@@ -44,6 +47,20 @@ class Evento {
   final bool comboObligatorio;
   final bool comboPorMesa;
 
+  /// Operación de comisiones del evento (db/52). Los eventos anteriores
+  /// siguen con la cuenta vieja (configV2 = false).
+  final bool configV2;
+  final String modoComision;
+  final bool comisionManillas;
+
+  /// Parte del boliche sobre cada manilla, de 0 a 1: la del evento; la cuenta
+  /// vieja usa el 50 % de siempre y, sin comisión, la manilla es del boliche.
+  num get pctBolicheManillas => !configV2
+      ? 0.5
+      : (modoComision == 'ninguno' || !comisionManillas)
+          ? 1
+          : pctBoliche / 100;
+
   factory Evento.desde(Map<String, dynamic> j) => Evento(
         id: j['id'] as String,
         nombre: j['nombre'] as String? ?? '',
@@ -60,6 +77,9 @@ class Evento {
         permiteAgrupar: j['permite_agrupar'] != false,
         comboObligatorio: j['combo_obligatorio'] != false,
         comboPorMesa: j['combo_por_mesa'] == true,
+        configV2: j['config_v2'] == true,
+        modoComision: j['modo_comision'] as String? ?? 'jefes',
+        comisionManillas: j['comision_manillas'] != false,
       );
 
   /// ¿Está en curso ahora? Contempla el cruce de medianoche (21:00 → 06:00).
@@ -98,7 +118,7 @@ final eventosProvider = FutureProvider<List<Evento>>((ref) async {
   final filas = await ref
       .watch(supabaseProvider)
       .from('eventos')
-      .select('id, nombre, fecha, hora_inicio, hora_fin, estado, ticket_url, precio_manilla, pct_boliche, venta_por_fases, permite_reserva, horas_reserva, permite_agrupar, combo_obligatorio, combo_por_mesa')
+      .select('id, nombre, fecha, hora_inicio, hora_fin, estado, ticket_url, precio_manilla, pct_boliche, venta_por_fases, permite_reserva, horas_reserva, permite_agrupar, combo_obligatorio, combo_por_mesa, config_v2, modo_comision, comision_manillas')
       .eq('club_id', club)
       .neq('estado', 'cerrado')
       .order('fecha', ascending: true);

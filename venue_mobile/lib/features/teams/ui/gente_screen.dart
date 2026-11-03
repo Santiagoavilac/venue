@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import 'chip_team.dart';
+import 'reparto_evento.dart';
 
 import '../../../core/networking/supabase.dart';
 import '../../../core/theme/venue_theme.dart';
@@ -112,7 +113,11 @@ class MiTeamScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 10),
             if (teamId != null && club.usaRelacionadores && club.usaTeams) ...[
-              _RepartoTeam(teamId: teamId, club: club, evento: ev),
+              // operación nueva: reparto en % por evento; los eventos anteriores, el de siempre
+              if (ev != null && ev.configV2)
+                RepartoEvento(key: ValueKey(ev.id), evento: ev)
+              else
+                _RepartoTeam(teamId: teamId, club: club, evento: ev),
               const SizedBox(height: 10),
             ],
             if (teamId != null)

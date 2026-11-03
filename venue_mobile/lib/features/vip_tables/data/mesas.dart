@@ -273,12 +273,16 @@ class Combo {
 /// Registro de combos en texto, para pegar en WhatsApp (port de
 /// `copyRegistroMesas`): precio NETO, ya sin las comisiones.
 String registroDeCombos(String evento, String fecha, List<Mesa> vendidas,
-    Map<String, Combo> combos) {
+    Map<String, Combo> combos, {Map<String, num>? comisiones}) {
   String bs(num n) => n == n.roundToDouble() ? n.toInt().toString() : n.toStringAsFixed(2);
   num neto(Mesa m) {
+    // la comisión la calcula el servidor con la operación del evento; sin
+    // ese dato, la fija del combo (cuenta de siempre)
     final c = combos[m.comboId];
-    final com = (c?.comisionRrpp ?? 0) + (c?.comisionJefe ?? 0);
-    final v = m.precio - com * m.comboQty;
+    final com = comisiones != null
+        ? (comisiones[m.id] ?? 0)
+        : ((c?.comisionRrpp ?? 0) + (c?.comisionJefe ?? 0)) * m.comboQty;
+    final v = m.precio - com;
     return v < 0 ? 0 : v;
   }
 
@@ -343,6 +347,15 @@ final mesasRepositoryProvider =
 class MesasRepository {
   MesasRepository(this._sb);
   final SupabaseClient _sb;
+
+  /// Comisión de cada mesa vendida (rrpp + jefe), calculada por el servidor.
+  Future<Map<String, num>> comisiones(String eventoId) async {
+    final r = await _sb.rpc('comisiones_mesas', params: {'p_evento': eventoId});
+    return {
+      for (final x in (r as List? ?? const []))
+        x['mesa_id'] as String: ((x['rrpp'] as num?) ?? 0) + ((x['jefe'] as num?) ?? 0),
+    };
+  }
 
   /// Libera las reservas vencidas y devuelve las etiquetas de las que eran
   /// de la persona (para avisarle). Si falla, el plano carga igual.

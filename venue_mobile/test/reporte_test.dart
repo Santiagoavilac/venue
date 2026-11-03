@@ -22,7 +22,8 @@ void main() {
     ],
     bonos: [{'user_id': 'a', 'monto': 50}, {'user_id': 'a', 'monto': 25}],
     mesas: [
-      {'precio': 900, 'combo_qty': 2, 'c': {'comision_rrpp': 60, 'comision_jefe': 20}},
+      // como lo devuelve comisiones_mesas: 2 combos × (60 + 20), ya calculado
+      {'precio': 900, 'rrpp': 120, 'jefe': 40},
     ],
     entradas: [
       {'precio': 100, 'estado': 'usada'}, {'precio': 100, 'estado': 'usada'},

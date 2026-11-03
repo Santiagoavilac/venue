@@ -198,14 +198,18 @@ async function copyText(txt) {
 }
 // registro de mesas/combos en texto (formato planimetría), copiado al portapapeles
 async function copyRegistroMesas() {
-  const { data: ms } = await sb.from("mesas")
-    .select("cliente, combo_qty, precio, etiqueta, c:combos(nombre,precio,comision_rrpp,comision_jefe)")
-    .eq("evento_id", ev.id).neq("estado", "disponible").order("etiqueta");
+  const [{ data: ms }, { data: coms }] = await Promise.all([
+    sb.from("mesas")
+      .select("id, cliente, combo_qty, precio, etiqueta, c:combos(nombre,precio)")
+      .eq("evento_id", ev.id).neq("estado", "disponible").order("etiqueta"),
+    sb.rpc("comisiones_mesas", { p_evento: ev.id })
+  ]);
   const arr = ms || [];
   if (!arr.length) return toast("No hay mesas vendidas todavía", "warn");
-  // el registro va con el precio NETO: lo que queda al boliche después de comisiones
-  const comDe = m => (+m.c?.comision_rrpp || 0) + (+m.c?.comision_jefe || 0);
-  const netoDe = m => Math.max((+m.precio || 0) - comDe(m) * (m.combo_qty || 1), 0);
+  // el registro va con el precio NETO: lo que queda al boliche después de
+  // comisiones, con la comisión que calcula el servidor según la operación del evento
+  const comPor = {}; (coms || []).forEach(c => comPor[c.mesa_id] = (+c.rrpp || 0) + (+c.jefe || 0));
+  const netoDe = m => Math.max((+m.precio || 0) - (comPor[m.id] || 0), 0);
   let total = 0;
   const lineas = arr.map((m, i) => {
     const q = m.combo_qty || 1, nom = m.c?.nombre || "Combo", p = netoDe(m);
@@ -2116,9 +2120,11 @@ function cargarContabilidad() {
 /* Helpers financieros compartidos. */
 const veDinero = () => ["admin", "jefe"].includes(me.rol);
 
-/* Participación del boliche sobre las manillas prepagadas. Vive acá y no
-   suelto en la fórmula para que cambiarlo sea tocar un solo número. */
-const PCT_BOLICHE_MANILLAS = 0.5;
+/* Parte del boliche sobre cada manilla: la que fijó el admin para el evento.
+   Los eventos con la cuenta anterior siguen con el 50 % de siempre; si el
+   evento no paga comisión por manillas, la manilla es toda del boliche. */
+const pctBolicheManillas = () => !ev || !ev.config_v2 ? 0.5
+  : (ev.modo_comision === "ninguno" || ev.comision_manillas === false) ? 1 : (+ev.pct_boliche || 0) / 100;
 
 /* Resultado para el boliche.
  *
@@ -2141,7 +2147,7 @@ const PCT_BOLICHE_MANILLAS = 0.5;
 function resultadoBoliche(entradas, mesas, puerta) {
   const manillas = (entradas || []).filter(e => e.estado === "usada");
   const manBruto = manillas.reduce((a, e) => a + (+e.precio || 0), 0);
-  const manBoliche = manBruto * PCT_BOLICHE_MANILLAS;
+  const manBoliche = manBruto * pctBolicheManillas();
 
   const vendidas = (mesas || []).filter(m => m.estado && m.estado !== "disponible");
   const mesaBruto = vendidas.reduce((a, m) => a + (+m.precio || 0), 0);
@@ -2155,7 +2161,7 @@ function resultadoBoliche(entradas, mesas, puerta) {
   const pueCant = +(puerta?.ingresaron) || 0;
   const puePrecio = +(puerta?.precio) || 0;
   const pueBruto = pueCant * puePrecio;
-  const pueDesc = pueBruto * PCT_BOLICHE_MANILLAS;
+  const pueDesc = pueBruto * pctBolicheManillas();
 
   return {
     manCant: manillas.length, manBruto, manBoliche,
@@ -3736,13 +3742,13 @@ async function pintarLiquidacion(prepagadas) {
     contarPuertaIngresada(lp)
   ]);
   if (error || !L) return;
-  const pct = Math.round(PCT_BOLICHE_MANILLAS * 100);
+  const pct = Math.round(pctBolicheManillas() * 100);
 
   // Prepagadas: de lo que ya trae la pantalla, para que la cuenta mostrada
   // sea exactamente la que da el total.
   const preCant = +(prepagadas?.cant) || 0;
   const preBruto = +(prepagadas?.bruto) || 0;
-  const preBoliche = preBruto * PCT_BOLICHE_MANILLAS;
+  const preBoliche = preBruto * pctBolicheManillas();
   const preUnit = preCant > 0 ? Math.round(preBruto / preCant) : 0;
 
   // Mesas netas: bruto menos las comisiones que ya calcula la RPC.
@@ -3750,7 +3756,7 @@ async function pintarLiquidacion(prepagadas) {
 
   // Compra en puerta: sólo ingresados, sólo con precio cargado.
   const pueCant = +(pue.ingresaron) || 0, puePrecio = +(pue.precio) || 0;
-  const pueDesc = pueCant * puePrecio * PCT_BOLICHE_MANILLAS;
+  const pueDesc = pueCant * puePrecio * pctBolicheManillas();
 
   const total = preBoliche + mesaNeto - pueDesc;
 
@@ -3951,7 +3957,7 @@ async function screenStats() {
     sb.from("v_stats_rrpp").select("*").eq("evento_id", ev.id),
     sb.from("v_stats_mesas").select("*").eq("evento_id", ev.id),
     sb.from("bonos").select("*, p:profiles!bonos_user_id_fkey(nombre)").eq("evento_id", ev.id),
-    sb.from("mesas").select("precio, combo_qty, c:combos(comision_rrpp,comision_jefe)").eq("evento_id", ev.id).neq("estado", "disponible"),
+    sb.rpc("comisiones_mesas", { p_evento: ev.id }),
     // total real de entradas prepagadas (incluye las vendidas por admins, que v_stats_rrpp no cuenta)
     traerTodo(() => sb.from("entradas").select("precio, estado").eq("evento_id", ev.id).is("mesa_id", null).order("id")),
     // total real de anotados en listas (incluye lo que meten jefes y admins).
@@ -3965,12 +3971,9 @@ async function screenStats() {
     usad: a.usad + (e.estado === "usada" ? 1 : 0),
     bruto: a.bruto + (e.estado === "usada" ? (+e.precio || 0) : 0)
   }), { vend: 0, usad: 0, bruto: 0 });
-  // comisión de mesas real = fija del combo × cantidad (indep. de quién la vendió)
-  const mesasTot = (mesasAll || []).reduce((a, m) => {
-    const q = m.combo_qty || 1;
-    return { n: a.n + 1, bs: a.bs + (+m.precio || 0),
-      comR: a.comR + (+m.c?.comision_rrpp || 0) * q, comJ: a.comJ + (+m.c?.comision_jefe || 0) * q };
-  }, { n: 0, bs: 0, comR: 0, comJ: 0 });
+  // comisión de mesas: la calcula el servidor con la operación del evento
+  const mesasTot = (mesasAll || []).reduce((a, m) => ({ n: a.n + 1, bs: a.bs + (+m.precio || 0),
+    comR: a.comR + (+m.rrpp || 0), comJ: a.comJ + (+m.jefe || 0) }), { n: 0, bs: 0, comR: 0, comJ: 0 });
   const mesasBy = {}; (mrows || []).forEach(m => mesasBy[m.rrpp_id] = m);
   const bonosBy = {}; (bonos || []).forEach(b => bonosBy[b.user_id] = (bonosBy[b.user_id] || 0) + +b.monto);
   // desglose CA/CE por lista (admin)
@@ -4275,6 +4278,7 @@ async function sheetHistorico(rango) {
    jefe; lo que vende el jefe es todo suyo. Vacío = la regla de siempre. */
 async function pintarReparto(teamId) {
   const box = $("#repartoBox"); if (!box) return;
+  if (ev && ev.config_v2) return pintarRepartoEvento(box);
   const { data: t, error } = await sb.from("teams").select("rrpp_por_manilla, rrpp_por_combo").eq("id", teamId).single();
   if (error) { box.innerHTML = ""; return; }   // base sin db/33: no se muestra
   const cfg = cfgClub();
@@ -4308,6 +4312,55 @@ async function pintarReparto(teamId) {
   };
 }
 
+/* Reparto del jefe en un evento con la operación nueva: el boliche le da al
+   team un % de cada manilla (y, si corresponde, de mesas y combos) y el jefe
+   decide qué % de eso va a cada relacionador. Si no lo definió para este
+   evento, rige el último que usó (la primera vez, 50 %). El servidor guarda
+   quién lo cambió y cuándo. */
+async function pintarRepartoEvento(box) {
+  const { data: r, error } = await sb.rpc("reparto_jefe", { p_evento: ev.id });
+  if (error || !r) { box.innerHTML = ""; return; }
+  if (r.modo !== "jefes") {
+    box.innerHTML = `<div class="tarjeta" style="margin-bottom:16px"><div style="font-weight:700;font-size:16px;margin-bottom:4px">Reparto de comisiones</div>
+      <p class="hint" style="margin:0">${r.modo === "ninguno" ? "En este evento no se pagan comisiones." : "En este evento cada relacionador cobra su comisión entera: no hay reparto del jefe."}</p></div>`;
+    return;
+  }
+  const extras = [r.comision_mesas ? `el ${fmtBs(r.pct_comision_mesas)} % de cada mesa` : "", r.comision_combos ? "la comisión de cada combo" : ""].filter(Boolean);
+  box.innerHTML = `<div class="tarjeta" style="margin-bottom:16px">
+    <div style="font-weight:700;font-size:16px;margin-bottom:4px">Reparto de comisiones · ${esc(ev.nombre)}</div>
+    ${r.definido ? "" : `<p class="hint" style="margin:0 0 10px;color:var(--warn)">Todavía no definiste el reparto de este evento: se usa el último que usaste (${fmtBs(r.pct_rrpp)} %). Confirmalo o cambialo.</p>`}
+    <p class="hint" style="margin:0 0 12px">Tu team gana <b>${fmtBs(r.pozo_manilla)} Bs</b> por manilla${extras.length ? `, más ${extras.join(" y ")}` : ""}. Elegí qué parte va a cada relacionador; el resto es tuyo. Lo que vendés vos es todo tuyo.</p>
+    <div class="field" style="max-width:260px"><label>% para cada relacionador</label><input id="rpPct" type="number" min="0" max="100" step="1" value="${r.pct_rrpp}"></div>
+    <p class="hint" id="rpRes" style="margin:-4px 0 12px"></p>
+    <button class="btn primary" id="rpGo" style="width:auto;padding:0 20px">${r.definido ? "Guardar reparto" : "Confirmar reparto"}</button>
+  </div>`;
+  const pinta = () => {
+    const v = +$("#rpPct").value;
+    const ok = $("#rpPct").value.trim() !== "" && v >= 0 && v <= 100;
+    const rel = ok ? Math.round(r.pozo_manilla * v) / 100 : 0;
+    $("#rpRes").innerHTML = ok ? `Por manilla: cada relacionador <b>${fmtBs(rel)} Bs</b> · vos <b>${fmtBs(r.pozo_manilla - rel)} Bs</b>.` : "Poné un número entre 0 y 100.";
+  };
+  pinta(); $("#rpPct").oninput = pinta;
+  $("#rpGo").onclick = () => {
+    const v = +$("#rpPct").value;
+    if ($("#rpPct").value.trim() === "" || isNaN(v) || v < 0 || v > 100) return toast("Poné un número entre 0 y 100", "warn");
+    sheet(`
+      <div class="sh-h">Confirmar reparto</div>
+      <p style="margin:0 0 10px">${fmtBs(v)} % para cada relacionador y ${fmtBs(100 - v)} % para vos, en ${esc(ev.nombre)}.</p>
+      <p class="hint" style="margin:0 0 14px">Se aplica a todas las ventas de tu team en este evento y administración ve el cambio.</p>
+      <div id="rpErr" class="hint" style="margin:0 0 10px;color:var(--danger)"></div>
+      <div class="dt-acc"><button class="btn primary" id="rpOk">Acepto</button><button class="btn ghost2" id="rpNo">Cancelar</button></div>`);
+    $("#rpNo").onclick = () => closeSheet();
+    $("#rpOk").onclick = async () => {
+      $("#rpOk").disabled = true;
+      const { error: e2 } = await sb.rpc("fijar_reparto_jefe", { p_evento: ev.id, p_pct_rrpp: v });
+      if (e2) { $("#rpOk").disabled = false; $("#rpErr").textContent = mensajeDeError(e2); return; }
+      closeSheet(); dataCache.clear(); toast("Reparto guardado");
+      pintarRepartoEvento(box);
+    };
+  };
+}
+
 /* comisiones por team con cut editable por relacionador (admin)
    boliche = precio − cutJefe − cutRel: si sube el cut de un rel, baja lo del boliche */
 let comisTeamOpen = null;
@@ -4318,6 +4371,13 @@ async function sheetComisiones() {
   ]);
   if (error) return fail(error);
   await loadTeams();
+  // cuenta nueva: lo que se reparte es el % del team (lo define el jefe por evento)
+  const nueva = !!ev.config_v2;
+  const repartos = {};
+  if (nueva) await Promise.all(teamsCache.filter(t => rows.some(r => r.team_id === t.id)).map(async t => {
+    const { data } = await sb.rpc("reparto_jefe", { p_evento: ev.id, p_team: t.id });
+    if (data) repartos[t.id] = data;
+  }));
   const cutDef = ev.cut_rrpp != null ? +ev.cut_rrpp
     : ev.precio_manilla * (1 - ev.pct_boliche / 100) * (ev.pct_rrpp / 100);
   const cutJefe = ev.precio_manilla * (1 - ev.pct_boliche / 100) * (1 - ev.pct_rrpp / 100);
@@ -4342,7 +4402,9 @@ async function sheetComisiones() {
       ${open ? `<div class="lst-body">
         <div class="list-row" style="background:var(--surface-3);border-radius:10px;padding:9px 12px;margin-bottom:6px">
           <div class="r-l"><span class="relmark" style="background:var(--warn)">${esc(jefeNombre[0])}</span>
-            <span>Jefe: ${esc(jefeNombre)}<br><small style="color:var(--text-3)">${fmtBs(cutJefe)} Bs × manilla del team</small></span></div>
+            <span>Jefe: ${esc(jefeNombre)}<br><small style="color:var(--text-3)">${nueva && repartos[t.id]
+              ? `${fmtBs(repartos[t.id].jefe_por_manilla)} Bs × manilla · reparto ${fmtBs(repartos[t.id].pct_rrpp)} % para relacionadores${repartos[t.id].definido ? "" : " (heredado)"}`
+              : `${fmtBs(cutJefe)} Bs × manilla del team`}</small></span></div>
           <span class="r-sub" style="font-weight:600;color:var(--ok)">${fmtBs(comJefe)} Bs</span>
         </div>
         ${tRows.filter(r => byId[r.rrpp_id]?.rol === "rrpp").sort((a, b) => b.entradas_usadas - a.entradas_usadas).map(r => {
@@ -4350,20 +4412,34 @@ async function sheetComisiones() {
           return `<div class="list-row com-row">
             <div class="r-l"><span class="relmark">${esc(r.rrpp[0])}</span>
               <span>${esc(r.rrpp)}<br><small style="color:var(--text-3)">${r.entradas_usadas} manillas · ${fmtBs(r.comision_rrpp)} Bs</small></span></div>
-            <input type="number" data-cut="${r.rrpp_id}" value="${g?.cut_rel ?? ""}" placeholder="${cutDef}" title="Bs por manilla — vacío = ${cutDef}">
+            ${nueva ? "" : `<input type="number" data-cut="${r.rrpp_id}" value="${g?.cut_rel ?? ""}" placeholder="${cutDef}" title="Bs por manilla — vacío = ${cutDef}">`}
           </div>`;
         }).join("")}
+        ${nueva && repartos[t.id] ? `<div class="row2" style="margin-top:8px;align-items:end">
+          <div class="field" style="margin:0"><label>% para relacionadores</label><input type="number" min="0" max="100" data-rep="${t.id}" value="${repartos[t.id].pct_rrpp}"></div>
+          <div class="hint" style="margin:0 0 10px">El resto es del jefe. Normalmente lo define el jefe.</div>
+        </div>` : ""}
       </div>` : ""}
     </div>`;
   }).join("");
   sheet(`
     <div class="sh-h">Comisiones · ${esc(ev.nombre)}</div>
-    <div class="hint" style="margin:0 0 12px">Tocá un team para editar los Bs por manilla de cada relacionador (vacío = ${fmtBs(cutDef)} Bs). Lo del boliche se ajusta solo: precio − jefe − relacionador. Se paga solo sobre ingresados (CE).</div>
+    <div class="hint" style="margin:0 0 12px">${nueva
+      ? "Cada team recibe su % de cada manilla y el jefe lo reparte. Tocá un team para ver o ajustar su reparto. Se paga solo sobre ingresados (CE)."
+      : `Tocá un team para editar los Bs por manilla de cada relacionador (vacío = ${fmtBs(cutDef)} Bs). Lo del boliche se ajusta solo: precio − jefe − relacionador. Se paga solo sobre ingresados (CE).`}</div>
     ${cards || `<div class="empty">Sin actividad por teams todavía.</div>`}
     <div class="com-total">Total comisiones a pagar: ${fmtBs(totGeneral)} Bs</div>`);
   document.querySelectorAll("#sheetBody .lst-head").forEach(h => h.onclick = () => {
     const id = h.parentElement.dataset.tm;
     comisTeamOpen = comisTeamOpen === id ? null : id;
+    sheetComisiones();
+  });
+  document.querySelectorAll("#sheetBody [data-rep]").forEach(inp => inp.onchange = async () => {
+    const v = +inp.value;
+    if (inp.value.trim() === "" || isNaN(v) || v < 0 || v > 100) return toast("Entre 0 y 100", "warn");
+    const { error: e2 } = await sb.rpc("fijar_reparto_jefe", { p_evento: ev.id, p_pct_rrpp: v, p_team: inp.dataset.rep });
+    if (e2) return fail(e2);
+    dataCache.clear(); toast("Reparto actualizado");
     sheetComisiones();
   });
   document.querySelectorAll("#sheetBody [data-cut]").forEach(inp => inp.onchange = async () => {
@@ -5160,6 +5236,11 @@ const leerOpcionesClub = pre => Object.fromEntries(["usa_relacionadores", "usa_t
   .map(k => [k, !!$(`#${pre}_${k}`)?.checked]));
 function sheetAjustesClub() {
   const c = clubData(club); if (!c) return;
+  return sheetOperacion(club, null);
+}
+/* respaldo por si la base todavía no tiene opciones_operacion */
+function sheetAjustesClubViejo() {
+  const c = clubData(club); if (!c) return;
   sheet(`<div class="sh-h">Relacionadores y comisiones<span class="r-sub">${esc(c.nombre)}</span></div>
     ${opcionesClubHTML(c, "aj")}
     <p class="hint" style="margin:4px 0 12px">Con teams, cada jefe decide en "Mi team" cuánto le da a cada relacionador de la comisión de su team; lo que vende el jefe es todo suyo.</p>
@@ -5173,6 +5254,60 @@ function sheetAjustesClub() {
     await recargarClubs(); buildTabbar();
     toast("Configuración guardada"); closeSheet(); renderTab();
   };
+}
+
+/* Operación y comisiones (boliche o evento). Los campos, sus etiquetas y
+   cuándo se ven los decide el servidor (opciones_operacion): si mañana se
+   agrega una opción, aparece acá y en la app sin publicar nada nuevo. */
+async function sheetOperacion(clubId, evId) {
+  const { data, error } = await sb.rpc("opciones_operacion", { p_club: clubId, p_evento: evId });
+  if (error) {
+    if (!evId && (error.code === "PGRST202" || error.code === "42883")) return sheetAjustesClubViejo();
+    return fail(error);
+  }
+  const campos = data.campos || [];
+  const valores = {};
+  campos.forEach(c => { if (!(c.clave in valores)) valores[c.clave] = c.valor; });
+  const visible = c => Object.entries(c.visible_si || {}).every(([k, vs]) => vs.includes(valores[k]));
+  const campo = (c, i) => {
+    if (!visible(c)) return "";
+    const ayuda = c.ayuda ? `<small style="color:var(--text-3)">${esc(c.ayuda)}</small>` : "";
+    if (c.tipo === "opcion") return `<div class="field"><label>${esc(c.etiqueta)}</label>
+      <div class="seg">${(c.opciones || []).map(o => `<button type="button" class="segbtn ${valores[c.clave] === o.valor ? "on" : ""}" data-op="${i}" data-v="${esc(o.valor)}">${esc(o.etiqueta)}</button>`).join("")}</div>
+      ${(c.opciones || []).filter(o => o.valor === valores[c.clave] && o.ayuda).map(o => `<small style="color:var(--text-3)">${esc(o.ayuda)}</small>`).join("")}</div>`;
+    if (c.tipo === "si_no") return `<label class="op-club"><input type="checkbox" data-sn="${i}" ${valores[c.clave] ? "checked" : ""}>
+      <span><b>${esc(c.etiqueta)}</b>${c.ayuda ? `<small>${esc(c.ayuda)}</small>` : ""}</span></label>`;
+    if (c.tipo === "porcentaje") return `<div class="field"><label>${esc(c.etiqueta)}</label>
+      <input type="number" min="0" max="100" step="1" data-pc="${i}" value="${valores[c.clave] ?? ""}">${ayuda}</div>`;
+    return "";
+  };
+  const pinta = () => {
+    sheet(`<div class="sh-h">${evId ? "Comisiones de este evento" : "Relacionadores y comisiones"}<span class="r-sub">${esc(clubNombre(clubId))}</span></div>
+      ${data.aviso ? `<p class="hint" style="margin:0 0 12px;color:var(--warn)">${esc(data.aviso)}</p>` : ""}
+      ${evId ? "" : `<p class="hint" style="margin:0 0 12px">Es lo que usa cada evento nuevo. Cada evento se puede cambiar después, sin tocar los demás.</p>`}
+      ${campos.map(campo).join("")}
+      <div id="opErr" class="hint" style="margin:6px 0 10px;color:var(--danger)"></div>
+      <button class="btn primary" id="opGo">Guardar</button>`);
+    document.querySelectorAll("#sheetBody [data-op]").forEach(b => b.onclick = () => { valores[campos[+b.dataset.op].clave] = b.dataset.v; pinta(); });
+    document.querySelectorAll("#sheetBody [data-sn]").forEach(b => b.onchange = () => { valores[campos[+b.dataset.sn].clave] = b.checked; pinta(); });
+    document.querySelectorAll("#sheetBody [data-pc]").forEach(b => b.oninput = () => { valores[campos[+b.dataset.pc].clave] = b.value === "" ? null : +b.value; });
+    $("#opGo").onclick = async () => {
+      const malos = campos.filter(c => visible(c) && c.tipo === "porcentaje")
+        .filter(c => valores[c.clave] == null || isNaN(valores[c.clave]) || valores[c.clave] < 0 || valores[c.clave] > 100);
+      if (malos.length) { $("#opErr").textContent = "Los porcentajes van de 0 a 100."; return; }
+      $("#opGo").disabled = true;
+      const { error: e2 } = await sb.rpc("guardar_opciones_operacion", { p_club: clubId, p_evento: evId, p_valores: valores });
+      if (e2) { $("#opGo").disabled = false; $("#opErr").textContent = mensajeDeError(e2); return; }
+      dataCache.clear();
+      await recargarClubs();
+      if (evId && ev && ev.id === evId) {
+        const { data: fresco } = await sb.from("eventos").select("*").eq("id", evId).single();
+        if (fresco) Object.assign(ev, fresco);
+      }
+      buildTabbar(); toast("Comisiones guardadas"); closeSheet(); renderTab();
+    };
+  };
+  pinta();
 }
 
 function sheetNuevoClub() {
@@ -5651,9 +5786,9 @@ async function screenEventos() {
         </div>
         <div class="row2">
           <div class="field"><label>Precio manilla (Bs)</label><input id="evPrecio" type="number" value="60"></div>
-          <div class="field"><label>Comisión rrpp (Bs)</label><input id="evCut" type="number" value="15" title="Bs fijos por manilla ingresada — no depende del precio de la manilla"></div>
-          <div class="field"><label>% boliche</label><input id="evPct" type="number" value="50"></div>
+          <div class="field"><label>% boliche de cada manilla</label><input id="evPct" type="number" min="0" max="100" value="${+(clubData(club)?.pct_boliche_def ?? 50)}"></div>
         </div>
+        <p class="hint" style="margin:-4px 0 12px">El resto de cada manilla es la comisión. Cómo se reparte, y si se paga por mesas o combos, sale de la configuración del boliche; después se ajusta en "Editar evento → Comisiones de este evento".</p>
         <div class="field"><label>¿Cómo se venden las prepagadas?</label>
           <div class="seg"><button type="button" class="segbtn on" data-evmodo="unico">Precio único</button><button type="button" class="segbtn" data-evmodo="fases">Por fases</button></div>
           <small style="color:var(--text-3)" id="evModoHint">Todas al mismo precio, como siempre.</small></div>
@@ -5779,8 +5914,10 @@ async function screenEventos() {
     if (!nombre || !fecha) return toast("Nombre y fecha", "warn");
     const { data: nuevo, error: e2 } = await sb.from("eventos").insert({
       club_id: club, nombre, fecha,
-      precio_manilla: +$("#evPrecio").value || 60, pct_boliche: +$("#evPct").value || 50,
-      cut_rrpp: +$("#evCut").value || 15
+      // 0 es un valor válido (todo para el team): solo vacío toma el del boliche
+      precio_manilla: +$("#evPrecio").value || 60,
+      pct_boliche: $("#evPct").value.trim() === "" ? (+(clubData(club)?.pct_boliche_def ?? 50)) : Math.max(0, Math.min(100, +$("#evPct").value)),
+      cut_rrpp: 15
     }).select().single();
     if (e2) return fail(e2);
     // listas por defecto para que el evento nazca usable (editables en "Listas")
@@ -6071,11 +6208,12 @@ async function sheetEditarEvento(evId) {
     </div>
     <div class="row2">
       <div class="field"><label>Precio manilla (Bs)</label><input id="eeP" type="number" value="${e.precio_manilla}"></div>
-      <div class="field"><label>% boliche</label><input id="eePct" type="number" value="${e.pct_boliche}"></div>
+      ${e.config_v2 ? "" : `<div class="field"><label>% boliche</label><input id="eePct" type="number" value="${e.pct_boliche}"></div>`}
     </div>
-    <div class="field"><label>Comisión del relacionador (Bs por manilla)</label>
+    ${e.config_v2 ? "" : `<div class="field"><label>Comisión del relacionador (Bs por manilla)</label>
       <input id="eeCut" type="number" value="${e.cut_rrpp ?? 15}">
-      <small style="color:var(--text-3)">Monto fijo. No se mueve aunque cambies el precio de la manilla.</small></div>
+      <small style="color:var(--text-3)">Monto fijo. No se mueve aunque cambies el precio de la manilla.</small></div>`}
+    <button class="btn ghost2" id="eeOper" style="margin-bottom:14px">Comisiones de este evento</button>
     <div class="row2">
       <div class="field"><label>Empieza</label><input id="eeHi" type="time" value="${(e.hora_inicio || "21:00").slice(0, 5)}"></div>
       <div class="field"><label>Termina</label><input id="eeHf" type="time" value="${(e.hora_fin || "06:00").slice(0, 5)}"></div>
@@ -6105,6 +6243,7 @@ async function sheetEditarEvento(evId) {
     <p class="hint" style="margin:-4px 0 14px"><b>Próximo</b>: visible, se anota y se vende. <b>Activo</b>: igual, solo marca que la noche está en curso. <b>Cerrado</b>: desaparece del selector y queda en el Histórico. El día del evento aparece la etiqueta HOY sola.</p>
     <button class="btn primary" id="eeGo">Guardar cambios</button>`);
   $("#eeFases").onclick = () => sheetFases(evId, e.nombre);
+  $("#eeOper").onclick = () => sheetOperacion(club, evId);
   const sw = { res: e.permite_reserva !== false, agr: e.permite_agrupar !== false,
                cxm: !!e.combo_por_mesa, cob: e.combo_obligatorio !== false };
   document.querySelectorAll("#sheetBody [data-sw]").forEach(b => b.onclick = () => {
@@ -6117,8 +6256,9 @@ async function sheetEditarEvento(evId) {
       nombre: $("#eeN").value.trim() || e.nombre,
       fecha: $("#eeF").value || e.fecha,
       precio_manilla: +$("#eeP").value || e.precio_manilla,
-      pct_boliche: +$("#eePct").value || e.pct_boliche,
-      cut_rrpp: +$("#eeCut").value || 15,
+      // con la operación nueva el % se edita en "Comisiones de este evento"
+      pct_boliche: $("#eePct") ? (+$("#eePct").value || e.pct_boliche) : e.pct_boliche,
+      cut_rrpp: $("#eeCut") ? (+$("#eeCut").value || 15) : e.cut_rrpp,
       hora_inicio: $("#eeHi").value || e.hora_inicio,
       hora_fin: $("#eeHf").value || e.hora_fin,
       entrada_hasta: $("#eeQr").value ? new Date($("#eeQr").value).toISOString() : null,

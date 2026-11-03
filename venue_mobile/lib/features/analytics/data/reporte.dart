@@ -7,6 +7,8 @@ import '../../events/data/eventos.dart';
 import '../../teams/data/equipo.dart';
 
 /// Parte del boliche sobre las manillas ingresadas (regla de la web).
+/// Parte del boliche sobre cada manilla cuando el evento no dice otra cosa
+/// (cuenta vieja). La del evento sale de `Evento.pctBolicheManillas`.
 const pctBolicheManillas = 0.5;
 
 /// Lo que hizo una persona en el evento (v_stats_rrpp + v_stats_mesas + bonos).
@@ -122,13 +124,12 @@ class Cierre {
     }
     var mN = 0;
     num mBs = 0, mR = 0, mJ = 0;
+    // comisión de cada mesa: la calcula el servidor con la operación del evento
     for (final m in mesas) {
-      final q = n(m['combo_qty']) == 0 ? 1 : n(m['combo_qty']);
-      final c = m['c'] as Map?;
       mN++;
       mBs += n(m['precio']);
-      mR += n(c?['comision_rrpp']) * q;
-      mJ += n(c?['comision_jefe']) * q;
+      mR += n(m['rrpp']);
+      mJ += n(m['jefe']);
     }
     final porL = <String, ({int a, int i})>{};
     var ing = 0;
@@ -160,9 +161,10 @@ class Cierre {
   required num totalMesas,
   required int puertaIngresaron,
   required num puertaPrecio,
+  num pctBoliche = pctBolicheManillas,
 }) {
-  final pre = brutoPrepagadasIngresadas * pctBolicheManillas;
-  final pue = puertaIngresaron * puertaPrecio * pctBolicheManillas;
+  final pre = brutoPrepagadasIngresadas * pctBoliche;
+  final pue = puertaIngresaron * puertaPrecio * pctBoliche;
   return (prepagadas: pre, mesas: totalMesas, puerta: pue, total: pre + totalMesas - pue);
 }
 
@@ -191,8 +193,8 @@ class ReporteRepository {
       _sb.from('v_stats_rrpp').select().eq('evento_id', eventoId),
       _sb.from('v_stats_mesas').select().eq('evento_id', eventoId),
       _sb.from('bonos').select('user_id, monto').eq('evento_id', eventoId),
-      _sb.from('mesas').select('precio, combo_qty, c:combos(comision_rrpp,comision_jefe)')
-          .eq('evento_id', eventoId).neq('estado', 'disponible'),
+      _sb.rpc('comisiones_mesas', params: {'p_evento': eventoId}).then((r) =>
+          [for (final x in (r as List? ?? const [])) Map<String, dynamic>.from(x as Map)]),
       traerTodo((d, h) => _sb.from('entradas').select('precio, estado')
           .eq('evento_id', eventoId).isFilter('mesa_id', null).order('id', ascending: true).range(d, h)),
       traerTodo((d, h) => _sb.from('registros').select('ingreso_at, lista_tipo_id')

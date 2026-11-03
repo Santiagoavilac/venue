@@ -1,4 +1,5 @@
 import '../../../core/widgets/opcion_texto.dart';
+import '../../clubs/ui/operacion_sheet.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -1551,17 +1552,15 @@ class _NuevoEventoState extends ConsumerState<_NuevoEvento> {
                 decoration: const InputDecoration(labelText: '% boliche'),
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: _cut,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Bs por manilla al RRPP',
-                ),
-              ),
-            ),
           ],
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            'El resto de cada manilla es la comisión. Cómo se reparte, y si se paga por mesas o combos, '
+            'sale de la configuración del boliche; después se ajusta en "Comisiones de este evento".',
+            style: TextStyle(fontSize: 12.5, color: VenueColors.textoSuave),
+          ),
         ),
         const SizedBox(height: 8),
         Text(
@@ -1630,6 +1629,10 @@ class _EditarEventoState extends ConsumerState<_EditarEvento> {
   late final _p = TextEditingController(text: '${e['precio_manilla']}');
   late final _pct = TextEditingController(text: '${e['pct_boliche']}');
   late final _cut = TextEditingController(text: '${e['cut_rrpp'] ?? 15}');
+
+  /// Operación nueva (db/52): el % y el reparto se editan en "Comisiones de
+  /// este evento"; los eventos anteriores conservan sus campos de siempre.
+  late final _v2 = e['config_v2'] == true;
   late final _hi = TextEditingController(
     text: '${e['hora_inicio']}'.substring(0, 5),
   );
@@ -1692,12 +1695,26 @@ class _EditarEventoState extends ConsumerState<_EditarEvento> {
           ],
         ),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            campo('% boliche', _pct, num: true),
-            const SizedBox(width: 8),
-            campo('Bs por manilla al RRPP', _cut, num: true),
-          ],
+        if (!_v2) ...[
+          Row(
+            children: [
+              campo('% boliche', _pct, num: true),
+              const SizedBox(width: 8),
+              campo('Bs por manilla al RRPP', _cut, num: true),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
+        OutlinedButton.icon(
+          onPressed: () async {
+            if (await abrirOperacion(context, ref,
+                clubId: e['club_id'] as String, eventoId: e['id'] as String)) {
+              if (context.mounted) avisar(context, 'Comisiones guardadas');
+              ref.invalidate(eventosProvider);
+            }
+          },
+          icon: const Icon(Icons.payments_outlined, size: 20),
+          label: const Text('Comisiones de este evento'),
         ),
         const SizedBox(height: 10),
         Row(
@@ -1776,8 +1793,8 @@ class _EditarEventoState extends ConsumerState<_EditarEvento> {
                     'nombre': _n.text.trim(),
                     'fecha': _f.text.trim(),
                     'precio_manilla': precio,
-                    'pct_boliche': pct,
-                    'cut_rrpp': cut,
+                    if (!_v2) 'pct_boliche': pct,
+                    if (!_v2) 'cut_rrpp': cut,
                     'hora_inicio': _hi.text.trim(),
                     'hora_fin': _hf.text.trim(),
                     'entrada_hasta': _qr?.toUtc().toIso8601String(),

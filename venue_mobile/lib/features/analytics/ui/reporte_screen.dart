@@ -833,8 +833,9 @@ class _Liquidacion extends ConsumerWidget {
       totalMesas: n('total_mesas'),
       puertaIngresaron: l.puerta.ingresaron,
       puertaPrecio: l.puerta.precio,
+      pctBoliche: ev.pctBolicheManillas,
     );
-    const pct = 50;
+    final pct = (ev.pctBolicheManillas * 100).round();
     final unit = c.entUsadas > 0 ? (c.entBruto / c.entUsadas).round() : 0;
     final cerrado = ev.estado == 'cerrado';
     final angosto = MediaQuery.sizeOf(context).width < 600;

@@ -285,6 +285,10 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                     ),
                   if (!_editando && vendidas.isNotEmpty && !esPortero)
                     _Accion('Registro de combos', Icons.copy_rounded, () async {
+                      final coms = await ref
+                          .read(mesasRepositoryProvider)
+                          .comisiones(ev.id)
+                          .then<Map<String, num>?>((c) => c, onError: (_) => null);
                       await Clipboard.setData(
                         ClipboardData(
                           text: registroDeCombos(
@@ -292,6 +296,7 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                             ev.fechaCorta,
                             vendidas,
                             combos,
+                            comisiones: coms,
                           ),
                         ),
                       );
