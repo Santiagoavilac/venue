@@ -2,9 +2,17 @@
 
 ## Estado de esta entrega
 
-Cambios locales probados. No se aplicó la migración ni se publicó la función corregida.
-El proyecto configurado es `cxksjarupexptfksnptg`. La cuenta disponible en MCP/CLI no tiene acceso administrativo a él.
-El acceso REST local permite verificar tablas y algunos permisos. Se encontró la sesión correcta en el segundo Chrome, perfil Suma (Work), y desde allí se verificaron el cron activo cada minuto, su condición de QR activos, ejecuciones SQL recientes y el nombre del secreto de cron en Vault. No se leyeron valores secretos ni se recuperó la fuente remota completa.
+Al 04/11/2026 la integración está operativa en producción. Lo verificado en esta sesión, contra el proyecto `cxksjarupexptfksnptg`:
+
+- La migración `20261031172015_baneco_seguro.sql` **ya está aplicada**: la tabla `baneco_conciliacion`, que solo crea esa migración, existe en la base.
+- La función `baneco` **ya está publicada**: ACTIVE, versión 22 del 31/10/2026 22:32, con las marcas de la versión corregida (`BANECO_PRODUCTION_APPROVED`, `BANECO_CREDENTIALS_EXPIRES_AT`, `GENERACION_INCIERTA`, token de cron y de webhook).
+- Los diez secretos de producción están cargados y verificados por digest SHA256 desde el CLI.
+- `authenticate` contra `apimkt.baneco.com.bo` devuelve token. `paidQR` y `statusQR` responden. El cifrado de la cuenta funciona.
+- Un barrido ejecutado con el token de cron devolvió HTTP 200 y `errores: 0`.
+
+Las versiones anteriores de este documento decían que la migración no se había aplicado y que la función corregida no se había publicado. Ambas cosas se hicieron después de escribirlo y quedaron sin registrar, lo que llevó a repetir trabajo ya hecho.
+
+Falta todavía: ejecutar `db/45-baneco-barrido.sql`, confirmar las entradas de Vault `baneco_project_url` y `baneco_cron_token`, y verificar que el cron corra solo. No se ejecutó `generateQR`: sería un cobro real.
 
 Se cobra en una cuenta bancaria única. La distribución posterior de fondos es manual.
 
@@ -72,6 +80,26 @@ Un resultado exitoso de `cron.job_run_details` sólo prueba que PostgreSQL envi�
 - Para producción, exigir confirmación del banco sobre URL, usuario habilitado, cuenta, llave AES y vigencia. Además de `BANECO_AMBIENTE=produccion`, la función exige `BANECO_PRODUCTION_APPROVED=true` y `BANECO_PRODUCTION_HOST` igual al host confirmado. Estos flags no reemplazan la autorización bancaria.
 - No se debe probar `generateQR` en producción ni efectuar pagos reales sin autorización explícita.
 - El manual no especifica firma del webhook ni cómo enviar cabeceras adicionales. Coordinar con el banco el uso de `x-baneco-token` antes de habilitarlo. Mientras tanto, usar consultas y conciliación.
+
+## Caso 175774: estado consolidado
+
+Juntando lo de sesiones anteriores con lo último del banco, el juego de producción es: usuario `A101332710` (API Market, caso 175774), cuenta de cobro `1031028940`, llave AES de 32 caracteres del caso 175774 y host `apimkt.baneco.com.bo`. Todo eso quedó en `.env.local`, ignorado por Git, con el juego de certificación comentado al lado.
+
+El 04/11/2026 se autenticó correctamente contra producción: **HTTP 200, responseCode 0, token recibido**. La secuencia fue 404 (usuario sin habilitar) → 401 (clave vencida) → 0 (clave nueva de 4 dígitos). Quedan confirmados el usuario, la llave AES de producción y el host `apimkt.baneco.com.bo`. Con `BANECO_PRODUCTION_APPROVED=true` autorizado por el responsable, se verificaron en producción las operaciones de lectura: `paidQR` del día responde correctamente y `statusQR` devuelve 404 ante un `qrId` inexistente, que es la respuesta esperada. El cifrado de la cuenta para `generateQR` también funciona. `generateQR` y `cancelQR` no se ejecutaron: crearían un cobro real.
+
+**Vigencia de la clave: resuelto.** El banco confirmó por WhatsApp el 04/11/2026 que las 48 horas del correo son el plazo para **habilitar** la clave, no su vida útil: "48 horas tiene para habilitarlo, una vez lo habilita, de ahí para adelante esa va a ser su clave". No hay rotación cada 48 horas y no hace falta ningún mecanismo de renovación automática.
+
+Consecuencia práctica: `BANECO_CREDENTIALS_EXPIRES_AT` no debe llevar la fecha del correo. `autenticar()` corta antes de llamar al banco cuando esa fecha pasa, así que poner el 06/11 habría bloqueado la integración por configuración propia mientras la clave seguía siendo válida. Se dejó una fecha a un año como tope de revisión. El banco no comunicó un vencimiento real; si algún día lo comunica, ese valor manda.
+
+El manual v1.3.0 no expone ningún endpoint para cambiar o renovar credenciales; los únicos son `authenticate`, `encrypt`, `decrypt`, los de `qrsimple`, `accounts/history` y `batchPayment/upload`. El token JWT dura 30 minutos, consistente con el caché de la función. El PDF `Documenacion API Market 2026` corresponde al BNB, no a Banco Económico, y su endpoint `UpdateCredentials` no aplica acá.
+
+Los secretos cargados hoy en Supabase son los de **certificación**, no los de producción: se verificó comparando los digests SHA256 del panel contra los valores conocidos. La llave AES del caso 175774 todavía no está cargada ahí.
+
+Falta entonces:
+
+- Cargar el juego de producción como secretos de Supabase. La cuenta del CLI da 403 al listar o escribir secretos en `cxksjarupexptfksnptg`.
+- `BANECO_CREDENTIALS_EXPIRES_AT` con la vigencia confirmada, y `BANECO_PRODUCTION_APPROVED=true` recién tras autorización.
+La llave AES del caso 175774 es de **producción**, confirmado por el usuario. Certificación conserva su propia llave, la que hoy está en los secretos de Supabase.
 
 ## Solicitud 175282: datos concretos que faltan del banco
 

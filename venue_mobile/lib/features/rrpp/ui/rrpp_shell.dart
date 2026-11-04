@@ -567,7 +567,9 @@ Widget _tituloHoja(String t, String sub) => Padding(
 String? _miRef;
 Future<String> _linkVenta(WidgetRef ref, Proximo e) async {
   _miRef ??= await ref.read(rrppRepositoryProvider).miRef();
-  return '$_aftr?r=$_miRef#/evento/${e.eventoId}';
+  // ?ref= lleva el nombre del relacionador (genjiro-sasamoto), no un código
+  // opaco: es lo que se comparte por WhatsApp. El jefe de team no viaja acá.
+  return '$_aftr?ref=${Uri.encodeComponent(_miRef!)}#/evento/${e.eventoId}';
 }
 
 void _abrirProximo(BuildContext context, WidgetRef ref, Proximo e) => _hoja(

@@ -419,13 +419,20 @@ async function pintarDescubrir() {
 }
 
 /* ── evento ─────────────────────────────────────────────────────────── */
-/* Enlace personal de un relacionador (?r=código): se guarda para la sesión
-   y cada evento que se abre con él suma una visita a su nombre. No cambia
-   precios ni comisiones: solo mide cuánta gente llega por su enlace. */
+/* Enlace personal de un relacionador (?ref=nombre-apellido): se guarda para
+   la sesión y cada evento que se abre con él suma una visita a su nombre, y
+   la compra queda sellada a su favor en aftr_comprar.
+   El enlace sólo nombra a la persona: el jefe de team y el equipo no viajan
+   en la URL ni intervienen en resolverla.
+   Se acepta ?r= además de ?ref= porque los enlaces viejos, con código
+   aleatorio de 8 caracteres, siguen circulando por WhatsApp. */
 const REF = (() => {
   try {
-    const r = new URLSearchParams(location.search).get("r");
-    if (r && /^[a-z0-9]{6,12}$/i.test(r)) sessionStorage.setItem("aftr.ref", r.toLowerCase());
+    const q = new URLSearchParams(location.search);
+    const r = q.get("ref") || q.get("r");
+    if (r && /^[a-z0-9]+(-[a-z0-9]+)*$/i.test(r) && r.length >= 3 && r.length <= 60) {
+      sessionStorage.setItem("aftr.ref", r.toLowerCase());
+    }
     return sessionStorage.getItem("aftr.ref");
   } catch { return null; }
 })();

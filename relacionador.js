@@ -435,7 +435,7 @@
   let miRef = null;
   async function linkVenta(e) {
     if (!miRef) { const { data, error } = await sb.rpc("rrpp_mi_ref"); if (error) throw error; miRef = data; }
-    return `${AFTR_URL}?r=${miRef}#/evento/${e.evento_id}`;
+    return `${AFTR_URL}?ref=${encodeURIComponent(miRef)}#/evento/${e.evento_id}`;
   }
 
   async function sheetProximo(e) {
