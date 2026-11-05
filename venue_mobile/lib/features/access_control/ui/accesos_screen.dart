@@ -13,6 +13,7 @@ import '../../guestlists/ui/listas_screen.dart';
 import '../../tickets/data/entradas.dart';
 import '../../tickets/ui/entradas_screen.dart';
 import 'escaner_screen.dart';
+import '../../events/ui/cambiar_evento.dart';
 
 /// Accesos para quien vende: Listas, Entradas y —para quien valida en la
 /// puerta— Escáner. El resumen de números está en la tarjeta del evento.
@@ -42,6 +43,7 @@ class AccesosScreen extends ConsumerWidget {
       length: conEscaner ? 3 : 2,
       child: Column(
         children: [
+          const DeQueEvento(),
           TabBar(
             isScrollable: conEscaner,
             tabAlignment: conEscaner ? TabAlignment.start : null,

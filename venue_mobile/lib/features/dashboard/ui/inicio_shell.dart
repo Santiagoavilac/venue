@@ -13,6 +13,7 @@ import '../../../core/widgets/patron.dart';
 import '../../../core/widgets/revolver.dart';
 import '../../authentication/data/sesion.dart';
 import '../../events/data/eventos.dart';
+import '../../events/ui/cambiar_evento.dart';
 import '../../avisos/bienvenida.dart';
 import '../../access_control/ui/escaner_screen.dart';
 import '../../access_control/ui/lista_puerta_screen.dart';
@@ -869,62 +870,6 @@ Future<void> _cambiarClub(BuildContext context, WidgetRef ref) async {
   }
 }
 
-/// Elegir el evento de trabajo (el resto de la app opera sobre ese).
-Future<void> _cambiarEvento(BuildContext context, WidgetRef ref) async {
-  final eventos = ref.read(eventosProvider).value ?? const <Evento>[];
-  final actual = ref.read(eventoActivoProvider)?.id;
-  // antes esto volvía sin hacer nada si había un solo evento, así que la
-  // píldora parecía un cartel y nadie descubría que ahí se cambia de evento
-  if (eventos.isEmpty) return;
-  final elegido = await showModalBottomSheet<String>(
-    context: context,
-    builder: (c) => SafeArea(
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(bottom: 10, left: 4),
-            child: Text(
-              'Evento',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
-            ),
-          ),
-          for (final e in eventos)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: VenueColors.superficie2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: e.id == actual
-                        ? Theme.of(c).colorScheme.primary
-                        : VenueColors.linea,
-                  ),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: ListTile(
-                  leading: const Icon(Icons.calendar_today_outlined),
-                  title: Text(
-                    e.nombre,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(e.fechaCorta),
-                  trailing: e.id == actual
-                      ? const Icon(Icons.check_rounded)
-                      : null,
-                  onTap: () => Navigator.pop(c, e.id),
-                ),
-              ),
-            ),
-        ],
-      ),
-    ),
-  );
-  if (elegido != null) ref.read(eventoElegidoProvider.notifier).elegir(elegido);
-}
-
 /// Píldora del evento de trabajo en la barra.
 class _Pildora extends StatelessWidget {
   const _Pildora({required this.child, this.alTocar});
@@ -1050,7 +995,7 @@ class _BarraSuperior extends ConsumerWidget {
       style: const TextStyle(fontSize: 15),
     );
     final pEv = _Pildora(
-      alTocar: () => _cambiarEvento(context, ref),
+      alTocar: () => cambiarEvento(context, ref),
       child: Row(
         mainAxisSize: ancho ? MainAxisSize.min : MainAxisSize.max,
         children: [

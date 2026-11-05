@@ -20,6 +20,7 @@ import '../../events/data/eventos.dart';
 import '../data/mesas.dart';
 import 'mesa_hojas.dart';
 import 'plano.dart';
+import '../../events/ui/cambiar_evento.dart';
 
 /// Mesas del evento sobre el plano del local.
 ///
@@ -176,7 +177,10 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
     final esPortero = rol == Rol.portero;
     final repo = ref.read(mesasRepositoryProvider);
 
-    return VistaAsync(
+    return Column(children: [
+      const DeQueEvento(),
+      Expanded(
+        child: VistaAsync(
       valor: mesas,
       reintentar: () => ref.invalidate(mesasProvider),
       datos: (todas) {
@@ -541,7 +545,9 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
           ),
         );
       },
-    );
+        ),
+      ),
+    ]);
   }
 }
 

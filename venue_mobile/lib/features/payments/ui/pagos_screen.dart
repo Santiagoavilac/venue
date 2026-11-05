@@ -16,6 +16,7 @@ import '../../teams/data/equipo.dart';
 import '../../vip_tables/ui/mesa_hojas.dart';
 import '../data/pagos.dart';
 import '../../../core/widgets/insignia.dart';
+import '../../events/ui/cambiar_evento.dart';
 
 Future<T?> _hoja<T>(BuildContext context, Widget child) => showModalBottomSheet<T>(
       context: context,
@@ -99,7 +100,10 @@ class PagosScreen extends ConsumerWidget {
       }
     }
 
-    return RefreshIndicator(
+    return Column(children: [
+      const DeQueEvento(),
+      Expanded(
+        child: RefreshIndicator(
       onRefresh: () async {
         recargar();
         await ref.read(rendicionesProvider.future);
@@ -252,7 +256,9 @@ class PagosScreen extends ConsumerWidget {
           );
         },
       ),
-    );
+        ),
+      ),
+    ]);
   }
 }
 

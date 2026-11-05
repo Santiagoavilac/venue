@@ -69,7 +69,10 @@ trabajo. Última actualización: 2026-11-05.
 - [x] La píldora siempre visible, también con un solo evento
 - [x] Tocar un evento en una lista ya no cambia el evento global
 - [x] Prueba `venue_mobile/test/evento_activo_test.dart`
-- [ ] Línea fija arriba en Mesas, Pagos y Accesos con de qué evento son los datos
+- [x] `DeQueEvento` arriba de Mesas, Pagos y Accesos: de qué evento son los
+      datos y el toque para cambiarlo. El selector salió de `inicio_shell` a
+      `features/events/ui/cambiar_evento.dart` para que lo usen las dos.
+      Prueba: `test/de_que_evento_test.dart`
 
 ## Fase 3 · Pantalla por pantalla
 
