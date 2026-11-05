@@ -330,24 +330,24 @@ class _CabeceraGente extends ConsumerWidget {
         ),
         FilaFichas(
           children: [
-            FichaDato(
+            TarjetaCifra(
               icono: Icons.person_outline_rounded,
               etiqueta: 'Usuarios',
               valor: '${usuarios.length}',
             ),
-            FichaDato(
+            TarjetaCifra(
               icono: Icons.groups_outlined,
               etiqueta: 'Teams',
               valor: '${teams.length}',
               color: VenueColors.info,
             ),
-            FichaDato(
+            TarjetaCifra(
               icono: Icons.shield_outlined,
               etiqueta: 'Admins',
               valor: '$admins',
               color: VenueColors.aviso,
             ),
-            FichaDato(
+            TarjetaCifra(
               icono: Icons.check_circle_outline,
               etiqueta: 'Activos',
               valor: '$activos',

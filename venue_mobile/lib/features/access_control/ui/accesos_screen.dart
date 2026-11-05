@@ -5,6 +5,7 @@ import '../../../core/networking/supabase.dart';
 import '../../../core/sync/tiempo_real.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/estado_vista.dart';
+import '../../../core/widgets/tarjeta_cifra.dart';
 import '../../events/data/eventos.dart';
 import '../../guestlists/data/listas.dart';
 import '../../clubs/data/clubs.dart';
@@ -97,43 +98,28 @@ class ResumenView extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _Dato(
-                'Adentro ahora',
-                '$adentro',
-                'Invitados de lista y entradas con QR que ya ingresaron',
-                color: VenueColors.ok,
-              ),
+              TarjetaCifra(etiqueta: 'Adentro ahora', valor: '$adentro', detalle: 'Invitados de lista y entradas con QR que ya ingresaron', color: VenueColors.ok),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: _Dato(
-                      'Anotados en listas',
-                      '${n('anotados')}',
-                      '${n('ingresaron')} ingresaron',
-                    ),
+                    child: TarjetaCifra(etiqueta: 'Anotados en listas', valor: '${n('anotados')}', detalle: '${n('ingresaron')} ingresaron'),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _Dato(
-                      'Entradas con QR',
-                      '${n('qr_total')}',
-                      '${n('qr_usados')} ingresaron',
-                    ),
+                    child: TarjetaCifra(etiqueta: 'Entradas con QR', valor: '${n('qr_total')}', detalle: '${n('qr_usados')} ingresaron'),
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: _Dato('Prepagadas', '${n('entradas')}', 'vendidas'),
+                    child: TarjetaCifra(etiqueta: 'Prepagadas', valor: '${n('entradas')}', detalle: 'vendidas'),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _Dato(
-                      'Mesas',
-                      '${n('mesas')}',
-                      'vendidas o reservadas',
-                    ),
+                    child: TarjetaCifra(etiqueta: 'Mesas', valor: '${n('mesas')}', detalle: 'vendidas o reservadas'),
                   ),
                 ],
               ),
@@ -143,49 +129,6 @@ class ResumenView extends ConsumerWidget {
       ),
     );
   }
-}
-
-class _Dato extends StatelessWidget {
-  const _Dato(this.titulo, this.valor, this.pie, {this.color});
-  final String titulo;
-  final String valor;
-  final String pie;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              titulo,
-              style: TextStyle(
-                color: VenueColors.textoSuave,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              valor,
-              style: TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
-            ),
-            Text(
-              pie,
-              style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }
 
 /// Un ingreso ya ocurrido, de lista o de entrada, para el Historial.

@@ -212,36 +212,6 @@ class _Filtros extends ConsumerWidget {
   }
 }
 
-class _Cifra extends StatelessWidget {
-  const _Cifra(this.etiqueta, this.valor, {this.detalle, this.color});
-  final String etiqueta, valor;
-  final String? detalle;
-  final Color? color;
-  @override
-  Widget build(BuildContext context) => Tarjeta(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(etiqueta, style: TextStyle(fontSize: 13, color: VenueColors.textoSuave)),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(valor,
-                style: TextStyle(
-                    fontSize: 21, fontWeight: FontWeight.w700, color: color, fontFeatures: const [FontFeature.tabularFigures()])),
-          ),
-          if (detalle != null)
-            Text(detalle!, maxLines: 2, style: TextStyle(fontSize: 12, color: VenueColors.textoTenue, height: 1.3)),
-        ]),
-      );
-}
-
-Widget _grilla(List<Widget> cifras) => LayoutBuilder(builder: (context, c) {
-      final cols = c.maxWidth >= 640 ? 4 : 2;
-      final w = (c.maxWidth - 10 * (cols - 1)) / cols;
-      return Wrap(spacing: 10, runSpacing: 10, children: [for (final x in cifras) SizedBox(width: w, child: x)]);
-    });
-
 class _Vacio extends StatelessWidget {
   const _Vacio(this.titulo, [this.detalle]) : accion = null;
   final String titulo;
@@ -462,11 +432,11 @@ class _Inicio extends ConsumerWidget {
           Text('${t.eventos} ${t.eventos == 1 ? 'evento' : 'eventos'}',
               style: TextStyle(color: VenueColors.textoSuave)),
           const SizedBox(height: 16),
-          _grilla([
-            _Cifra('Por cobrar', _bs(t.pendiente), detalle: 'estimado + confirmado', color: t.pendiente > 0 ? VenueColors.aviso : null),
-            _Cifra('Cobrado', _bs(t.pagado), detalle: 'marcado como pagado', color: VenueColors.ok),
-            _Cifra('Entraron', _miles(t.entraron), detalle: '${_miles(t.ingresaron)} de lista · ${_miles(t.manillas)} con QR'),
-            _Cifra('Mesas', _miles(t.mesas), detalle: 'confirmadas'),
+          GrillaCifras(children: [
+            TarjetaCifra(etiqueta: 'Por cobrar', valor: _bs(t.pendiente), detalle: 'estimado + confirmado', color: t.pendiente > 0 ? VenueColors.aviso : null),
+            TarjetaCifra(etiqueta: 'Cobrado', valor: _bs(t.pagado), detalle: 'marcado como pagado', color: VenueColors.ok),
+            TarjetaCifra(etiqueta: 'Entraron', valor: _miles(t.entraron), detalle: '${_miles(t.ingresaron)} de lista · ${_miles(t.manillas)} con QR'),
+            TarjetaCifra(etiqueta: 'Mesas', valor: _miles(t.mesas), detalle: 'confirmadas'),
           ]),
           if (pend.isNotEmpty && activos.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -577,11 +547,11 @@ void _abrirProximo(BuildContext context, WidgetRef ref, Proximo e) => _hoja(
       context,
       (c) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _tituloHoja(e.evento, '${e.club} · ${_fecha(e.fecha)}${e.hora != null ? ' · ${e.hora}' : ''}'),
-        _grilla([
-          _Cifra('Anotados', _miles(e.anotados), detalle: e.cupoTotal != null ? 'de ${e.cupoTotal} de cupo' : 'en tus listas'),
-          _Cifra('Entradas QR', _miles(e.entradasVendidas), detalle: 'vendidas'),
-          _Cifra('Mesas', _miles(e.mesas), detalle: 'a tu nombre'),
-          _Cifra('Por manilla', e.porManilla > 0 ? _bs(e.porManilla) : '—', detalle: 'comisión estimada'),
+        GrillaCifras(children: [
+          TarjetaCifra(etiqueta: 'Anotados', valor: _miles(e.anotados), detalle: e.cupoTotal != null ? 'de ${e.cupoTotal} de cupo' : 'en tus listas'),
+          TarjetaCifra(etiqueta: 'Entradas QR', valor: _miles(e.entradasVendidas), detalle: 'vendidas'),
+          TarjetaCifra(etiqueta: 'Mesas', valor: _miles(e.mesas), detalle: 'a tu nombre'),
+          TarjetaCifra(etiqueta: 'Por manilla', valor: e.porManilla > 0 ? _bs(e.porManilla) : '—', detalle: 'comisión estimada'),
         ]),
         if (e.porManilla > 0 && e.entradasVendidas > 0)
           Padding(
@@ -658,11 +628,11 @@ void _abrirPasado(BuildContext context, EventoRrpp e) {
     context,
     (c) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _tituloHoja(e.evento, '${e.club} · ${_fecha(e.fecha)}'),
-      _grilla([
-        _Cifra('Entraron', _miles(e.entraron), detalle: '${e.ingresaron}/${e.anotados} de lista · ${e.entradasUsadas} QR'),
-        _Cifra('Entradas', _miles(e.entradasVendidas), detalle: '${e.entradasUsadas} usadas'),
-        _Cifra('Mesas', _miles(e.mesasConfirmadas), detalle: e.mesasReservadas > 0 ? '${e.mesasReservadas} reservadas' : 'confirmadas'),
-        _Cifra('Ventas', _bs(e.ventas), detalle: 'para el boliche'),
+      GrillaCifras(children: [
+        TarjetaCifra(etiqueta: 'Entraron', valor: _miles(e.entraron), detalle: '${e.ingresaron}/${e.anotados} de lista · ${e.entradasUsadas} QR'),
+        TarjetaCifra(etiqueta: 'Entradas', valor: _miles(e.entradasVendidas), detalle: '${e.entradasUsadas} usadas'),
+        TarjetaCifra(etiqueta: 'Mesas', valor: _miles(e.mesasConfirmadas), detalle: e.mesasReservadas > 0 ? '${e.mesasReservadas} reservadas' : 'confirmadas'),
+        TarjetaCifra(etiqueta: 'Ventas', valor: _bs(e.ventas), detalle: 'para el boliche'),
       ]),
       TituloBloque('Tu comisión', accion: _Estado(e.estadoComision)),
       Tarjeta(
@@ -735,11 +705,11 @@ class _Stats extends ConsumerWidget {
         final primero = todos.lastOrNull;
         return [
           const _Filtros(),
-          _grilla([
-            _Cifra('Asistencia', '${t.asistencia}%', detalle: '${_miles(t.ingresaron)} de ${_miles(t.anotados)} anotados'),
-            _Cifra('Comisión promedio', _bs(t.promedio), detalle: 'por evento'),
-            _Cifra('Ventas generadas', _bs(t.ventas), detalle: 'para los boliches'),
-            _Cifra('Eventos', _miles(t.eventos), detalle: 'trabajados'),
+          GrillaCifras(children: [
+            TarjetaCifra(etiqueta: 'Asistencia', valor: '${t.asistencia}%', detalle: '${_miles(t.ingresaron)} de ${_miles(t.anotados)} anotados'),
+            TarjetaCifra(etiqueta: 'Comisión promedio', valor: _bs(t.promedio), detalle: 'por evento'),
+            TarjetaCifra(etiqueta: 'Ventas generadas', valor: _bs(t.ventas), detalle: 'para los boliches'),
+            TarjetaCifra(etiqueta: 'Eventos', valor: _miles(t.eventos), detalle: 'trabajados'),
           ]),
           const TituloBloque('Evolución mensual'),
           SingleChildScrollView(
@@ -790,10 +760,9 @@ class _Stats extends ConsumerWidget {
           if (rs.isEmpty)
             const _Vacio('Tus récords aparecen con tu primer evento')
           else
-            _grilla([
+            GrillaCifras(children: [
               for (final r in rs)
-                _Cifra(r.titulo, r.plata ? _bs(r.valor) : _miles(r.valor),
-                    detalle: r.evento != null
+                TarjetaCifra(etiqueta: r.titulo, valor: r.plata ? _bs(r.valor) : _miles(r.valor), detalle: r.evento != null
                         ? '${r.evento!.evento} · ${r.evento!.club} · ${_fecha(r.evento!.fecha)}'
                         : r.mes != null
                             ? _mesCorto(r.mes!)
@@ -876,10 +845,9 @@ class _Links extends ConsumerWidget {
             return const _Vacio('Sin visitas por tu enlace todavía',
                 'Compartí tu enlace desde un evento próximo: acá vas a ver cuánta gente entra y cuántos compran.');
           }
-          return _grilla([
-            _Cifra('Visitas', _miles(d.visitas)),
-            _Cifra('Compras', _miles(d.compras),
-                detalle: d.clientes > 0 ? '${(d.compras * 100 / d.clientes).round()}% de quienes iniciaron sesión' : null),
+          return GrillaCifras(children: [
+            TarjetaCifra(etiqueta: 'Visitas', valor: _miles(d.visitas)),
+            TarjetaCifra(etiqueta: 'Compras', valor: _miles(d.compras), detalle: d.clientes > 0 ? '${(d.compras * 100 / d.clientes).round()}% de quienes iniciaron sesión' : null),
           ]);
         },
       );
@@ -1121,11 +1089,11 @@ void _abrirBoliche(BuildContext context, WidgetRef ref, BolicheMio b, List<Event
     context,
     (c) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _tituloHoja(b.nombre, b.activo ? (b.rol == 'jefe' ? 'Jefe' : 'Relacionador') + (b.team != null ? ' · ${b.team}' : '') : 'Sin acceso'),
-      _grilla([
-        _Cifra('Eventos', _miles(t.eventos), detalle: 'trabajados'),
-        _Cifra('Entraron', _miles(t.entraron), detalle: '${_miles(t.manillas)} manillas'),
-        _Cifra('Comisiones', _bs(t.comision), detalle: '${_bs(t.pendiente)} por cobrar', color: VenueColors.ok),
-        _Cifra('Ventas', _bs(t.ventas), detalle: '${_miles(t.mesas)} mesas'),
+      GrillaCifras(children: [
+        TarjetaCifra(etiqueta: 'Eventos', valor: _miles(t.eventos), detalle: 'trabajados'),
+        TarjetaCifra(etiqueta: 'Entraron', valor: _miles(t.entraron), detalle: '${_miles(t.manillas)} manillas'),
+        TarjetaCifra(etiqueta: 'Comisiones', valor: _bs(t.comision), detalle: '${_bs(t.pendiente)} por cobrar', color: VenueColors.ok),
+        TarjetaCifra(etiqueta: 'Ventas', valor: _bs(t.ventas), detalle: '${_miles(t.mesas)} mesas'),
       ]),
       const SizedBox(height: 12),
       _Barras(porMes(l, (e) => e.comisionTotal), plata: true),

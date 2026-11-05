@@ -12,12 +12,17 @@ trabajo. Última actualización: 2026-11-05.
       evento) y sale de la paleta oscura. La app arranca en oscuro, que es lo
       que arregla la pestaña gris clara bajo el encabezado oscuro.
       Prueba: `test/tema_test.dart`
-- [ ] `TarjetaCifra` único que reemplace las cinco variantes
+- [x] `TarjetaCifra` único (`core/widgets/tarjeta_cifra.dart`) con su `GrillaCifras`.
+      Reemplazó a `Indicador`, `FichaDato`, `Kpi`, `_Dato` de Accesos y `_Cifra`
+      del relacionador: 45 llamadas migradas. Prueba: `test/tarjeta_cifra_test.dart`
 - [ ] Badge de estado único que reemplace las siete
 - [ ] `EsqueletoLista` con `skeletonizer` en lugar de las 46 ruleditas
 - [ ] Sacar `HeroEvento` de `gestion_screen.dart` a `core/widgets/`
-- [ ] Borrar lo muerto: `GrillaIndicadores`, `MarcaClub`, parámetros ignorados de
-      `Indicador`, `FichaDato` y `AccionRapida`
+- [~] Borrar lo muerto: ya salieron `Indicador`, `GrillaIndicadores`, `FichaDato`
+      y `Kpi` con sus parámetros ignorados (`horizontal`, `color` de ficha).
+      **`MarcaClub` no está muerto**: el de `patron.dart` lo usan `inicio_shell`
+      (tres veces) y el de `selector_club_screen` es otro, con otra firma.
+      Falta el `color` ignorado de `AccionRapida`
 
 ## Fase 1 · Privacidad en el servidor
 

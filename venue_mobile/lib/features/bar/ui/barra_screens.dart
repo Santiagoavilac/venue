@@ -7,7 +7,8 @@ import '../../../core/networking/supabase.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
-import '../../analytics/ui/reporte_screen.dart' show Kpi, Renglon;
+import '../../../core/widgets/tarjeta_cifra.dart';
+import '../../analytics/ui/reporte_screen.dart' show Renglon;
 import '../../clubs/data/clubs.dart';
 import '../../events/data/eventos.dart';
 import '../data/barra.dart';
@@ -100,15 +101,10 @@ class InventarioScreen extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  Expanded(child: Kpi('Valor del stock', '$valor Bs', '')),
+                  Expanded(child: TarjetaCifra(etiqueta: 'Valor del stock', valor: '$valor Bs')),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Kpi(
-                      'Bajo stock',
-                      '$bajos',
-                      ' de ${filas.length}',
-                      color: bajos > 0 ? VenueColors.aviso : null,
-                    ),
+                    child: TarjetaCifra(etiqueta: 'Bajo stock', valor: '$bajos', sufijo: ' de ${filas.length}', color: bajos > 0 ? VenueColors.aviso : null),
                   ),
                 ],
               ),
@@ -1410,24 +1406,15 @@ class CierreBarraScreen extends ConsumerWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Expanded(child: Kpi('Vendido', '${s('bs')} Bs', '')),
+                  Expanded(child: TarjetaCifra(etiqueta: 'Vendido', valor: '${s('bs')} Bs')),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Kpi(
-                      'Vasos',
-                      '${s('tragos')}',
-                      ' · ${s('ventas')} ventas',
-                    ),
+                    child: TarjetaCifra(etiqueta: 'Vasos', valor: '${s('tragos')}', sufijo: ' · ${s('ventas')} ventas'),
                   ),
                 ],
               ),
               const SizedBox(height: 10),
-              Kpi(
-                'Cortesías',
-                '${s('cortesias')}',
-                ' vasos sin cobrar',
-                color: VenueColors.aviso,
-              ),
+              TarjetaCifra(etiqueta: 'Cortesías', valor: '${s('cortesias')}', sufijo: ' vasos sin cobrar', color: VenueColors.aviso),
               const SizedBox(height: 12),
               const Text(
                 'Por barra',
@@ -1516,16 +1503,11 @@ class _AnaliticaBarraScreenState extends ConsumerState<AnaliticaBarraScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Kpi('Ingresos', '${e['ingresos'] ?? 0} Bs', ''),
+                    child: TarjetaCifra(etiqueta: 'Ingresos', valor: '${e['ingresos'] ?? 0} Bs'),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Kpi(
-                      'Margen neto',
-                      '${m['margen_neto'] ?? 0} Bs',
-                      m['margen_pct'] == null ? '' : ' · ${m['margen_pct']}%',
-                      color: VenueColors.ok,
-                    ),
+                    child: TarjetaCifra(etiqueta: 'Margen neto', valor: '${m['margen_neto'] ?? 0} Bs', sufijo: m['margen_pct'] == null ? '' : ' · ${m['margen_pct']}%', color: VenueColors.ok),
                   ),
                 ],
               ),
@@ -1533,19 +1515,11 @@ class _AnaliticaBarraScreenState extends ConsumerState<AnaliticaBarraScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Kpi(
-                      'Vasos',
-                      '${e['vasos'] ?? 0}',
-                      ' · ${e['vasos_cortesia'] ?? 0} cortesía',
-                    ),
+                    child: TarjetaCifra(etiqueta: 'Vasos', valor: '${e['vasos'] ?? 0}', sufijo: ' · ${e['vasos_cortesia'] ?? 0} cortesía'),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Kpi(
-                      'Ticket promedio',
-                      '${e['ticket_promedio'] ?? 0} Bs',
-                      '',
-                    ),
+                    child: TarjetaCifra(etiqueta: 'Ticket promedio', valor: '${e['ticket_promedio'] ?? 0} Bs'),
                   ),
                 ],
               ),

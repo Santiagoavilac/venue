@@ -1471,23 +1471,23 @@ class NumerosEvento extends ConsumerWidget {
     String v(int? x) => x == null ? '…' : '$x';
     return FilaFichas(
       children: [
-        FichaDato(
+        TarjetaCifra(
           icono: Icons.groups_outlined,
           etiqueta: 'Listas',
           valor: v(n?.listas),
           color: VenueColors.aviso,
         ),
-        FichaDato(
+        TarjetaCifra(
           icono: Icons.qr_code_2_rounded,
           etiqueta: 'QR',
           valor: v(n?.qr),
         ),
-        FichaDato(
+        TarjetaCifra(
           icono: Icons.table_bar_outlined,
           etiqueta: 'Mesas',
           valor: v(n?.mesas),
         ),
-        FichaDato(
+        TarjetaCifra(
           icono: Icons.how_to_reg_outlined,
           etiqueta: 'Entraron',
           valor: v(n?.ingresaron),

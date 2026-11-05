@@ -730,57 +730,6 @@ Future<void> _verTodos(BuildContext context, String titulo, List<StatsPersona> p
       ),
     ));
 
-/// Indicador sin ícono para las pantallas que solo tienen el dato (Barra).
-/// Mismo marco y tipografía que [Indicador].
-class Kpi extends StatelessWidget {
-  const Kpi(this.titulo, this.valor, this.sufijo, {super.key, this.color});
-  final String titulo;
-  final String valor;
-  final String sufijo;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) => Tarjeta(
-    padding: const EdgeInsets.all(16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          titulo,
-          style: TextStyle(
-            color: VenueColors.textoSuave,
-            fontSize: 13.5,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: valor,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.4,
-                  color: color,
-                ),
-              ),
-              TextSpan(
-                text: sufijo,
-                style: TextStyle(
-                  color: VenueColors.textoTenue,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class Renglon extends StatelessWidget {
   const Renglon(this.k, this.v, {super.key, this.color, this.fuerte = false});
   final String k;
