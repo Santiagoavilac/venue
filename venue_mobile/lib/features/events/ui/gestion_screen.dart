@@ -18,6 +18,7 @@ import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../../teams/data/gente.dart';
 import '../../tickets/data/ticket_imagen.dart';
+import '../../analytics/data/reporte.dart';
 import '../data/eventos.dart';
 import '../data/gestion.dart';
 import 'hero_evento.dart';
@@ -778,6 +779,7 @@ class _EventoDetalleState extends ConsumerState<_EventoDetalle> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 NumerosEvento(eventoId: widget.eventoId),
+                _PlataDelEvento(eventoId: widget.eventoId),
                 if (a.publicar) ...[
                   const SizedBox(height: 12),
                   FilledButton.icon(
@@ -3153,6 +3155,49 @@ class _AftrState extends ConsumerState<_Aftr> {
           style: TextStyle(color: VenueColors.textoSuave, fontSize: 12),
         ),
       ],
+    );
+  }
+}
+
+/// Lo que va de la noche en plata, para el admin: es lo que de verdad se
+/// quiere saber al abrir "Gestionar evento", y antes había que irse al
+/// Reporte para verlo. Sale de `liquidacion_evento`, la misma cuenta que usa
+/// la liquidación, así que no hay dos números distintos para lo mismo.
+class _PlataDelEvento extends ConsumerWidget {
+  const _PlataDelEvento({required this.eventoId});
+  final String eventoId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = ref.watch(liquidacionDeEventoProvider(eventoId)).value;
+    if (l == null) return const SizedBox.shrink();
+    num n(String k) => (l[k] as num?) ?? 0;
+    String bs(num v) => '${v.round()} Bs';
+    final manillas = n('total_manillas');
+    final mesas = n('total_mesas');
+    return Padding(
+      padding: const EdgeInsets.only(top: Esp.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const TituloBloque('Lo que va de la noche'),
+          TarjetaCifra(
+            etiqueta: 'Para el boliche',
+            valor: bs(n('total_a_pagar')),
+            detalle:
+                'Manillas ${bs(manillas)} · Mesas ${bs(mesas)}, ya sin comisiones',
+            tono: Tono.ok,
+          ),
+          const SizedBox(height: Esp.sm),
+          TarjetaCifra(
+            etiqueta: 'Manillas usadas',
+            valor: '${n('manillas_netas').round()}',
+            detalle: n('manillas_externas') > 0
+                ? '${n('manillas_usadas').round()} marcadas · ${n('manillas_externas').round()} externas no cuentan'
+                : 'a ${bs(n('por_manilla'))} para el boliche',
+          ),
+        ],
+      ),
     );
   }
 }

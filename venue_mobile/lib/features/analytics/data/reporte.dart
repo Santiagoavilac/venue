@@ -351,6 +351,15 @@ final rankingTeamsProvider = FutureProvider.autoDispose<List<ScoreTeam>?>((ref) 
   return ref.watch(reporteRepositoryProvider).rankingTeams(ev.id);
 });
 
+/// La plata de un evento cualquiera, no sólo el activo: "Gestionar evento"
+/// necesita la del evento que se está mirando. Sólo admin; la RPC lo exige
+/// igual, pero así ni se pide.
+final liquidacionDeEventoProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>?, String>((ref, eventoId) async {
+  if (ref.watch(rolProvider).value != Rol.admin) return null;
+  return ref.watch(reporteRepositoryProvider).liquidacion(eventoId);
+});
+
 final liquidacionProvider = FutureProvider.autoDispose<
     ({Map<String, dynamic> servidor, ({String? nombre, int ingresaron, num precio}) puerta})?>((ref) async {
   final ev = ref.watch(eventoActivoProvider);

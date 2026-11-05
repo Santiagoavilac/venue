@@ -275,7 +275,8 @@ class HeroEvento extends StatelessWidget {
   }
 }
 
-/// Anotados en listas, QR emitidos, mesas vendidas e ingresos por lista.
+/// Cómo va la noche: cuánta gente hay adentro, cuántos de los anotados
+/// llegaron, cuántas entradas se usaron y cuántas mesas se vendieron.
 class NumerosEvento extends ConsumerWidget {
   const NumerosEvento({super.key, required this.eventoId});
   final String eventoId;
@@ -284,29 +285,32 @@ class NumerosEvento extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final n = ref.watch(numerosEventoProvider(eventoId)).value;
     String v(int? x) => x == null ? '…' : '$x';
+    // de a pares: cuántos de los anotados llegaron, cuántas de las entradas
+    // vendidas se usaron. Un contador suelto no dice cómo va la noche.
     return FilaFichas(
       children: [
         TarjetaCifra(
+          icono: Icons.how_to_reg_outlined,
+          etiqueta: 'Adentro',
+          valor: n == null ? '…' : '${adentroDe(n)}',
+          tono: Tono.ok,
+        ),
+        TarjetaCifra(
           icono: Icons.groups_outlined,
-          etiqueta: 'Listas',
-          valor: v(n?.listas),
-          color: VenueColors.aviso,
+          etiqueta: 'De lista',
+          valor: v(n?.ingresaron),
+          de: v(n?.anotados),
         ),
         TarjetaCifra(
           icono: Icons.qr_code_2_rounded,
-          etiqueta: 'QR',
-          valor: v(n?.qr),
+          etiqueta: 'Entradas',
+          valor: v(n?.qrUsados),
+          de: v(n?.entradas),
         ),
         TarjetaCifra(
           icono: Icons.table_bar_outlined,
           etiqueta: 'Mesas',
           valor: v(n?.mesas),
-        ),
-        TarjetaCifra(
-          icono: Icons.how_to_reg_outlined,
-          etiqueta: 'Entraron',
-          valor: v(n?.ingresaron),
-          color: VenueColors.ok,
         ),
       ],
     );

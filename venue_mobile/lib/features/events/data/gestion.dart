@@ -253,17 +253,38 @@ final eventosGestionProvider = FutureProvider.autoDispose<List<Fila>>((ref) asyn
 
 /// Números del evento para su tarjeta: anotados en listas, QR emitidos,
 /// mesas vendidas e ingresos por lista. Cuatro conteos sin traer filas.
+/// Cómo viene la noche de un evento.
+///
+/// Antes esto eran cuatro consultas de conteo sueltas que devolvían cuatro
+/// números sin relación entre sí: cuántos anotados, cuántas entradas, cuántas
+/// mesas y cuántos entraron. Cuatro contadores no dicen cómo va la noche; lo
+/// que se quiere saber es cuántos de los anotados llegaron y cuántas de las
+/// entradas vendidas se usaron.
+///
+/// Ahora sale de `resumen_evento`, que ya existía, va en una sola consulta y
+/// pasa por la guarda del servidor como el resto.
+typedef NumerosDeEvento = ({
+  int anotados,
+  int ingresaron,
+  int entradas,
+  int qrUsados,
+  int mesas,
+});
+
+/// Cuánta gente hay adentro ahora: la de lista que entró más los QR usados.
+int adentroDe(NumerosDeEvento n) => n.ingresaron + n.qrUsados;
+
 final numerosEventoProvider = FutureProvider.autoDispose
-    .family<({int listas, int qr, int mesas, int ingresaron}), String>((ref, eventoId) async {
-  final sb = ref.watch(supabaseProvider);
-  final r = await Future.wait([
-    sb.from('registros').select('id').eq('evento_id', eventoId).count(CountOption.exact),
-    sb.from('entradas').select('id').eq('evento_id', eventoId)
-        .isFilter('mesa_id', null).neq('estado', 'anulada').count(CountOption.exact),
-    sb.from('mesas').select('id').eq('evento_id', eventoId)
-        .neq('estado', 'disponible').count(CountOption.exact),
-    sb.from('registros').select('id').eq('evento_id', eventoId)
-        .not('ingreso_at', 'is', null).count(CountOption.exact),
-  ]);
-  return (listas: r[0].count, qr: r[1].count, mesas: r[2].count, ingresaron: r[3].count);
+    .family<NumerosDeEvento, String>((ref, eventoId) async {
+  final r = Map<String, dynamic>.from(await ref
+      .watch(supabaseProvider)
+      .rpc('resumen_evento', params: {'p_evento': eventoId}) as Map);
+  int n(String k) => (r[k] as num?)?.toInt() ?? 0;
+  return (
+    anotados: n('anotados'),
+    ingresaron: n('ingresaron'),
+    entradas: n('entradas'),
+    qrUsados: n('qr_usados'),
+    mesas: n('mesas'),
+  );
 });

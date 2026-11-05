@@ -86,8 +86,10 @@ trabajo. Última actualización: 2026-11-05.
       dibujado (con un evento gratis, "Crear evento" fallaba sin salida),
       "Crear evento" siempre arriba, y la lista agrupada por tramo
       (`agruparPorTramo`: hoy, próximos del más cercano, pasados del más
-      reciente). Falta que "Gestionar evento" muestre datos reales en vez de
-      cuatro contadores y seis filas
+      reciente), y los números de a pares desde `resumen_evento` en una sola
+      consulta en vez de cuatro conteos sueltos. "Gestionar evento" abre con
+      la plata de la noche (`liquidacion_evento`, sólo admin), que antes había
+      que ir a buscar al Reporte
 - [ ] **Pagos** — hoy no usa ninguna primitiva del sistema
 - [ ] **Accesos** — unificar `_Dato` con `TarjetaCifra`
 - [ ] **Reporte** — tokens y gráficos con `fl_chart`
