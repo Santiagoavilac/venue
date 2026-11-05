@@ -1,5 +1,47 @@
 import 'package:flutter/material.dart';
 
+// Los colores del modo oscuro viven acá sueltos porque los usan dos cosas: la
+// paleta oscura y [Oscuro], el cromo que va sobre algo negro aunque la app
+// esté en claro. Tenerlos una sola vez es lo que evita que la app parezca
+// hecha por tres personas distintas.
+const _fondoOscuro = Color(0xFF0B0B0D);
+const _superficieOscura = Color(0xFF141416);
+const _superficie2Oscura = Color(0xFF1B1B1E);
+const _superficieAltaOscura = Color(0xFF242428);
+const _textoOscuro = Color(0xFFF4F4F5);
+const _textoSuaveOscuro = Color(0xFFA1A1AA);
+const _textoTenueOscuro = Color(0xFF71717A);
+const _malOscuro = Color(0xFFF25C5C);
+
+/// Cromo que va encima de algo oscuro y por eso **no sigue el modo de la app**:
+/// el ingreso sobre el video, la burbuja del tutorial sobre su velo, el texto
+/// sobre la foto de un evento. Debajo siempre hay negro, así que en modo claro
+/// ponerlo claro lo volvería ilegible.
+///
+/// Son los mismos colores de la paleta oscura, no otros inventados: antes cada
+/// pantalla elegía su gris y ninguno coincidía (`0xFF16181C`, `0xFF1C1F24`,
+/// `0xF21B2230`…).
+abstract final class Oscuro {
+  static const fondo = _fondoOscuro;
+  static const superficie = _superficieOscura;
+
+  /// Tarjetas y burbujas que flotan sobre el velo.
+  static const tarjeta = _superficie2Oscura;
+
+  /// Campos de texto sobre fondo oscuro.
+  static const campo = _superficieAltaOscura;
+  static const texto = _textoOscuro;
+  static const suave = _textoSuaveOscuro;
+  static const tenue = _textoTenueOscuro;
+  static const mal = _malOscuro;
+
+  /// Borde apenas visible sobre negro.
+  static const linea = Color(0x29FFFFFF);
+
+  /// El velo que oscurece lo que haya detrás para que se lea el texto.
+  static const velo = Color(0x9E000000);
+}
+
 /// Paleta de un modo (oscuro o claro). Los de estado son fijos por modo y no
 /// dependen de la marca del boliche: en la puerta el verde y el rojo tienen
 /// que significar siempre lo mismo.
@@ -17,19 +59,19 @@ class Paleta {
 
   static const oscura = Paleta(
     brillo: Brightness.dark,
-    fondo: Color(0xFF0B0B0D),
-    superficie: Color(0xFF141416),
-    superficie2: Color(0xFF1B1B1E),
-    superficieAlta: Color(0xFF242428),
+    fondo: _fondoOscuro,
+    superficie: _superficieOscura,
+    superficie2: _superficie2Oscura,
+    superficieAlta: _superficieAltaOscura,
     lateral: Color(0xFF0F0F11),
     linea: Color(0x17FFFFFF),
     lineaSuave: Color(0x0FFFFFFF),
-    texto: Color(0xFFF4F4F5),
-    textoSuave: Color(0xFFA1A1AA),
-    textoTenue: Color(0xFF71717A),
+    texto: _textoOscuro,
+    textoSuave: _textoSuaveOscuro,
+    textoTenue: _textoTenueOscuro,
     ok: Color(0xFF34C77B),
     aviso: Color(0xFFF5A524),
-    mal: Color(0xFFF25C5C),
+    mal: _malOscuro,
     neutro: Color(0xFF7C8598),
     info: Color(0xFF5AA9FF),
   );

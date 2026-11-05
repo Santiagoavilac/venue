@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/theme/venue_theme.dart';
+
+/// La burbuja flota sobre el velo, así que es oscura también en modo claro.
+const _burbuja = Oscuro.tarjeta;
+
 /// Tutorial guiado del inicio (como el de MD Vinyl): una tarjeta oscura que
 /// apunta a cada botón de la barra, con qué es y "Siguiente". Sale una vez
 /// por persona en este teléfono; se puede volver a ver desde el perfil.
@@ -116,7 +121,8 @@ class _TutorialGuiadoState extends State<TutorialGuiado> {
       const margen = 16.0, pico = 10.0;
 
       final tarjeta = Material(
-        color: const Color(0xF21B2230),
+        // la burbuja va sobre el velo: oscura en los dos modos
+        color: _burbuja,
         borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
@@ -132,44 +138,42 @@ class _TutorialGuiadoState extends State<TutorialGuiado> {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(color: marca, shape: BoxShape.circle),
-                    child: Icon(p.icono, size: 19, color: Colors.white),
+                    child: Icon(p.icono, size: 19, color: Oscuro.texto),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(p.titulo,
                         style: const TextStyle(
-                            color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+                            color: Oscuro.texto, fontSize: 17, fontWeight: FontWeight.w700)),
                   ),
                   if (!ultimo)
                     TextButton(
                       onPressed: widget.alTerminar,
                       style: TextButton.styleFrom(
-                          foregroundColor: Colors.white70, minimumSize: const Size(44, 36)),
+                          foregroundColor: Oscuro.suave, minimumSize: const Size(44, 36)),
                       child: const Text('Saltar'),
                     ),
                 ]),
                 const SizedBox(height: 10),
                 Text(p.texto,
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: .86), fontSize: 15, height: 1.4)),
+                    style: const TextStyle(color: Oscuro.texto, fontSize: 15, height: 1.4)),
                 const SizedBox(height: 14),
                 Row(children: [
                   Text('${_n + 1}/${widget.pasos.length}',
-                      style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                      style: const TextStyle(color: Oscuro.suave, fontSize: 13)),
                   const Spacer(),
                   if (_n > 0)
                     TextButton(
                       onPressed: () => _ir(_n - 1),
-                      style: TextButton.styleFrom(foregroundColor: Colors.white70),
+                      style: TextButton.styleFrom(foregroundColor: Oscuro.suave),
                       child: const Text('Atrás'),
                     ),
                   const SizedBox(width: 4),
-                  // colores fijos: el tema pinta los botones para fondo claro
                   FilledButton(
                     onPressed: _siguiente,
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF1B2230),
+                      backgroundColor: Oscuro.texto,
+                      foregroundColor: Oscuro.fondo,
                       shape: const StadiumBorder(),
                       minimumSize: const Size(0, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -236,7 +240,7 @@ class _Velo extends CustomPainter {
             todo,
             Path()..addRRect(RRect.fromRectAndRadius(hueco!.inflate(4), const Radius.circular(16))),
           );
-    canvas.drawPath(p, Paint()..color = Colors.black.withValues(alpha: .62));
+    canvas.drawPath(p, Paint()..color = Oscuro.velo);
   }
 
   @override
@@ -260,7 +264,7 @@ class _Pico extends CustomPainter {
           ..lineTo(s.width, s.height)
           ..lineTo(s.width / 2, 0)
           ..close());
-    canvas.drawPath(p, Paint()..color = const Color(0xF21B2230));
+    canvas.drawPath(p, Paint()..color = _burbuja);
   }
 
   @override

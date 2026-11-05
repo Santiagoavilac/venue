@@ -569,8 +569,8 @@ class HeroEvento extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color.lerp(marca, Colors.black, .35)!,
-            Color.lerp(marca, Colors.black, .8)!,
+            Color.lerp(marca, Oscuro.fondo, .35)!,
+            Color.lerp(marca, Oscuro.fondo, .8)!,
           ],
         ),
       ),
@@ -603,9 +603,9 @@ class HeroEvento extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withValues(alpha: .15),
-                    Colors.black.withValues(alpha: .35),
-                    Colors.black.withValues(alpha: .80),
+                    Oscuro.fondo.withValues(alpha: .15),
+                    Oscuro.fondo.withValues(alpha: .35),
+                    Oscuro.fondo.withValues(alpha: .80),
                   ],
                   stops: const [0, .45, 1],
                 ),
@@ -655,11 +655,11 @@ class HeroEvento extends StatelessWidget {
                       if (menu != null)
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: .35),
+                            color: Oscuro.fondo.withValues(alpha: .35),
                             shape: BoxShape.circle,
                           ),
                           child: IconTheme(
-                            data: const IconThemeData(color: Colors.white),
+                            data: const IconThemeData(color: Oscuro.texto),
                             child: menu!,
                           ),
                         ),
@@ -675,10 +675,10 @@ class HeroEvento extends StatelessWidget {
                       height: 1.08,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.4,
-                      color: Colors.white,
+                      color: Oscuro.texto,
                       shadows: [
                         Shadow(
-                          color: Colors.black.withValues(alpha: .5),
+                          color: Oscuro.fondo.withValues(alpha: .5),
                           blurRadius: 12,
                         ),
                       ],
@@ -691,7 +691,7 @@ class HeroEvento extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.white.withValues(alpha: .88),
+                      color: Oscuro.texto.withValues(alpha: .88),
                     ),
                   ),
                 ],

@@ -4,7 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'venue_theme.dart';
 
 /// Modo de la app. Se elige en el panel de perfil y queda guardado en el
-/// teléfono. Arranca en claro; el oscuro queda para quien lo prefiera de noche.
+/// teléfono.
+///
+/// Arranca en **oscuro**: Venue se usa de noche y adentro de un boliche, y
+/// todo lo que no se puede aclarar (el ingreso sobre el video, el velo del
+/// tutorial, la foto del evento, el splash) ya es oscuro. Arrancar en claro
+/// era lo que hacía ver una pestaña gris clara debajo de un encabezado
+/// oscuro. El claro sigue estando para quien lo prefiera.
 enum Apariencia {
   oscura('Oscuro'),
   clara('Claro');
@@ -13,7 +19,7 @@ enum Apariencia {
   final String etiqueta;
 
   static Apariencia desde(String? s) =>
-      values.where((a) => a.name == s).firstOrNull ?? Apariencia.clara;
+      values.where((a) => a.name == s).firstOrNull ?? Apariencia.oscura;
 
   Paleta get paleta => this == Apariencia.clara ? Paleta.clara : Paleta.oscura;
 }
@@ -25,11 +31,11 @@ Future<Apariencia> aparienciaGuardada() async {
   try {
     return Apariencia.desde((await SharedPreferences.getInstance()).getString(_clave));
   } catch (_) {
-    return Apariencia.clara;
+    return Apariencia.oscura;
   }
 }
 
-final aparienciaInicialProvider = Provider<Apariencia>((_) => Apariencia.clara);
+final aparienciaInicialProvider = Provider<Apariencia>((_) => Apariencia.oscura);
 
 class AparienciaNotifier extends Notifier<Apariencia> {
   @override

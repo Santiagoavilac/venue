@@ -7,8 +7,11 @@ trabajo. Última actualización: 2026-11-05.
 
 - [x] Librerías: `flutter_animate`, `skeletonizer`, `lucide_icons_flutter` en `pubspec.yaml`
 - [x] `venue_mobile/lib/core/theme/tokens.dart` (tipografía y espaciado)
-- [ ] Una sola paleta efectiva: el cromo hardcodeado (`acceso_oscuro.dart`, tutorial,
-      degradés de `HeroEvento`) lee del tema. Arregla la pestaña Catálogo gris
+- [x] Una sola paleta efectiva: `Oscuro` en `venue_theme.dart` es el cromo que va
+      sobre algo negro (ingreso sobre el video, velo del tutorial, foto del
+      evento) y sale de la paleta oscura. La app arranca en oscuro, que es lo
+      que arregla la pestaña gris clara bajo el encabezado oscuro.
+      Prueba: `test/tema_test.dart`
 - [ ] `TarjetaCifra` único que reemplace las cinco variantes
 - [ ] Badge de estado único que reemplace las siete
 - [ ] `EsqueletoLista` con `skeletonizer` en lugar de las 46 ruleditas

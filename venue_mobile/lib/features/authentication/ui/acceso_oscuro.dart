@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/fondo_video.dart';
 
-/// Piezas del ingreso, que es siempre oscuro sin importar el modo de la app
-/// (las mismas medidas que el login de usuario y contraseña).
+/// Piezas del ingreso, que es siempre oscuro sin importar el modo de la app:
+/// detrás hay un video oscuro. Los colores salen de [Oscuro], que es la paleta
+/// oscura de siempre; antes esta pantalla tenía cuatro grises propios que no
+/// coincidían con ninguno del resto de la app.
 abstract final class Acceso {
-  static const fondo = Color(0xFF16181C), campo = Color(0xFF26292F), suave = Color(0xFF9AA0A9),
-      tarjeta = Color(0xFF1C1F24), error = Color(0xFFFF8A80);
+  static const fondo = Oscuro.fondo, campo = Oscuro.campo, suave = Oscuro.suave,
+      tarjeta = Oscuro.tarjeta, error = Oscuro.mal;
 
   static InputDecoration campoDeco({String? pista, Widget? sufijo}) => InputDecoration(
         filled: true,
@@ -17,8 +20,8 @@ abstract final class Acceso {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white24)),
-        hintStyle: const TextStyle(color: Colors.white38),
+            borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Oscuro.linea)),
+        hintStyle: const TextStyle(color: Oscuro.tenue),
       );
 
   static Widget rotulo(String t) => Padding(
@@ -30,7 +33,7 @@ abstract final class Acceso {
   static Widget titulo(String t, String sub) => Padding(
         padding: const EdgeInsets.only(top: 6, bottom: 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(t, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
+          Text(t, style: const TextStyle(color: Oscuro.texto, fontSize: 24, fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
           Text(sub, style: const TextStyle(color: suave, fontSize: 14.5, height: 1.35)),
         ]),
@@ -46,17 +49,17 @@ abstract final class Acceso {
   static Widget botonBlanco(String texto, VoidCallback? alTocar, {bool cargando = false}) => FilledButton(
         onPressed: cargando ? null : alTocar,
         style: FilledButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          disabledBackgroundColor: Colors.white24,
-          disabledForegroundColor: Colors.white54,
+          backgroundColor: Oscuro.texto,
+          foregroundColor: Oscuro.fondo,
+          disabledBackgroundColor: Oscuro.campo,
+          disabledForegroundColor: Oscuro.tenue,
           minimumSize: const Size.fromHeight(54),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         child: cargando
             ? const SizedBox(
-                width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.black))
+                width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Oscuro.fondo))
             : Text(texto),
       );
 
@@ -65,9 +68,9 @@ abstract final class Acceso {
         child: OutlinedButton(
           onPressed: alTocar,
           style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.white,
+            foregroundColor: Oscuro.texto,
             minimumSize: const Size.fromHeight(52),
-            side: const BorderSide(color: Colors.white24),
+            side: const BorderSide(color: Oscuro.linea),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
@@ -109,12 +112,12 @@ class FondoAcceso extends StatelessWidget {
                                 onPressed: alVolver,
                                 padding: EdgeInsets.zero,
                                 alignment: Alignment.centerLeft,
-                                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Oscuro.texto, size: 20),
                               )
                             : marca
                                 ? const Text('VENUE',
                                     style: TextStyle(
-                                        color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 5))
+                                        color: Oscuro.texto, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 5))
                                 : null,
                       ),
                     ),
@@ -136,7 +139,7 @@ class LogoGoogle extends StatelessWidget {
         width: 22,
         height: 22,
         alignment: Alignment.center,
-        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+        decoration: const BoxDecoration(color: Oscuro.texto, shape: BoxShape.circle),
         child: const Text('G',
             style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.w800, fontSize: 14, height: 1)),
       );
