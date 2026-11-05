@@ -24,6 +24,7 @@ import '../data/rrpp.dart';
 import 'gestion_solicitudes.dart';
 import '../../../core/widgets/insignia.dart';
 import '../../../core/widgets/esqueleto.dart';
+import '../../../core/widgets/estado_vista.dart';
 
 const _aftr = 'https://www.aftrvenue.com/';
 
@@ -164,8 +165,8 @@ class _Pagina extends ConsumerWidget {
             data: hijos,
             loading: () => const [EsqueletoResumen()],
             error: (e, _) => [
-              _Vacio.accion('No pudimos cargar tus datos', mensajeDeError(e),
-                  accion: OutlinedButton(onPressed: () => _refrescar(ref), child: const Text('Reintentar'))),
+              BloqueVacio('No pudimos cargar tus datos', mensajeDeError(e),
+                  OutlinedButton(onPressed: () => _refrescar(ref), child: const Text('Reintentar'))),
             ],
           ),
         ],
@@ -212,26 +213,6 @@ class _Filtros extends ConsumerWidget {
       ]),
     );
   }
-}
-
-class _Vacio extends StatelessWidget {
-  const _Vacio(this.titulo, [this.detalle]) : accion = null;
-  final String titulo;
-  final String? detalle;
-  final Widget? accion;
-  const _Vacio.accion(this.titulo, this.detalle, {required this.accion});
-  @override
-  Widget build(BuildContext context) => Tarjeta(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
-        child: Column(children: [
-          Text(titulo, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-          if (detalle != null) ...[
-            const SizedBox(height: 6),
-            Text(detalle!, textAlign: TextAlign.center, style: TextStyle(color: VenueColors.textoSuave, height: 1.4)),
-          ],
-          if (accion != null) ...[const SizedBox(height: 12), accion!],
-        ]),
-      );
 }
 
 Insignia _insignia(String estado) => switch (estado) {
@@ -327,7 +308,7 @@ class _Barras extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (puntos.every((p) => p.valor == 0)) {
-      return const _Vacio('Sin datos en este período');
+      return const BloqueVacio('Sin datos en este período');
     }
     final color = Theme.of(context).colorScheme.primary;
     final max = puntos.map((p) => p.valor).reduce((a, b) => a > b ? a : b).toDouble();
@@ -404,12 +385,12 @@ class _Inicio extends ConsumerWidget {
           if (activos.isEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: _Vacio.accion(
+              child: BloqueVacio(
                 pend.isNotEmpty ? 'Tu solicitud está en camino' : 'Sumate a tu primer boliche',
                 pend.isNotEmpty
                     ? 'Esperando que ${pend.map((s) => s.club).join(', ')} te apruebe. Mientras tanto podés pedir sumarte a otros.'
                     : 'Buscá el boliche con el que trabajás y pedí sumarte, o pegá el enlace que te pasaron.',
-                accion: Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.center, children: [
+                Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.center, children: [
                   FilledButton(onPressed: () => abrirExplorar(context, ref), child: const Text('Explorar boliches')),
                   OutlinedButton(onPressed: () => abrirCodigo(context, ref), child: const Text('Tengo un enlace')),
                 ]),
@@ -438,7 +419,7 @@ class _Inicio extends ConsumerWidget {
           ],
           const TituloBloque('Próximos eventos'),
           if (prox.isEmpty)
-            _Vacio('No tenés eventos próximos', activos.isEmpty ? null : 'Cuando tus boliches creen uno, aparece acá.')
+            BloqueVacio('No tenés eventos próximos', activos.isEmpty ? null : 'Cuando tus boliches creen uno, aparece acá.')
           else
             _lista([for (final e in prox.take(3)) _filaProximo(context, ref, e)]),
           if (noche != null) ...[
@@ -496,11 +477,11 @@ class _EventosState extends ConsumerState<_Eventos> {
           const _Filtros(periodo: false),
           if (_proximos)
             prox.isEmpty
-                ? const _Vacio('No hay eventos próximos', 'Los eventos de tus boliches aparecen acá apenas se crean.')
+                ? const BloqueVacio('No hay eventos próximos', 'Los eventos de tus boliches aparecen acá apenas se crean.')
                 : _lista([for (final e in prox) _filaProximo(context, ref, e)])
           else
             pasados.isEmpty
-                ? const _Vacio('Todavía no trabajaste ningún evento', 'Cuando anotes invitados o vendas, tu historial se arma solo.')
+                ? const BloqueVacio('Todavía no trabajaste ningún evento', 'Cuando anotes invitados o vendas, tu historial se arma solo.')
                 : _lista([for (final e in pasados) _filaPasado(context, e)]),
         ];
       },
@@ -744,11 +725,11 @@ class _Stats extends ConsumerWidget {
           ],
           const TituloBloque('Mejores eventos'),
           mejores.isEmpty
-              ? const _Vacio('Sin eventos en este período')
+              ? const BloqueVacio('Sin eventos en este período')
               : _lista([for (final e in mejores.take(5)) _filaPasado(context, e)]),
           const TituloBloque('Mis récords'),
           if (rs.isEmpty)
-            const _Vacio('Tus récords aparecen con tu primer evento')
+            const BloqueVacio('Tus récords aparecen con tu primer evento')
           else
             GrillaCifras(children: [
               for (final r in rs)
@@ -803,7 +784,7 @@ class _Recurrentes extends ConsumerWidget {
           final l = s.data ?? const [];
           if (!s.hasData) return const SizedBox(height: 60, child: Center(child: CircularProgressIndicator()));
           if (l.isEmpty) {
-            return const _Vacio('Todavía no hay invitados que repitan',
+            return const BloqueVacio('Todavía no hay invitados que repitan',
                 'Cuando alguien vuelva a entrar por tu lista en otro evento, lo vas a ver acá.');
           }
           return Tarjeta(
@@ -832,7 +813,7 @@ class _Links extends ConsumerWidget {
           final d = s.data;
           if (d == null) return const SizedBox(height: 60, child: Center(child: CircularProgressIndicator()));
           if (d.visitas == 0) {
-            return const _Vacio('Sin visitas por tu enlace todavía',
+            return const BloqueVacio('Sin visitas por tu enlace todavía',
                 'Compartí tu enlace desde un evento próximo: acá vas a ver cuánta gente entra y cuántos compran.');
           }
           return GrillaCifras(children: [
@@ -887,7 +868,7 @@ class _Ganancias extends ConsumerWidget {
           ),
           const TituloBloque('Por evento'),
           if (l.isEmpty)
-            const _Vacio('Sin comisiones en este período')
+            const BloqueVacio('Sin comisiones en este período')
           else
             _lista([
               for (final e in l)
@@ -944,8 +925,8 @@ class _Perfil extends ConsumerWidget {
         TituloBloque('Mis establecimientos',
             accion: TextButton(onPressed: () => abrirExplorar(context, ref), child: const Text('Explorar'))),
         if (boliches.isEmpty)
-          _Vacio.accion('Todavía no trabajás con ningún boliche', null,
-              accion: Wrap(spacing: 8, children: [
+          BloqueVacio('Todavía no trabajás con ningún boliche', null,
+              Wrap(spacing: 8, children: [
                 FilledButton(onPressed: () => abrirExplorar(context, ref), child: const Text('Explorar boliches')),
                 OutlinedButton(onPressed: () => abrirCodigo(context, ref), child: const Text('Tengo un enlace')),
               ]))
@@ -1154,7 +1135,7 @@ class _ExplorarState extends ConsumerState<_Explorar> {
                 if (!s.hasData) return const EsqueletoLista(filas: 3, conFoto: false);
                 final l = s.data!;
                 if (l.isEmpty) {
-                  return _Vacio(_q.isEmpty ? 'Todavía no hay boliches abiertos a solicitudes' : 'No encontramos boliches',
+                  return BloqueVacio(_q.isEmpty ? 'Todavía no hay boliches abiertos a solicitudes' : 'No encontramos boliches',
                       'Si te pasaron un enlace, usá "Tengo un enlace".');
                 }
                 return SingleChildScrollView(

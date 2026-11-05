@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../networking/supabase.dart';
+import '../theme/tokens.dart';
 import '../theme/venue_theme.dart';
 import 'esqueleto.dart';
+import 'patron.dart';
 
 /// Mensaje centrado para pantallas sin datos o con error.
 class MensajeVista extends StatelessWidget {
@@ -58,6 +60,43 @@ class MensajeVista extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "Acá no hay nada todavía", del tamaño de un bloque y no de una pantalla.
+///
+/// [MensajeVista] ocupa el centro de la vista con su ícono grande: sirve
+/// cuando no hay NADA que mostrar. Adentro de una pantalla que sí tiene datos,
+/// donde lo vacío es un bloque entre otros (el ranking de un período sin
+/// ventas, el historial de alguien que recién empieza), hace falta algo del
+/// tamaño de una tarjeta. Esto es eso, y vivía repetido en el espacio del
+/// relacionador.
+class BloqueVacio extends StatelessWidget {
+  const BloqueVacio(this.titulo, [this.detalle, this.accion]);
+
+  final String titulo;
+  final String? detalle;
+
+  /// Un botón para salir del vacío: "Crear el primero", "Ver otro período".
+  final Widget? accion;
+
+  @override
+  Widget build(BuildContext context) => Tarjeta(
+    padding: const EdgeInsets.symmetric(horizontal: Esp.lg + 2, vertical: Esp.xl - 2),
+    child: Column(
+      children: [
+        Text(titulo, textAlign: TextAlign.center, style: Tipo.fila),
+        if (detalle != null) ...[
+          const SizedBox(height: Esp.sm - 2),
+          Text(
+            detalle!,
+            textAlign: TextAlign.center,
+            style: Tipo.cuerpo.copyWith(color: VenueColors.textoSuave),
+          ),
+        ],
+        if (accion != null) ...[const SizedBox(height: Esp.md), accion!],
+      ],
+    ),
+  );
 }
 
 /// Pinta un [AsyncValue] con los tres estados resueltos: cargando, error con
