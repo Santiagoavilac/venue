@@ -32,8 +32,15 @@ test('la web solicita el QR sin enviar un importe del cliente', async () => {
   assert.match(s.c.innerHTML,/Bs 25.50/); assert.match(s.c.innerHTML,/Guardar QR/); assert.equal(s.timers[0].ms,4000);
 });
 test('revisión no muestra QR pagable ni un éxito', async () => {
-  const s=escenario(async()=>({data:{pago:{estado:'revisar'}}})); await tick();
-  assert.match(s.c.innerHTML,/No vuelvas a pagar/); assert.doesNotMatch(s.c.innerHTML,/Guardar QR|Pago confirmado/);
+  const s=escenario(async()=>({data:{pago:{estado:'revisar',monto:25.5}}})); await tick();
+  assert.match(s.c.innerHTML,/Tu pago no se pudo entregar/); assert.doesNotMatch(s.c.innerHTML,/Guardar QR|Pago confirmado/);
+});
+test('el pago fuera de plazo lo dice y ofrece el WhatsApp de soporte', async () => {
+  const s=escenario(async()=>({data:{pago:{estado:'revisar',monto:25.5,nota:'PAGADO_FUERA_DE_PLAZO'}}})); await tick();
+  assert.match(s.c.innerHTML,/Tu pago llegó tarde/);
+  assert.match(s.c.innerHTML,/diez minutos/);
+  assert.match(s.c.innerHTML,/wa\.me\/59175028040/);
+  assert.doesNotMatch(s.c.innerHTML,/Guardar QR/);
 });
 test('la consulta siguiente se agenda recién al terminar la anterior', async () => {
   let liberar;

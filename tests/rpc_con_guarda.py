@@ -47,13 +47,27 @@ EXCEPCIONES = {
     'aftr_mis_accesos': 'delega en impl.aftr_mis_accesos_social_base(), que es la '
                         'versión anterior de esta misma función y arranca con '
                         'impl.aftr_yo(): sin sesión no pasa de ahí',
+    # Las dos envolturas de historia no comprueban sesión: delegan en la compra
+    # real, que arranca con impl.aftr_yo(). Lo que ellas sí validan es que la
+    # historia exista y siga vigente.
+    'aftr_comprar_historia': 'delega en aftr_comprar, que arranca con impl.aftr_yo()',
+    'aftr_reservar_historia': 'delega en aftr_reservar_mesa, que arranca con impl.aftr_yo()',
+    # El cobro del banco: lo llama la Edge Function con la llave de servicio.
+    # Ninguna está concedida a authenticated ni a anon (db/44 y 20261031172015
+    # las revocan), así que el permiso es el grant.
+    'aftr_pago_confirmado': 'solo service_role: la llama la Edge Function del banco',
+    'aftr_pago_confirmado_entradas': 'solo service_role: la llama la Edge Function del banco',
+    'baneco_qr_anulado': 'solo service_role: la llama el barrido del banco',
+    'baneco_reservar_destino': 'solo service_role: la llama la Edge Function del banco',
+    'baneco_reservar_qr': 'solo service_role: la llama la Edge Function del banco',
+    'baneco_liberar_sin_qr': 'solo service_role: la llama la Edge Function del banco',
 }
 
 # Señales de que la función comprueba quién llama.
 SEÑALES = (
     'impl.exigir', 'exigir_sesion', 'rol_en_club', 'es_platform_admin',
     'auth.uid()', 'rol_en(', 've_registro', 'impl.aftr_yo', 'impl.aftr_staff',
-    'impl.team_en_club', 'mi_team_en_club',
+    'impl.team_en_club', 'mi_team_en_club', 'impl.aftr_bar_staff',
 )
 
 
@@ -75,8 +89,16 @@ def funciones():
                 continue
             if 'returns trigger' in cabecera:
                 continue  # un trigger no es una RPC: nadie lo llama de afuera
-            fin = t.find('\n$$;', m.end())
-            cuerpo = t[m.end():fin if fin != -1 else m.end() + 8000]
+            # El cuerpo termina en SU comilla, no en el próximo `$$;` del
+            # archivo: midiendo mal, una función sin control parecía tenerlo
+            # porque leía el cuerpo de la de abajo.
+            cita = re.search(r'\bas\s+(\$[a-z_]*\$)', t[m.end():], re.I)
+            if cita:
+                desde = m.end() + cita.end()
+                cierre = t.find(cita.group(1), desde)
+                cuerpo = t[desde:cierre if cierre != -1 else desde + 8000]
+            else:
+                cuerpo = t[m.end():m.end() + 8000]
             hallazgo[nombre] = (cuerpo, f.name)
     return hallazgo
 

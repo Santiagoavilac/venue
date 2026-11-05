@@ -9,6 +9,7 @@ import '../../core/widgets/movimiento.dart';
 import '../../core/widgets/piezas.dart';
 import '../../data/aftr_repo.dart';
 import '../../data/modelos.dart';
+import '../../data/pulse_repo.dart' show nuevaOperacion;
 import '../pulse/pulse_screen.dart';
 
 Future<void> _hoja(BuildContext context, Widget hijo) =>
@@ -91,6 +92,10 @@ class _CompraState extends ConsumerState<_Compra> {
   int _n = 1;
   bool _enviando = false;
 
+  /// Una clave por elección: dos toques sobre el mismo botón devuelven el
+  /// mismo pedido, y cambiar la cantidad empieza otro.
+  String _clave = nuevaOperacion();
+
   int get _precio => widget.fase?.precio ?? widget.d.precio;
   int get _max => (widget.fase?.quedan ?? 10).clamp(1, 10);
 
@@ -102,7 +107,8 @@ class _CompraState extends ConsumerState<_Compra> {
     try {
       final orden = await ref
           .read(repoProvider)
-          .comprar(widget.d.evento.id, widget.fase?.id, _n, historia: widget.historia);
+          .comprar(widget.d.evento.id, widget.fase?.id, _n,
+              historia: widget.historia, clave: _clave);
       ref.invalidate(accesosProvider);
       ref.invalidate(eventoProvider(widget.d.evento.id));
       if (!mounted || !raiz.mounted) return;
@@ -162,7 +168,7 @@ class _CompraState extends ConsumerState<_Compra> {
                 ),
                 _Paso(
                   icono: Icons.remove_rounded,
-                  onTap: _n > 1 ? () => setState(() => _n--) : null,
+                  onTap: _n > 1 ? () => setState(() { _n--; _clave = nuevaOperacion(); }) : null,
                 ),
                 SizedBox(
                   width: 40,
@@ -172,7 +178,7 @@ class _CompraState extends ConsumerState<_Compra> {
                 ),
                 _Paso(
                   icono: Icons.add_rounded,
-                  onTap: _n < _max ? () => setState(() => _n++) : null,
+                  onTap: _n < _max ? () => setState(() { _n++; _clave = nuevaOperacion(); }) : null,
                 ),
               ],
             ),
@@ -245,6 +251,9 @@ class _ReservaMesaState extends ConsumerState<_ReservaMesa> {
   bool _enviando = false;
   bool _listo = false;
 
+  /// Ver _CompraState: una clave por elección de mesa y combo.
+  String _clave = nuevaOperacion();
+
   List<Combo> get _combos => _mesa == null
       ? const []
       : widget.d.combos.where((c) => c.sirvePara(_mesa!)).toList();
@@ -258,7 +267,8 @@ class _ReservaMesaState extends ConsumerState<_ReservaMesa> {
     try {
       final orden = await ref
           .read(repoProvider)
-          .reservarMesa(widget.d.evento.id, _mesa!.id, _combo?.id, historia: widget.historia);
+          .reservarMesa(widget.d.evento.id, _mesa!.id, _combo?.id,
+              historia: widget.historia, clave: _clave);
       ref.invalidate(accesosProvider);
       ref.invalidate(eventoProvider(widget.d.evento.id));
       if (mounted) {
@@ -329,6 +339,7 @@ class _ReservaMesaState extends ConsumerState<_ReservaMesa> {
                           activa: _mesa?.id == m.id,
                           onTap: () => setState(() {
                             _mesa = m;
+                            _clave = nuevaOperacion();
                             if (_combo != null && !_combo!.sirvePara(m)) {
                               _combo = null;
                             }
@@ -352,7 +363,7 @@ class _ReservaMesaState extends ConsumerState<_ReservaMesa> {
                               _FilaCombo(
                                 c,
                                 elegido: _combo?.id == c.id,
-                                onTap: () => setState(() => _combo = c),
+                                onTap: () => setState(() { _combo = c; _clave = nuevaOperacion(); }),
                               ),
                           ],
                         ),

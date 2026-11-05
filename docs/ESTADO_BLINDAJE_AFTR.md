@@ -15,8 +15,10 @@ Leyenda: `ok` hecho y verificado · `—` sin empezar.
 | 1.4 | El usuario se entera (tarjeta + WhatsApp 75028040) | ok app y web |
 | 1.5 | Un solo camino para cancelar | ok `20261106090000` |
 | 1.6 | Crones `aftr-vencer` y `aftr-mesas-vencer` | ok `20261106090000` |
-| 1.7 | `client_key` en `aftr_comprar` y `aftr_reservar_mesa` | — |
-| 1.8 | Techo a la recarga de PULSE | — |
+| 1.7 | `client_key` en `aftr_comprar` y `aftr_reservar_mesa` | ok `20261106110000` |
+| 1.8 | Techo a la recarga de PULSE | ok `20261106110000` |
+
+**Fase 1 cerrada.**
 
 ## Fases 2 a 9
 
@@ -38,6 +40,19 @@ después los datos, después la experiencia.
   del aviso de pago tardío). `node --check aftr_web/aftr.js`. 31 pruebas de la
   Edge Function, dos nuevas: un QR anulado no impide pedir otro, y el estado
   informa `limite` y `nota`.
+- Dos compras con la misma `client_key` devuelven el mismo pedido (una sola fila);
+  sin clave siguen siendo dos, como antes; con la misma clave y otra cantidad
+  avisa en vez de devolver el pedido viejo. Recarga de Bs 3.000 rechazada, Bs 50
+  aceptada. Probado contra la base real con la sesión del cliente, en una
+  transacción que vuelve atrás.
+- `node --test tests/*.test.mjs`: 17 pruebas de la web, dos nuevas del aviso de
+  pago tardío.
+- `tests/rpc_con_guarda.py` medía mal el cuerpo de cada función (cortaba en el
+  próximo `$$;` del archivo, no en su propia comilla), así que una RPC sin
+  control podía parecer que lo tenía leyendo el cuerpo de la de abajo. Arreglado:
+  aparecieron diez, todas con control real (seis sólo `service_role`, dos que
+  delegan en la compra, y `venue_avanzar_pedido`/`venue_pedidos_mesa` que usan
+  `impl.aftr_bar_staff`, que faltaba en la lista de señales).
 - Edge Function `baneco` desplegada: era obligatorio, porque ahora una orden
   puede tener más de un QR y el `maybeSingle()` anterior habría fallado.
 

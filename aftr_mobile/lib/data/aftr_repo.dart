@@ -123,12 +123,18 @@ class AftrRepo {
 
   /// Crea el pedido y devuelve su id. Se paga con QR del banco (o lo
   /// confirma el boliche a mano); recién ahí salen las entradas.
-  Future<String> comprar(String evento, String? fase, int cantidad, {String? historia}) async {
+  /// [clave] es la del toque, no la de la llamada: con el celular lento, dos
+  /// toques o un reintento de red crearían dos pedidos y el cupo quedaría
+  /// retenido dos veces. Mandando la misma clave, el servidor devuelve el
+  /// mismo pedido.
+  Future<String> comprar(String evento, String? fase, int cantidad,
+      {String? historia, String? clave}) async {
     final r = await _rpc(historia == null ? 'aftr_comprar' : 'aftr_comprar_historia', {
       'p_evento': evento,
       if (historia != null) 'p_historia': historia,
       'p_fase': fase,
       'p_cantidad': cantidad,
+      'p_client_key': clave,
     });
     return (r as Map)['id'] as String;
   }
@@ -171,12 +177,14 @@ class AftrRepo {
     }
   }
 
-  Future<String> reservarMesa(String evento, String mesa, String? combo, {String? historia}) async {
+  Future<String> reservarMesa(String evento, String mesa, String? combo,
+      {String? historia, String? clave}) async {
     final r = await _rpc(historia == null ? 'aftr_reservar_mesa' : 'aftr_reservar_historia', {
       'p_evento': evento,
       if (historia != null) 'p_historia': historia,
       'p_mesa': mesa,
       'p_combo': combo,
+      'p_client_key': clave,
     });
     return (r as Map)['id'] as String;
   }

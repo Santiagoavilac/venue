@@ -528,6 +528,9 @@ function ligarCabecera(e, _g, guardar) {
 
 function hojaCompra(d, fase) {
   let n = 1;
+  // Una clave por elección: dos clics seguidos devuelven el mismo pedido en vez
+  // de crear dos y retener el cupo dos veces. Cambiar la cantidad empieza otra.
+  let clave = crypto.randomUUID();
   const precio = fase ? fase.precio : d.precio, max = Math.max(1, Math.min(10, fase?.quedan ?? 10));
   const c = abrirHoja("");
   const render = () => {
@@ -536,14 +539,14 @@ function hojaCompra(d, fase) {
       <div class="caja" style="margin-top:22px;background:none;border:1px solid var(--borde)"><div class="cuerpo"><b>${esc(fase?.nombre || "Entrada general")}</b><small>${bs(precio)} c/u</small></div>
         <div class="contador"><button data-menos ${n <= 1 ? "disabled" : ""}>−</button><output>${n}</output><button data-mas ${n >= max ? "disabled" : ""}>+</button></div></div>
       ${pasoPago}<div class="total"><span>Total</span><b>${bs(precio * n)}</b></div><button class="boton" data-ok>Pagar</button>`;
-    $("[data-menos]", c).onclick = () => { n--; render(); };
-    $("[data-mas]", c).onclick = () => { n++; render(); };
+    $("[data-menos]", c).onclick = () => { n--; clave = crypto.randomUUID(); render(); };
+    $("[data-mas]", c).onclick = () => { n++; clave = crypto.randomUUID(); render(); };
     $("[data-ok]", c).onclick = async (ev) => {
       ev.currentTarget.disabled = true;
       ev.currentTarget.innerHTML = `<span class="giro"></span>`;
       try {
         const historia=historiaCompra(d.id,"entrada");
-        const orden = await rpc(historia?"aftr_comprar_historia":"aftr_comprar", { p_evento:d.id, ...(historia?{p_historia:historia}:{}), p_fase: fase?.id || null, p_cantidad: n });
+        const orden = await rpc(historia?"aftr_comprar_historia":"aftr_comprar", { p_evento:d.id, ...(historia?{p_historia:historia}:{}), p_fase: fase?.id || null, p_cantidad: n, p_client_key: clave });
         hojaMetodoPago(orden.id, d.nombre);
         cargarAccesos().catch(() => {});
       } catch (e) { avisar(mensaje(e)); render(); }
@@ -641,7 +644,8 @@ function hojaPago(orden, titulo, tipo = "orden") {
 }
 
 function hojaMesa(d) {
-  let mesa = null, combo = null;
+  // Ver hojaCompra: una clave por elección de mesa y combo.
+  let mesa = null, combo = null, clave = crypto.randomUUID();
   const c = abrirHoja("");
   const combos = () => (mesa ? (d.combos || []).filter((k) => !(k.categorias || []).length || k.categorias.includes(mesa.categoria)) : []);
   const puede = () => mesa && (combo || (!d.combo_obligatorio && !combos().length));
@@ -655,12 +659,12 @@ function hojaMesa(d) {
         ${k.manillas ? `<div style="font-size:13px;color:var(--acento);margin-top:4px">Incluye ${k.manillas} manillas</div>` : ""}</div><b class="fuerte">${bs(k.precio)}</b></button>`).join("")}` : ""}
       ${pasoPago}<div class="total"><span>${mesa ? `Mesa ${esc(mesa.etiqueta)}` : "Elegí una mesa"}</span><b>${combo ? bs(combo.precio) : ""}</b></div>
       <button class="boton" data-ok ${puede() ? "" : "disabled"}>Reservar</button>`;
-    $$("[data-m]", c).forEach((b) => (b.onclick = () => { mesa = d.mesas.find((m) => m.id === b.dataset.m); if (combo && !combos().includes(combo)) combo = null; render(); }));
-    $$("[data-k]", c).forEach((b) => (b.onclick = () => { combo = d.combos.find((k) => k.id === b.dataset.k); render(); }));
+    $$("[data-m]", c).forEach((b) => (b.onclick = () => { mesa = d.mesas.find((m) => m.id === b.dataset.m); clave = crypto.randomUUID(); if (combo && !combos().includes(combo)) combo = null; render(); }));
+    $$("[data-k]", c).forEach((b) => (b.onclick = () => { combo = d.combos.find((k) => k.id === b.dataset.k); clave = crypto.randomUUID(); render(); }));
     $("[data-ok]", c).onclick = async (ev) => {
       ev.currentTarget.innerHTML = `<span class="giro"></span>`;
       try {
-        await rpc(historiaCompra(d.id,"mesa")?"aftr_reservar_historia":"aftr_reservar_mesa", { p_evento:d.id, ...(historiaCompra(d.id,"mesa")?{p_historia:historiaCompra(d.id,"mesa")}:{}), p_mesa: mesa.id, p_combo: combo?.id || null });
+        await rpc(historiaCompra(d.id,"mesa")?"aftr_reservar_historia":"aftr_reservar_mesa", { p_evento:d.id, ...(historiaCompra(d.id,"mesa")?{p_historia:historiaCompra(d.id,"mesa")}:{}), p_mesa: mesa.id, p_combo: combo?.id || null, p_client_key: clave });
         c.innerHTML = listo(`Mesa ${mesa.etiqueta} reservada`, `La guardamos para vos. Abrí el pedido en Accesos para pagar con QR.`, "Ver en Accesos");
         ligarListo(c, () => (location.hash = "#/accesos"));
       } catch (e) { avisar(mensaje(e)); render(); }
