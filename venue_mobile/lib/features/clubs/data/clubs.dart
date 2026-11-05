@@ -20,6 +20,7 @@ class Club {
     this.comisionManillas = true,
     this.comisionCombos = true,
     this.exigeComprobante = false,
+    this.logistica = 'bt',
     this.lat,
     this.lng,
     this.direccion,
@@ -38,6 +39,15 @@ class Club {
   /// Cómo trabaja con relacionadores (db/33). Sin tocar: como siempre.
   final bool usaRelacionadores, usaTeams, comisionManillas, comisionCombos;
 
+  /// Cómo trabaja el boliche: 'bt' (a mano, con jefes), 'aftr_jefes' (se
+  /// vende por el enlace de AFTR, con jefes) o 'premium' (AFTR y monto fijo
+  /// por manilla, sin jefes). Decide las demás banderas, no se suma a ellas.
+  final String logistica;
+
+  /// En esta forma de trabajar el relacionador vende a mano: genera la
+  /// entrada y sube el comprobante. En las de AFTR sólo comparte su enlace.
+  bool get ventaAMano => logistica == 'bt';
+
   /// El boliche pide la foto del pago para generar una entrada con precio.
   /// Se usa donde la plata se mueve por fuera de AFTR: el relacionador le
   /// rinde al jefe y el jefe al boliche, y el administrador quiere ver el
@@ -51,7 +61,7 @@ class Club {
   bool get ubicado => lat != null && lng != null;
 
   /// Opciones que cambia el admin, como las guarda la base.
-  static const opciones = ['usa_relacionadores', 'usa_teams', 'comision_manillas', 'comision_combos', 'exige_comprobante'];
+  static const opciones = ['usa_relacionadores', 'usa_teams', 'comision_manillas', 'comision_combos', 'exige_comprobante', 'logistica'];
 
   String get inicial {
     final t = (inicialTexto?.isNotEmpty ?? false) ? inicialTexto! : nombre;
@@ -71,6 +81,7 @@ class Club {
         comisionManillas: j['comision_manillas'] as bool? ?? true,
         comisionCombos: j['comision_combos'] as bool? ?? true,
         exigeComprobante: j['exige_comprobante'] as bool? ?? false,
+        logistica: j['logistica'] as String? ?? 'bt',
         lat: (j['lat'] as num?)?.toDouble(),
         lng: (j['lng'] as num?)?.toDouble(),
         direccion: j['direccion'] as String?,

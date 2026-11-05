@@ -18,6 +18,10 @@ import 'dart:typed_data';
 import '../../../core/media/imagenes.dart';
 import '../../../core/theme/tokens.dart';
 import '../../vip_tables/ui/mesa_hojas.dart' show ImagenComprobante;
+import 'package:share_plus/share_plus.dart';
+import 'package:flutter/services.dart';
+import '../../../core/widgets/patron.dart';
+import '../../rrpp/ui/rrpp_shell.dart' show linkDeVenta;
 
 enum _Alcance { mias, team, todas }
 
@@ -265,6 +269,8 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
     // Cuando el boliche pide el comprobante, una entrada con precio no se
     // genera sin la foto del pago: es lo que después mira el administrador.
     // Las gratis no lo necesitan, porque no hay pago que mostrar.
+    // dónde se vende a mano y dónde alcanza con el enlace de AFTR
+    final ventaAMano = club?.ventaAMano ?? true;
     final faltaComprobante = (club?.exigeComprobante ?? false) &&
         (precioAhora ?? 0) > 0 &&
         _comprobanteUrl == null;
@@ -326,6 +332,45 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                       ),
                   ]),
                 ),
+              // En los boliches que venden por AFTR el relacionador no genera
+              // entradas: comparte su enlace y la venta entra sola. El admin
+              // sí las genera, para una cortesía o una venta en la puerta.
+              if (!ventaAMano && rol != Rol.admin)
+                Tarjeta(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Acá se vende por AFTR', style: Tipo.fila),
+                    const SizedBox(height: Esp.xs),
+                    Text(
+                      'No hace falta que generes entradas ni subas comprobantes: '
+                      'compartí tu enlace y cada compra queda a tu nombre.',
+                      style: Tipo.apoyo,
+                    ),
+                    const SizedBox(height: Esp.md),
+                    Row(children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () async {
+                            final url = await linkDeVenta(ref, ev.id);
+                            await SharePlus.instance.share(ShareParams(
+                                text: '${ev.nombre}. Sacá tu entrada acá: $url'));
+                          },
+                          icon: const Icon(Icons.ios_share_rounded, size: 18),
+                          label: const Text('Compartir mi enlace'),
+                        ),
+                      ),
+                      const SizedBox(width: Esp.sm),
+                      OutlinedButton(
+                        onPressed: () async {
+                          await Clipboard.setData(
+                              ClipboardData(text: await linkDeVenta(ref, ev.id)));
+                          if (context.mounted) avisar(context, 'Enlace copiado');
+                        },
+                        child: const Text('Copiar'),
+                      ),
+                    ]),
+                  ]),
+                )
+              else
               Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 Expanded(
                   child: TextField(

@@ -1559,12 +1559,7 @@ class _BolicheFormState extends ConsumerState<_BolicheForm> {
   final _a = TextEditingController(text: '#22D3EE');
   bool _ocupado = false;
   bool _idTocado = false;
-  late final _opciones = {
-    'usa_relacionadores': c?.usaRelacionadores ?? true,
-    'usa_teams': c?.usaTeams ?? true,
-    'comision_manillas': c?.comisionManillas ?? true,
-    'comision_combos': c?.comisionCombos ?? true,
-  };
+  late String _logistica = c?.logistica ?? 'bt';
 
   @override
   void initState() {
@@ -1690,8 +1685,8 @@ class _BolicheFormState extends ConsumerState<_BolicheForm> {
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
           OpcionesBoliche(
-            valores: _opciones,
-            alCambiar: (k, v) => setState(() => _opciones[k] = v),
+            logistica: _logistica,
+            alCambiar: (v) => setState(() => _logistica = v),
           ),
           const SizedBox(height: 10),
         ],
@@ -1729,7 +1724,7 @@ class _BolicheFormState extends ConsumerState<_BolicheForm> {
                                 primario: _p.text.trim(),
                                 secundario: _s.text.trim(),
                                 acento: _a.text.trim(),
-                                opciones: _opciones,
+                                logistica: _logistica,
                               )
                               .then((completo) {
                                 if (!completo && context.mounted) {
@@ -1772,56 +1767,68 @@ class _BolicheFormState extends ConsumerState<_BolicheForm> {
 }
 
 /// Las cuatro opciones de cómo trabaja un boliche con relacionadores.
+/// Cómo trabaja el boliche, al crearlo. Una sola decisión en vez de cuatro
+/// interruptores: cada forma de trabajar decide sola si hay jefes, si el
+/// relacionador vende a mano y si tiene que subir el comprobante del pago.
+///
+/// Antes esto eran "trabaja con relacionadores", "con teams y jefes",
+/// "comisión por manilla" y "comisión por combo", que se podían dejar en
+/// combinaciones que no existen en la realidad.
 class OpcionesBoliche extends StatelessWidget {
   const OpcionesBoliche({
     super.key,
-    required this.valores,
+    required this.logistica,
     required this.alCambiar,
   });
-  final Map<String, bool> valores;
-  final void Function(String clave, bool valor) alCambiar;
 
-  static const textos = {
-    'usa_relacionadores': (
-      'Trabaja con relacionadores',
-      'Si no, venden el admin y el personal, sin comisiones',
+  final String logistica;
+  final ValueChanged<String> alCambiar;
+
+  /// Las tres formas: clave, nombre y qué significa en la práctica.
+  static const formas = [
+    (
+      'bt',
+      'A mano, con jefes',
+      'El relacionador vende la entrada, sube el comprobante del pago y le '
+          'rinde a su jefe; el jefe le rinde al boliche. Sin venta por AFTR.',
     ),
-    'usa_teams': (
-      'Con teams y jefes',
-      'Sin teams, cada relacionador cobra su comisión entera',
+    (
+      'aftr_jefes',
+      'Con AFTR y jefes',
+      'Se vende por el enlace de AFTR. El relacionador sólo comparte su '
+          'enlace: no genera entradas ni sube comprobantes. La comisión se '
+          'reparte por team.',
     ),
-    'comision_manillas': (
-      'Comisión por manilla',
-      'Lo que no es del boliche de cada manilla',
+    (
+      'premium',
+      'Con AFTR, monto fijo',
+      'Se vende por AFTR y cada relacionador cobra un monto fijo por manilla. '
+          'Sin jefes: rinde directo al boliche.',
     ),
-    'comision_combos': (
-      'Comisión por combo',
-      'La comisión de cada combo de mesa',
-    ),
-  };
+  ];
 
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      for (final e in textos.entries)
-        SwitchListTile(
+      for (final (clave, nombre, ayuda) in formas)
+        RadioListTile<String>(
           contentPadding: EdgeInsets.zero,
-          title: Text(
-            e.value.$1,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: Text(
-            e.value.$2,
-            style: TextStyle(color: VenueColors.textoSuave, fontSize: 13),
-          ),
-          value: valores[e.key] ?? true,
-          // sin relacionadores, lo demás no aplica
-          onChanged:
-              e.key != 'usa_relacionadores' &&
-                  !(valores['usa_relacionadores'] ?? true)
-              ? null
-              : (v) => alCambiar(e.key, v),
+          value: clave,
+          groupValue: logistica,
+          onChanged: (v) => alCambiar(v ?? logistica),
+          title: Text(nombre,
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: Text(ayuda,
+              style: TextStyle(color: VenueColors.textoSuave, fontSize: 13)),
         ),
+      Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          'Las mesas se venden a mano en las tres. Si pagan comisión se elige '
+          'después, en la configuración del boliche.',
+          style: TextStyle(color: VenueColors.textoTenue, fontSize: 12.5),
+        ),
+      ),
     ],
   );
 }

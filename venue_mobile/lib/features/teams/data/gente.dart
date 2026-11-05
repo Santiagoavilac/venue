@@ -223,13 +223,13 @@ class GenteRepository {
   }
 
   // ── boliches (plataforma) ──
-  /// Crea el boliche con cómo trabaja ([opciones]). Si la base todavía no
-  /// tiene db/33, se crea igual con la configuración de siempre y devuelve
-  /// false para avisar.
+  /// Crea el boliche con su forma de trabajar ([logistica]: 'bt',
+  /// 'aftr_jefes' o 'premium'). Si la base todavía no la tiene, se crea igual
+  /// con la configuración de siempre y devuelve false para avisar.
   Future<bool> crearClub({
     required String id, required String nombre, String? subtitulo,
     required String primario, required String secundario, required String acento,
-    Map<String, bool> opciones = const {},
+    String logistica = 'bt',
   }) async {
     final fila = {
       'id': id, 'nombre': nombre, 'subtitulo': subtitulo, 'color_primario': primario,
@@ -237,7 +237,16 @@ class GenteRepository {
       'inicial': nombre.isEmpty ? null : nombre[0].toUpperCase(),
     };
     try {
-      await _sb.from('clubs').insert({...fila, ...opciones});
+      await _sb.from('clubs').insert({
+        ...fila,
+        'logistica': logistica,
+        // lo que decide la logística, por si la base todavía no tiene el
+        // disparador: con jefes salvo en premium, y el comprobante sólo
+        // donde la venta es a mano
+        'usa_relacionadores': true,
+        'usa_teams': logistica != 'premium',
+        'exige_comprobante': logistica == 'bt',
+      });
       return true;
     } on PostgrestException catch (e) {
       if (e.code != '42703' && e.code != 'PGRST204') rethrow;
