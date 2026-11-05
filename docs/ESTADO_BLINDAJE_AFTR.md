@@ -32,7 +32,26 @@ Leyenda: `ok` hecho y verificado · `—` sin empezar.
 
 **Fase 2 cerrada**, menos lo que quedó anotado abajo para su propia fase.
 
-## Fases 3 a 9
+## Fase 3 · El marketplace, blindado
+
+| # | Qué | Estado |
+|---|-----|--------|
+| 3.1 | La plataforma fija las reglas, el boliche prende y apaga | ok `20261106150000` |
+| 3.2 | El vendedor acepta primero | ok `20261106150000` |
+| 3.3 | La oferta reservada sigue en el mercado, con "vuelve en N min" | ok `20261106150000` |
+| 3.4 | El techo contra lo que se pagó (`precio_base`) | ok `20261106150000` |
+| 3.5 | La sesión se exige arriba, no por el orden de los `if` | ok `20261106150000` |
+| 3.6 | Lo que no se toca, con pruebas nuevas | ok (33 pruebas) |
+
+**Fase 3 cerrada.**
+
+Sobre 3.5: el plan decía partir `aftr_reventa` en dos funciones. Se hizo de otra
+forma -la sesión se exige arriba, con la lista de acciones públicas- porque
+partirla rompería las apps publicadas, que llaman `aftr_reventa('mercado')` sin
+sesión. El agujero que el plan señalaba (un `p_accion` nuevo puesto arriba abre
+todo) queda cerrado igual, y sin depender del orden.
+
+## Fases 4 a 9
 
 Sin empezar. El orden del plan es el orden de trabajo: primero la plata,
 después los datos, después la experiencia.
@@ -108,6 +127,16 @@ después los datos, después la experiencia.
 - `aftr_eventos` con el rango `1900-01-01 → 2100-01-01` devuelve sólo los días
   que la app muestra; `aftr_historias` con un `p_datos` de 20 KB contesta "Datos
   no válidos"; `aftr_calor` sale de la caché y coincide con el cálculo en vivo.
+- `tests/social_database_test.py` sobre PostgreSQL descartable: 33 pruebas en
+  verde, siete nuevas -los datos de cobro no salen hasta que el vendedor acepta
+  (ni al comprador ni al vendedor), el rechazo devuelve la entrada al mercado,
+  una sola operación abierta por comprador, no se insiste sobre la misma oferta,
+  el tope diario cuenta las que no salieron, sólo la plataforma escribe la
+  política, y la oferta en operación sigue en el mercado con su `vuelve_at`-. Y
+  `test_17` cambió de sentido: el techo ahora se mide contra lo que pagó quien
+  revende, no contra el precio original de siempre.
+- El mismo flujo probado además contra la base real en una transacción que
+  vuelve atrás, con dos cuentas.
 - Edge Function `baneco` desplegada: era obligatorio, porque ahora una orden
   puede tener más de un QR y el `maybeSingle()` anterior habría fallado.
 

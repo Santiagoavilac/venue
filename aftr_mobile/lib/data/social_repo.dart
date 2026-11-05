@@ -27,6 +27,7 @@ Duration tiempoRestante(Object? fecha, DateTime ahora) {
 }
 
 String etiquetaReventa(Object? estado) => switch (estado) {
+  'esperando_vendedor' => 'Esperando al vendedor',
   'pendiente_pago' || 'esperando_pago' || 'pendiente' => 'Esperando pago',
   'pago_informado' || 'pagada' || 'pagado' => 'Pago informado',
   'completada' || 'confirmada' => 'Completada',
@@ -44,6 +45,20 @@ bool ordenTerminada(Object? estado) => const {
 bool pagoInformado(Object? estado) => const {
   'pago_informado', 'pagada', 'pagado', 'confirmando',
 }.contains(estado);
+
+/// "En pago · vuelve en 7 min". La oferta reservada sigue a la vista porque
+/// vuelve sola en minutos: lo que no se puede es soltarla mientras se paga,
+/// porque invitaría a dos pagos reales por la misma entrada.
+String enPagoVuelve(Object? vuelveAt, DateTime ahora) {
+  final falta = tiempoRestante(vuelveAt, ahora);
+  if (falta == Duration.zero) return 'En pago';
+  final min = (falta.inSeconds / 60).ceil();
+  return 'En pago\nvuelve en $min min';
+}
+
+/// El vendedor todavía no aceptó. Hasta que lo haga no se muestra ningún dato
+/// de cobro: iniciar una orden no puede ser la forma de conseguirlos.
+bool esperaAlVendedor(Object? estado) => estado == 'esperando_vendedor';
 
 /// Validates bytes before upload. The media Edge Function performs independent
 /// authoritative checks before the server allows a story to be published.

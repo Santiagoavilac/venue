@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/networking/supabase.dart';
+import '../../../core/theme/tokens.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../authentication/data/sesion.dart';
@@ -177,7 +178,7 @@ class _ReventaState extends ConsumerState<ReventaScreen>
                                 ? 'Reventa habilitada'
                                 : 'Reventa desactivada',
                           ),
-                          subtitle: const Text('Condiciones, precios y plazos'),
+                          subtitle: const Text('Prender o apagar, y tus condiciones'),
                           trailing: const Icon(Icons.tune),
                           onTap: () async {
                             final cambio = await Navigator.of(context)
@@ -185,6 +186,7 @@ class _ReventaState extends ConsumerState<ReventaScreen>
                                   MaterialPageRoute(
                                     builder: (_) => _ConfigReventa(
                                       config: mapaSocial(j['config']),
+                                      politica: mapaSocial(j['politica']),
                                     ),
                                   ),
                                 );
@@ -313,7 +315,13 @@ class _ReventaState extends ConsumerState<ReventaScreen>
 }
 
 class _ConfigReventa extends ConsumerStatefulWidget {
-  const _ConfigReventa({required this.config});
+  const _ConfigReventa({required this.config, required this.politica});
+
+  /// Los plazos y el techo de precio los fija AFTR, iguales para todos: acá se
+  /// muestran como información, no como campos. Un boliche poniendo el plazo
+  /// de pago en 30 minutos son 30 minutos de entrada bloqueada por alguien que
+  /// puede no pagar nunca.
+  final DatosSocial politica;
   final DatosSocial config;
   @override
   ConsumerState<_ConfigReventa> createState() => _ConfigState();
@@ -322,11 +330,7 @@ class _ConfigReventa extends ConsumerStatefulWidget {
 class _ConfigState extends ConsumerState<_ConfigReventa> {
   final _form = GlobalKey<FormState>();
   late bool _habilitada;
-  late TextEditingController _maximo,
-      _pago,
-      _confirmacion,
-      _cierre,
-      _condiciones;
+  late TextEditingController _condiciones;
   bool _ocupado = false;
   String? _error;
   @override
@@ -334,20 +338,12 @@ class _ConfigState extends ConsumerState<_ConfigReventa> {
     super.initState();
     final c = widget.config;
     _habilitada = c['habilitada'] == true;
-    _maximo = TextEditingController(text: '${c['max_precio_pct'] ?? ''}');
-    _pago = TextEditingController(text: '${c['pago_minutos'] ?? 15}');
-    _confirmacion = TextEditingController(
-      text: '${c['confirmacion_minutos'] ?? 30}',
-    );
-    _cierre = TextEditingController(text: '${c['cierre_minutos'] ?? 0}');
     _condiciones = TextEditingController(text: '${c['condiciones'] ?? ''}');
   }
 
   @override
   void dispose() {
-    for (final c in [_maximo, _pago, _confirmacion, _cierre, _condiciones]) {
-      c.dispose();
-    }
+    _condiciones.dispose();
     super.dispose();
   }
 
@@ -363,12 +359,6 @@ class _ConfigState extends ConsumerState<_ConfigReventa> {
       await ref.read(socialAftrProvider).reventa('configurar', {
         'club_id': club,
         'habilitada': _habilitada,
-        'max_precio_pct': _maximo.text.trim().isEmpty
-            ? null
-            : num.parse(_maximo.text.trim().replaceAll(',', '.')),
-        'pago_minutos': int.parse(_pago.text),
-        'confirmacion_minutos': int.parse(_confirmacion.text),
-        'cierre_minutos': int.parse(_cierre.text),
         'condiciones': _condiciones.text.trim(),
       });
       if (mounted) Navigator.pop(context, true);
@@ -379,29 +369,45 @@ class _ConfigState extends ConsumerState<_ConfigReventa> {
     }
   }
 
-  Widget _numero(
-    TextEditingController c,
-    String label, {
-    bool cero = false,
-    bool opcional = false,
-    String? ayuda,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: TextFormField(
-      controller: c,
-      enabled: !_ocupado,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(labelText: label, helperText: ayuda),
-      validator: (s) {
-        if (opcional && (s == null || s.trim().isEmpty)) return null;
-        final n = num.tryParse((s ?? '').replaceAll(',', '.'));
-        if (n == null || !n.isFinite || (cero ? n < 0 : n <= 0))
-          return 'Ingresá un valor ${cero ? 'de cero o mayor' : 'mayor a cero'}';
-        if (!opcional && n != n.round()) return 'Usá minutos enteros';
-        return null;
-      },
-    ),
-  );
+  /// Las reglas de AFTR, como información. No son editables acá a propósito:
+  /// son las mismas para todos los boliches.
+  Widget _reglasDeAftr() {
+    final p = widget.politica;
+    int n(String k, int def) => (p[k] as num?)?.toInt() ?? def;
+    final filas = <(String, String)>[
+      ('Precio máximo', '${n('max_precio_pct', 120)} % de lo que pagó quien revende'),
+      ('El vendedor acepta', 'tiene ${n('aceptacion_minutos', 30)} min para responder'),
+      ('Luego el comprador paga', 'tiene ${n('pago_minutos', 15)} min'),
+      ('Y el vendedor confirma', 'tiene ${n('confirmacion_minutos', 30)} min'),
+      ('Operaciones por persona', '${n('max_abiertas', 1)} a la vez · ${n('max_dia', 5)} por día'),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: VenueColors.superficie2,
+        borderRadius: BorderRadius.circular(Redondeo.medio),
+        border: Border.all(color: VenueColors.linea),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Las reglas las pone AFTR', style: Tipo.bloque),
+        const SizedBox(height: 4),
+        Text(
+          'Iguales en todos los boliches, para que el público sepa a qué atenerse. '
+          'Los datos de cobro del vendedor no se muestran hasta que acepta el pedido.',
+          style: Tipo.apoyo,
+        ),
+        const SizedBox(height: 12),
+        for (final f in filas)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(children: [
+              Expanded(child: Text(f.$1, style: Tipo.apoyo)),
+              Text(f.$2, style: Tipo.cuerpo),
+            ]),
+          ),
+      ]),
+    );
+  }
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !_ocupado,
@@ -428,24 +434,8 @@ class _ConfigState extends ConsumerState<_ConfigReventa> {
                         : (v) => setState(() => _habilitada = v),
                   ),
                   const SizedBox(height: 20),
-                  _numero(
-                    _maximo,
-                    'Precio máximo (% del precio original)',
-                    opcional: true,
-                    ayuda:
-                        'Vacío: precio libre. 100: hasta el precio original.',
-                  ),
-                  _numero(_pago, 'Tiempo para pagar (minutos)'),
-                  _numero(
-                    _confirmacion,
-                    'Tiempo para confirmar recepción (minutos)',
-                  ),
-                  _numero(
-                    _cierre,
-                    'Cerrar reventa antes del evento (minutos)',
-                    cero: true,
-                    ayuda: '0: hasta el inicio del evento.',
-                  ),
+                  _reglasDeAftr(),
+                  const SizedBox(height: 20),
                   TextFormField(
                     controller: _condiciones,
                     enabled: !_ocupado,

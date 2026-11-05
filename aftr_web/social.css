@@ -3,3 +3,7 @@
 /* El círculo con la foto de perfil del autor: tapa la inicial que queda debajo
    como respaldo cuando no hay foto. */
 .so-ring>span.so-con-foto,.so-avatar.so-con-foto{background-size:cover;background-position:center;background-repeat:no-repeat;color:transparent}
+
+/* Estados nuevos de la reventa. Dorado = algo está pasando y hay un plazo
+   corriendo; nunca sólo el color: al lado va siempre el texto del estado. */
+.social .so-state.esperando_vendedor,.social .so-state.reservada{color:var(--so-gold);background:#e8c26a12}

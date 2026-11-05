@@ -72,6 +72,8 @@ class _ReventaState extends ConsumerState<ReventaScreen> {
             if (mercado.isLoading && mercado.value == null) const Center(child: CircularProgressIndicator(color: Aftr.acento)),
             if (mercado.hasError) _ErrorReventa(mercado.error!, () => ref.invalidate(mercadoProvider)),
             if (!mercado.isLoading && !mercado.hasError && ofertas.isEmpty) const _VacioReventa('Todavía no hay entradas en reventa para esta selección.'),
+            // La oferta en operación no desaparece del mercado: dice cuándo
+            // vuelve. Esconderla hacía ver un mercado más chico del que hay.
             for (final o in ofertas) _PanelReventa(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const _Etiqueta('ENTRADA VERIFICADA', icono: Icons.verified_outlined),
               const SizedBox(height: 16), Text('${o['evento']}', style: Aftr.fuerte(22)),
@@ -79,7 +81,11 @@ class _ReventaState extends ConsumerState<ReventaScreen> {
               const SizedBox(height: 20), Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(precioReventa(o['precio_centavos']), style: Aftr.fuerte(25)),
                 Text('Vende ${o['vendedor'] ?? 'un usuario de AFTR'}', style: Aftr.cuerpo(12))])),
-                FilledButton(onPressed: _comprando ? null : () => _comprar(o), child: const Text('Comprar'))]),
+                if (o['estado'] == 'reservada')
+                  Text(enPagoVuelve(o['vuelve_at'], DateTime.now().add(desfaseSocial(mercado.value ?? {}))),
+                    textAlign: TextAlign.right, style: Aftr.cuerpo(13, c: Aftr.acento))
+                else
+                  FilledButton(onPressed: _comprando ? null : () => _comprar(o), child: const Text('Comprar'))]),
             ])),
           ])),
         if (!conCuenta) Center(child: Padding(padding: const EdgeInsets.all(28), child: BotonAftr('Ingresar para ver mis operaciones', onTap: () => asegurarCuenta(context, ref))))
@@ -249,6 +255,8 @@ class _OrdenState extends ConsumerState<OrdenReventaScreen> {
       ref.invalidate(ordenReventaProvider(widget.id)); refrescarReventa(ref);
       if (accion == 'mensaje') _mensaje.clear();
       if (mounted && accion != 'mensaje') avisar(context, switch (accion) {
+        'aceptar' => 'Aceptaste. El comprador ya ve tus datos y tiene unos minutos para pagar.',
+        'rechazar' => 'Pedido rechazado. Tu entrada vuelve al mercado.',
         'confirmar' => 'Venta completada. El comprador ya tiene su nueva entrada.',
         'informar_pago' => 'Pago informado. Esperando confirmación del vendedor.',
         'disputar' => 'Disputa abierta. La entrada sigue protegida durante la revisión.',
@@ -308,6 +316,7 @@ class _OrdenState extends ConsumerState<OrdenReventaScreen> {
     final fin = ordenTerminada(o['estado']);
     final informado = pagoInformado(o['estado']);
     final disputa = const {'en_disputa', 'disputada', 'disputa'}.contains(o['estado']);
+    final espera = esperaAlVendedor(o['estado']);
     final ahora = DateTime.now().add(desfaseSocial(o));
     final restante = tiempoRestante(informado ? o['confirmar_hasta'] : o['vence_at'], ahora);
     final metodo = mapaSocial(o['metodo']);
@@ -320,12 +329,23 @@ class _OrdenState extends ConsumerState<OrdenReventaScreen> {
           const SizedBox(height: 20), _PanelReventa(child: Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(etiquetaReventa(o['estado']), style: Aftr.fuerte(18)),
               const SizedBox(height: 6), Text(fin ? 'Consultá el detalle en el historial.' : disputa ? 'La entrada sigue bloqueada durante la revisión.' :
-                informado ? 'El vendedor debe verificar el ingreso.' : 'La entrada está protegida durante la operación.', style: Aftr.cuerpo(13))])),
+                espera ? (comprador
+                    ? 'El vendedor tiene que aceptar antes de que veas sus datos de cobro. No transfieras nada todavía.'
+                    : 'Alguien quiere tu entrada. Si aceptás, se le muestran tus datos de cobro y tiene unos minutos para pagar.')
+                : informado ? 'El vendedor debe verificar el ingreso.' : 'La entrada está protegida durante la operación.', style: Aftr.cuerpo(13))])),
             if (!fin && !disputa) Padding(padding: const EdgeInsets.only(left: 12), child: Text(relojReventa(restante), style: Aftr.fuerte(26, c: Aftr.acento))),
           ])),
           if (!fin && !disputa && restante == Duration.zero) const Padding(padding: EdgeInsets.only(bottom: 18),
             child: Text('El plazo terminó. Actualizando el estado con el servidor…')),
-          if (comprador && !fin) ...[
+          if (!comprador && espera) ...[
+            const SizedBox(height: 6),
+            BotonAftr('Aceptar y mostrar mis datos', cargando: _ocupado, onTap: () => _accion('aceptar')),
+            const SizedBox(height: 10),
+            TextButton(onPressed: _ocupado ? null : () => _accion('rechazar'), child: const Text('Rechazar el pedido')),
+          ],
+          // Los datos de cobro recién existen cuando el vendedor aceptó: antes
+          // alcanzaba con iniciar una orden para juntarlos de todo el mercado.
+          if (comprador && !fin && !espera) ...[
             Text('Datos para pagar al vendedor', style: Aftr.fuerte(19)), const SizedBox(height: 12),
             _PanelReventa(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               for (final campo in [('Titular', metodo['titular']), ('Banco', metodo['banco']), ('Cuenta', metodo['cuenta'])])
@@ -358,7 +378,8 @@ class _OrdenState extends ConsumerState<OrdenReventaScreen> {
           }, icon: const Icon(Icons.attach_file), label: const Text('Adjuntar prueba')),
           if (!fin) ...[const SizedBox(height: 12),
             if (!informado && !disputa) TextButton(onPressed: _ocupado ? null : _cancelar, child: const Text('Cancelar operación')),
-            if (!disputa) TextButton(onPressed: _ocupado ? null : _disputar, child: const Text('Tengo un problema · Abrir disputa')),
+            // sin datos de cobro mostrados no hay nada que disputar
+            if (!disputa && !espera) TextButton(onPressed: _ocupado ? null : _disputar, child: const Text('Tengo un problema · Abrir disputa')),
           ],
           if (o['estado'] == 'completada' || o['estado'] == 'confirmada') ...[
             const SizedBox(height: 16), BotonAftr(comprador ? 'Ver mi nueva entrada' : 'Ver mis accesos', onTap: () => context.go('/accesos'))],

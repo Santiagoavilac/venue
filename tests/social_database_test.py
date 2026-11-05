@@ -23,6 +23,18 @@ sql('set check_function_bodies=on;'+(root/'supabase/migrations/20261101004007_hi
 sql('alter table clubs add column if not exists logo_url text;')
 sql((root/'supabase/migrations/20261031234249_aftr_perfil_foto.sql').read_text())
 sql('set check_function_bodies=on;'+(root/'supabase/migrations/20261105070000_historias_foto_autor.sql').read_text())
+# pg_cron no existe en un PostgreSQL pelado: un stub alcanza, porque acá no se
+# prueba que el cron corra sino lo que hacen las funciones que agenda.
+sql('''create schema cron;
+create table cron.job(jobid bigserial primary key,jobname text,schedule text,command text);
+create function cron.schedule(jobname text,schedule text,command text) returns bigint
+ language sql as $$insert into cron.job(jobname,schedule,command) values($1,$2,$3) returning jobid$$;''')
+# De los límites de uso hace falta la pieza compartida (aftr_intentos y
+# impl.aftr_limite), que la reventa usa. La segunda mitad de esa migración
+# inyecta el freno en otras RPC que acá no existen.
+limites = (root/'supabase/migrations/20261106130000_limites_de_uso.sql').read_text()
+sql('set check_function_bodies=on;'+limites.split('-- ── los frenos')[0])
+sql('set check_function_bodies=on;'+(root/'supabase/migrations/20261106150000_reventa_el_vendedor_acepta.sql').read_text())
 
 def uid(n): return f'00000000-0000-4000-8000-{n:012d}'
 C,B,OTHER,ADMIN,CLUBADMIN,EV,ENT,FASE=[uid(n) for n in range(1,9)]
@@ -32,7 +44,7 @@ def history(action,data=None,user=C,role=None):
     return json.loads(sql("select aftr_historias('%s','%s'::jsonb)"%(action,json.dumps(data or {}).replace("'","''")),user,role))
 class SocialDB(unittest.TestCase):
  def setUp(self):
-  sql('truncate clubs,auth.users,aftr_clientes,profiles,eventos,entradas,aftr_ordenes,aftr_transferencias,evento_fase,storage.objects cascade;')
+  sql('truncate clubs,auth.users,aftr_clientes,profiles,eventos,entradas,aftr_ordenes,aftr_transferencias,evento_fase,storage.objects,aftr_intentos cascade;')
   sql(f"""insert into clubs(id,nombre,aftr_visible) values('uno','Club Uno',true),('dos','Club Dos',true);
   insert into auth.users values('{C}'),('{B}'),('{OTHER}'),('{ADMIN}'),('{CLUBADMIN}');
   insert into aftr_clientes(user_id,usuario,nombre) values('{C}','seller','Seller'),('{B}','buyer','Buyer'),('{OTHER}','other','Other');
@@ -44,10 +56,17 @@ class SocialDB(unittest.TestCase):
   insert into entradas(id,evento_id,code,cliente,rrpp_id,precio,estado,created_at,cliente_id,canal,fase_id)
   values('{ENT}','{EV}','OLDQR','Seller',null,50,'valida',now(),'{C}','aftr','{FASE}');
   insert into aftr_reventa_config(club_id,habilitada) values('uno',true);
+  -- el techo de la plataforma se afloja para los casos que no lo prueban: con
+  -- el 120 % por defecto, una entrada de 50 Bs no se puede ofrecer a 70
+  update aftr_reventa_politica set max_precio_pct=200;
   """)
  def offer(self):return call('publicar',{'entrada_id':ENT,'precio_centavos':7000,'metodo':{'titular':'Seller Name','banco':'Banco','cuenta':'123456'},'client_key':uid(100)})
- def order(self):
+ def pedido(self):
+  """La orden recién creada: el vendedor todavía no aceptó y no hay datos de cobro."""
   f=self.offer();return call('comprar',{'oferta_id':f['id'],'client_key':uid(101)},B)
+ def order(self):
+  """La orden pagable: el vendedor ya aceptó, que es lo que la habilita."""
+  o=self.pedido();return call('aceptar',{'id':o['id']})
  def paid(self):
   o=self.order();p=f'{B}/{uid(200)}.jpg';sql(f"insert into storage.objects(bucket_id,name) values('aftr-p2p','{p}')")
   return call('informar_pago',{'id':o['id'],'comprobante_path':p,'referencia':'BANK-42'},B)
@@ -115,6 +134,7 @@ class SocialDB(unittest.TestCase):
   first=self.paid();r=call('confirmar',{'id':first['id']})
   f=call('publicar',{'entrada_id':r['nueva_entrada_id'],'precio_centavos':9000,'metodo':{'titular':'Buyer Name','banco':'Banco','cuenta':'888'},'client_key':uid(410)},B)
   o=call('comprar',{'oferta_id':f['id'],'client_key':uid(411)},OTHER)
+  o=call('aceptar',{'id':o['id']},B)
   path=f'{OTHER}/{uid(412)}.jpg';sql(f"insert into storage.objects(bucket_id,name) values('aftr-p2p','{path}')")
   call('informar_pago',{'id':o['id'],'comprobante_path':path,'referencia':'REPAY'},OTHER)
   call('confirmar',{'id':o['id']},B)
@@ -132,9 +152,93 @@ class SocialDB(unittest.TestCase):
   path=f'{CLUBADMIN}/{uid(99)}.jpg';sql(f"insert into storage.objects(bucket_id,name) values('aftr-historias','{path}');insert into aftr_media_validada values('{path}','{CLUBADMIN}','imagen',5000,500,'sha',now());")
   h=history('publicar',{'storage_path':path,'identidad':'club','club_id':'uno'},CLUBADMIN)
   with self.assertRaises(AssertionError):history('retirar',{'id':h['id']},OTHER)
- def test_17_price_cap_uses_original_ticket_not_previous_resale(self):
-  call('configurar',{'club_id':'uno','habilitada':True,'max_precio_pct':100},CLUBADMIN)
-  with self.assertRaisesRegex(AssertionError,'máximo'):self.offer()
+ def test_17_el_techo_se_mide_contra_lo_que_pago_quien_revende(self):
+  # Antes se medía siempre contra el precio original, así que una cadena de
+  # reventas conservaba el mismo techo: con 100 Bs de original y tope del 120 %,
+  # el tercero podía volver a pedir 120 aunque hubiera pagado 120.
+  sql('update aftr_reventa_politica set max_precio_pct=120')
+  with self.assertRaisesRegex(AssertionError,'máximo'):self.offer()   # 70 > 60
+  f=call('publicar',{'entrada_id':ENT,'precio_centavos':6000,
+    'metodo':{'titular':'Seller Name','banco':'Banco','cuenta':'123456'},'client_key':uid(730)})
+  o=call('comprar',{'oferta_id':f['id'],'client_key':uid(731)},B)
+  o=call('aceptar',{'id':o['id']})
+  path=f'{B}/{uid(732)}.jpg';sql(f"insert into storage.objects(bucket_id,name) values('aftr-p2p','{path}')")
+  call('informar_pago',{'id':o['id'],'comprobante_path':path,'referencia':'REF-1'},B)
+  r=call('confirmar',{'id':o['id']})
+  nueva=r['nueva_entrada_id']
+  # pagó 60: ahora su techo son 72, no 60 otra vez ni 120 para siempre
+  self.assertEqual(sql(f"select precio_base from entradas where id='{nueva}'"),'60')
+  with self.assertRaisesRegex(AssertionError,'máximo'):call('publicar',{'entrada_id':nueva,
+    'precio_centavos':7300,'metodo':{'titular':'Buyer Name','banco':'Banco','cuenta':'123456'},'client_key':uid(733)},B)
+  call('publicar',{'entrada_id':nueva,'precio_centavos':7200,
+    'metodo':{'titular':'Buyer Name','banco':'Banco','cuenta':'123456'},'client_key':uid(734)},B)
+
+ def test_27_los_datos_de_cobro_no_salen_hasta_que_el_vendedor_acepta(self):
+  # Era gratis juntarlos: iniciar una orden no cuesta nada ni exige pagar.
+  o=self.pedido()
+  self.assertEqual(o['estado'],'esperando_vendedor')
+  self.assertIsNone(o['metodo'])
+  self.assertIsNone(call('orden',{'id':o['id']},B)['metodo'])
+  self.assertIsNone(call('orden',{'id':o['id']})['metodo'])      # ni el vendedor
+  with self.assertRaisesRegex(AssertionError,'vendedor'):call('aceptar',{'id':o['id']},B)
+  a=call('aceptar',{'id':o['id']})
+  self.assertEqual(a['estado'],'pendiente_pago')
+  self.assertEqual(a['metodo']['titular'],'Seller Name')
+  # y queda escrito que se mostraron
+  self.assertTrue(any('datos de cobro' in h['texto'] for h in a['historial']))
+
+ def test_28_el_vendedor_puede_rechazar_y_la_entrada_vuelve_al_mercado(self):
+  o=self.pedido()
+  r=call('rechazar',{'id':o['id']})
+  self.assertEqual(r['estado'],'cancelada')
+  self.assertEqual(sql(f"select estado from aftr_reventa_ofertas where id='{o['oferta_id']}'"),'retirada')
+  self.assertEqual(sql(f"select reventa_oferta_id from entradas where id='{ENT}'"),'')
+
+ def test_29_una_sola_operacion_abierta_por_comprador(self):
+  # Con tres órdenes simultáneas renovables se juntaba el mercado entero.
+  sql('insert into entradas(id,evento_id,code,cliente,precio,estado,created_at,cliente_id,canal,fase_id)'
+      f" values('{uid(800)}','{EV}','OTROQR','Other',50,'valida',now(),'{OTHER}','aftr','{FASE}')")
+  self.offer()
+  f2=call('publicar',{'entrada_id':uid(800),'precio_centavos':6000,
+    'metodo':{'titular':'Other Name','banco':'Banco','cuenta':'654321'},'client_key':uid(801)},OTHER)
+  call('comprar',{'oferta_id':sql(f"select id from aftr_reventa_ofertas where entrada_id='{ENT}'"),
+    'client_key':uid(802)},B)
+  with self.assertRaisesRegex(AssertionError,'pendiente'):call('comprar',{'oferta_id':f2['id'],'client_key':uid(803)},B)
+
+ def test_30_no_se_insiste_sobre_la_misma_oferta(self):
+  o=self.pedido()
+  call('rechazar',{'id':o['id']})
+  # la oferta vuelve a publicarse para probar el reintento
+  sql(f"update aftr_reventa_ofertas set estado='publicada' where id='{o['oferta_id']}'")
+  with self.assertRaisesRegex(AssertionError,'más tarde'):call('comprar',{'oferta_id':o['oferta_id'],'client_key':uid(810)},B)
+
+ def test_31_el_tope_diario_cuenta_las_que_no_salieron(self):
+  sql('update aftr_reventa_politica set max_dia=2')
+  o=self.pedido();call('rechazar',{'id':o['id']})
+  sql(f"update aftr_reventa_ofertas set estado='publicada' where id='{o['oferta_id']}'")
+  sql(f"update aftr_reventa_ordenes set oferta_id=oferta_id, created_at=now()-interval '1 minute' where comprador_id='{B}'")
+  sql("update aftr_reventa_politica set espera_horas=0")
+  o=call('comprar',{'oferta_id':o['oferta_id'],'client_key':uid(820)},B)
+  call('rechazar',{'id':o['id']})
+  sql(f"update aftr_reventa_ofertas set estado='publicada' where id='{o['oferta_id']}'")
+  with self.assertRaisesRegex(AssertionError,'por día'):call('comprar',{'oferta_id':o['oferta_id'],'client_key':uid(821)},B)
+
+ def test_32_solo_la_plataforma_escribe_la_politica(self):
+  with self.assertRaisesRegex(AssertionError,'Solo AFTR'):call('politica',{'max_precio_pct':300},CLUBADMIN)
+  call('politica',{'max_precio_pct':150},ADMIN)
+  self.assertEqual(sql('select max_precio_pct from aftr_reventa_politica'),'150')
+  # y el boliche ya no puede cambiar los plazos por su cuenta
+  call('configurar',{'club_id':'uno','habilitada':True,'pago_minutos':30,'max_precio_pct':999},CLUBADMIN)
+  self.assertEqual(sql('select max_precio_pct from aftr_reventa_politica'),'150')
+  self.assertEqual(sql("select pago_minutos from aftr_reventa_politica"),'15')
+
+ def test_33_la_oferta_en_operacion_sigue_en_el_mercado(self):
+  o=self.pedido()
+  m=call('mercado',None,None,'anon')['ofertas']
+  mia=[x for x in m if x['id']==o['oferta_id']]
+  self.assertEqual(len(mia),1)
+  self.assertEqual(mia[0]['estado'],'reservada')
+  self.assertIsNotNone(mia[0]['vuelve_at'])
  def test_18_seller_cannot_self_buy(self):
   f=self.offer()
   with self.assertRaisesRegex(AssertionError,'propia'):call('comprar',{'oferta_id':f['id'],'client_key':uid(599)},C)
@@ -196,6 +300,8 @@ class SocialDB(unittest.TestCase):
   with self.assertRaisesRegex(AssertionError,'titular'):call('publicar',{'entrada_id':ENT,'precio_centavos':7000,'metodo':metodo,'client_key':uid(701)})
   f=call('publicar',{'entrada_id':ENT,'precio_centavos':7000,'metodo':{**metodo,'qr_path':qr},'client_key':uid(702)})
   o=call('comprar',{'oferta_id':f['id'],'client_key':uid(703)},B)
+  # el QR de cobro aparece con todo lo demás: recién cuando el vendedor acepta
+  call('aceptar',{'id':o['id']})
   self.assertEqual(call('orden',{'id':o['id']},B)['metodo']['qr_path'],qr)
 
 unittest.main(argv=[sys.argv[0]],verbosity=2)
