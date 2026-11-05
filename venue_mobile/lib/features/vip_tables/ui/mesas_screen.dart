@@ -227,7 +227,12 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
           extra: [...fondos.keys, ..._pisosNuevos, ?_planta],
         );
         final planta = pisos.contains(_planta) ? _planta! : pisos.first;
-        final enLista = _vista[planta] ?? fondos[planta] == null;
+        // Mesas abre en el plano, siempre. Antes abría en lista cuando el
+        // piso no tenía fondo cargado, y una lista de etiquetas no le dice
+        // nada a quien vende: nadie sabe de memoria cuál es la M7. El plano
+        // se entiende mirando. Quien prefiera la lista la elige y queda
+        // elegida mientras dure la pantalla.
+        final enLista = _vista[planta] ?? false;
         final enPlanta = todas.where((m) => m.planta == planta).toList();
         final vendidas = todas.where((m) => !m.libre).toList();
         final porVerif = todas.where((m) => m.porVerificar).toList();

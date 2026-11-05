@@ -26,6 +26,7 @@ import '../../../core/widgets/insignia.dart';
 import '../../../core/widgets/esqueleto.dart';
 import '../../../core/widgets/estado_vista.dart';
 import '../../dashboard/ui/tutorial.dart';
+import '../../../core/theme/tokens.dart';
 
 const _aftr = 'https://www.aftrvenue.com/';
 
@@ -88,10 +89,10 @@ class _RrppShellState extends ConsumerState<RrppShell> {
       (Icons.home_outlined, Icons.home_rounded, 'Inicio'),
       (Icons.event_outlined, Icons.event_rounded, 'Eventos'),
       (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'Estadísticas'),
-      (Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 'Ganancias'),
+      (Icons.storefront_outlined, Icons.storefront_rounded, 'Boliches'),
       (Icons.person_outline_rounded, Icons.person_rounded, 'Perfil'),
     ];
-    const paginas = [_Inicio(), _Eventos(), _Stats(), _Ganancias(), _Perfil()];
+    const paginas = [_Inicio(), _Eventos(), _Stats(), _Boliches(), _Perfil()];
     final ancho = MediaQuery.sizeOf(context).width >= 900;
     final cuerpo = SafeArea(
       bottom: false,
@@ -107,9 +108,9 @@ class _RrppShellState extends ConsumerState<RrppShell> {
       pasos: () => const [
         PasoTutorial(
           icono: Icons.home_rounded,
-          titulo: 'Tu espacio',
-          texto: 'Acá está lo tuyo en todos los boliches donde trabajás: lo que '
-              'vendiste, lo que entró y lo que te queda por cobrar.',
+          titulo: 'Tu noche',
+          texto: 'Acá tenés a mano lo que usás para trabajar: anotar invitados, '
+              'vender entradas, el plano de mesas y lo que rendís al boliche.',
           objetivo: _sinFlechaRrpp,
         ),
         PasoTutorial(
@@ -120,19 +121,18 @@ class _RrppShellState extends ConsumerState<RrppShell> {
           objetivo: _sinFlechaRrpp,
         ),
         PasoTutorial(
-          icono: Icons.account_balance_wallet_rounded,
-          titulo: 'Ganancias',
-          texto: 'Tu comisión evento por evento, con su estado: estimada '
-              'mientras la noche sigue, por cobrar cuando el evento cerró, y '
-              'pagada cuando el boliche la marca.',
+          icono: Icons.bar_chart_rounded,
+          titulo: 'Estadísticas',
+          texto: 'Tu plata y tus números: lo que ganaste, lo que falta cobrar '
+              'y lo cobrado, evento por evento. Una comisión figura como '
+              'pagada recién cuando el boliche o tu jefe la marca.',
           objetivo: _sinFlechaRrpp,
         ),
         PasoTutorial(
           icono: Icons.person_rounded,
-          titulo: 'Tus boliches',
-          texto: 'En Perfil están los boliches con los que trabajás y podés '
-              'pedir unirte a otros. Tu historial es tuyo y queda aunque te '
-              'saquen de un boliche.',
+          titulo: 'Boliches',
+          texto: 'Los boliches con los que trabajás, y desde ahí pedís sumarte '
+              'a otros. Tu historial es tuyo y queda aunque te saquen de uno.',
           objetivo: _sinFlechaRrpp,
         ),
       ],
@@ -400,13 +400,69 @@ class _Barras extends StatelessWidget {
 
 // ── INICIO ──────────────────────────────────────────────────────────────
 
+/// Lo que el relacionador usa para trabajar la noche, sobre el boliche activo.
+///
+/// Vivía al fondo de Perfil, debajo de los datos de la cuenta y de las
+/// legales: para anotar un invitado había que entrar a Perfil, bajar hasta
+/// abajo y recién ahí encontrarlo. Es lo primero que se necesita, así que
+/// ahora abre el Inicio.
+List<Widget> herramientasDeTrabajo(BuildContext context, WidgetRef ref, Rol? rol) {
+  const flecha = Icon(Icons.chevron_right_rounded);
+  return [
+    _fila(
+        inicio: const Icon(Icons.how_to_reg_outlined),
+        titulo: 'Listas y entradas',
+        sub: 'Anotar invitados y vender QR',
+        fin: flecha,
+        alTocar: () => abrirHerramienta(context, ref, 'Listas y entradas', const AccesosScreen())),
+    _fila(
+        inicio: const Icon(Icons.table_bar_outlined),
+        titulo: 'Mesas',
+        sub: 'El plano, para vender y reservar',
+        fin: flecha,
+        alTocar: () => abrirHerramienta(context, ref, 'Mesas', const MesasScreen())),
+    _fila(
+        inicio: const Icon(Icons.payments_outlined),
+        titulo: 'Pagos',
+        sub: 'Lo que rendís al boliche',
+        fin: flecha,
+        alTocar: () => abrirHerramienta(context, ref, 'Pagos', const PagosScreen())),
+    _fila(
+        inicio: const Icon(Icons.auto_awesome_outlined),
+        titulo: 'Historias en AFTR',
+        sub: 'Publicar con tu atribución',
+        fin: flecha,
+        alTocar: () => abrirHerramienta(context, ref, 'Historias', const HistoriasScreen())),
+    if (rol == Rol.jefe) ...[
+      _fila(
+          inicio: const Icon(Icons.groups_outlined),
+          titulo: 'Mi team',
+          sub: 'Tu gente y el reparto',
+          fin: flecha,
+          alTocar: () => abrirHerramienta(context, ref, 'Mi team', const MiTeamScreen())),
+      _fila(
+          inicio: const Icon(Icons.bar_chart_outlined),
+          titulo: 'Stats del team',
+          sub: 'Tu team y el top de teams',
+          fin: flecha,
+          alTocar: () => abrirHerramienta(context, ref, 'Stats del team', const ReporteScreen())),
+      _fila(
+          inicio: const Icon(Icons.person_add_alt_outlined),
+          titulo: 'Quieren unirse',
+          sub: 'Solicitudes para tu team',
+          fin: flecha,
+          alTocar: () => abrirGestionSolicitudes(context, ref)),
+    ],
+  ];
+}
+
 class _Inicio extends ConsumerWidget {
   const _Inicio();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final perfil = ref.watch(perfilProvider).value;
-    final per = ref.watch(periodoProvider);
-    final club = ref.watch(filtroClubProvider);
+    final club = ref.watch(clubActivoProvider);
+    final rol = ref.watch(rolProvider).value;
     final boliches = ref.watch(misBolichesProvider).value ?? const <BolicheMio>[];
     final sols = ref.watch(misSolicitudesProvider).value ?? const <SolicitudMia>[];
     final prox = ref.watch(rrppProximosProvider).value ?? const <Proximo>[];
@@ -416,10 +472,6 @@ class _Inicio extends ConsumerWidget {
       saludo: 'Hola, ${perfil?.primerNombre ?? ''}',
       titulo: 'Inicio',
       hijos: (todos) {
-        final t = Totales.de(delPeriodo(todos, per, club));
-        final rs = records(todos);
-        final noche = rs.where((r) => r.titulo.startsWith('Asistentes')).firstOrNull;
-        final ult = todos.firstOrNull;
         return [
           if (activos.isEmpty)
             Padding(
@@ -435,19 +487,12 @@ class _Inicio extends ConsumerWidget {
                 ]),
               ),
             ),
-          const _Filtros(),
-          Text('Ganaste en ${per.largo}', style: TextStyle(color: VenueColors.textoSuave, fontSize: 13.5)),
-          Text(_bs(t.comision),
-              style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w700, letterSpacing: -1.2, height: 1.15)),
-          Text('${t.eventos} ${t.eventos == 1 ? 'evento' : 'eventos'}',
-              style: TextStyle(color: VenueColors.textoSuave)),
-          const SizedBox(height: 16),
-          GrillaCifras(children: [
-            TarjetaCifra(etiqueta: 'Por cobrar', valor: _bs(t.pendiente), detalle: 'estimado + confirmado', color: t.pendiente > 0 ? VenueColors.aviso : null),
-            TarjetaCifra(etiqueta: 'Cobrado', valor: _bs(t.pagado), detalle: 'marcado como pagado', color: VenueColors.ok),
-            TarjetaCifra(etiqueta: 'Entraron', valor: _miles(t.entraron), detalle: '${_miles(t.ingresaron)} de lista · ${_miles(t.manillas)} con QR'),
-            TarjetaCifra(etiqueta: 'Mesas', valor: _miles(t.mesas), detalle: 'confirmadas'),
-          ]),
+          // lo que el relacionador usa para trabajar, a mano y no escondido
+          // en Perfil: es lo primero que necesita al llegar al boliche
+          if (club != null) ...[
+            const TituloBloque('Para trabajar'),
+            _lista(herramientasDeTrabajo(context, ref, rol)),
+          ],
           if (pend.isNotEmpty && activos.isNotEmpty) ...[
             const SizedBox(height: 12),
             Tarjeta(
@@ -461,24 +506,6 @@ class _Inicio extends ConsumerWidget {
             BloqueVacio('No tenés eventos próximos', activos.isEmpty ? null : 'Cuando tus boliches creen uno, aparece acá.')
           else
             _lista([for (final e in prox.take(3)) _filaProximo(context, ref, e)]),
-          if (noche != null) ...[
-            const TituloBloque('Tu mejor noche'),
-            Tarjeta(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${_miles(noche.valor)} personas',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-                Text('${noche.evento!.evento} · ${noche.evento!.club} · ${_fecha(noche.evento!.fecha)}',
-                    style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
-                const SizedBox(height: 8),
-                Text(
-                  ult != null && ult.eventoId != noche.evento!.eventoId
-                      ? 'Te faltan ${_miles(noche.valor - ult.entraron + 1)} para superarla.'
-                      : 'Es tu último evento: estás en tu mejor momento.',
-                  style: TextStyle(color: VenueColors.textoSuave),
-                ),
-              ]),
-            ),
-          ],
         ];
       },
     );
@@ -691,6 +718,20 @@ final _series = <(String, num Function(EventoRrpp), bool)>[
   ('Asistentes', (e) => e.entraron, false),
 ];
 
+/// Una línea de plata: concepto, aclaración y monto.
+Widget _renglonPlata(String k, String d, num v, {bool total = false}) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(k, style: TextStyle(fontWeight: total ? FontWeight.w600 : FontWeight.w400)),
+            if (d.isNotEmpty) Text(d, style: TextStyle(fontSize: 12, color: VenueColors.textoTenue)),
+          ]),
+        ),
+        Text(_bs(v), style: TextStyle(fontWeight: FontWeight.w700, fontSize: total ? 17 : 14.5)),
+      ]),
+    );
+
 class _Stats extends ConsumerWidget {
   const _Stats();
   @override
@@ -715,6 +756,51 @@ class _Stats extends ConsumerWidget {
         final primero = todos.lastOrNull;
         return [
           const _Filtros(),
+          Text('Tu comisión en ${per.largo}', style: TextStyle(color: VenueColors.textoSuave, fontSize: 13.5)),
+          Text(_bs(t.comision),
+              style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w700, letterSpacing: -1.2, height: 1.15)),
+          Text('Lo que vendiste para los boliches: ${_bs(t.ventas)}. Eso no es tu ganancia: tu ganancia es la comisión.',
+              style: TextStyle(color: VenueColors.textoSuave, height: 1.4)),
+          const SizedBox(height: 14),
+          Tarjeta(
+            child: Column(children: [
+              _renglonPlata('Estimadas', 'eventos todavía abiertos', t.estimado),
+              _renglonPlata('Confirmadas', 'evento cerrado, falta pagar', t.confirmado),
+              _renglonPlata('Pagadas', 'marcadas por el boliche o tu jefe', t.pagado),
+              Divider(color: VenueColors.lineaSuave),
+              _renglonPlata('Total', '', t.comision, total: true),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          GrillaCifras(children: [
+            TarjetaCifra(etiqueta: 'Por cobrar', valor: _bs(t.pendiente), detalle: 'estimado + confirmado', color: t.pendiente > 0 ? VenueColors.aviso : null),
+            TarjetaCifra(etiqueta: 'Cobrado', valor: _bs(t.pagado), detalle: 'marcado como pagado', color: VenueColors.ok),
+            TarjetaCifra(etiqueta: 'Entraron', valor: _miles(t.entraron), detalle: '${_miles(t.ingresaron)} de lista · ${_miles(t.manillas)} con QR'),
+            TarjetaCifra(etiqueta: 'Mesas', valor: _miles(t.mesas), detalle: 'confirmadas'),
+          ]),
+          const TituloBloque('Por evento'),
+          if (l.isEmpty)
+            const BloqueVacio('Sin comisiones en este período')
+          else
+            _lista([
+              for (final e in l)
+                _filaPasado(context, e,
+                    sub: [
+                      e.club,
+                      if (e.comisionEntradas > 0) 'entradas ${_bs(e.comisionEntradas)}',
+                      if (e.comisionMesas > 0) 'mesas ${_bs(e.comisionMesas)}',
+                      if (e.comisionJefe > 0) 'jefe ${_bs(e.comisionJefe)}',
+                      if (e.bono > 0) 'bono ${_bs(e.bono)}',
+                    ].join(' · ')),
+            ]),
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 6),
+            child: Text(
+                'Cada boliche paga distinto: el monto por manilla y por combo sale de la configuración de ese boliche y de tu team. '
+                'Una comisión figura como pagada solo cuando el boliche o tu jefe la marca.',
+                style: TextStyle(color: VenueColors.textoTenue, fontSize: 12.5, height: 1.4)),
+          ),
+          const TituloBloque('Tus números'),
           GrillaCifras(children: [
             TarjetaCifra(etiqueta: 'Asistencia', valor: '${t.asistencia}%', detalle: '${_miles(t.ingresaron)} de ${_miles(t.anotados)} anotados'),
             TarjetaCifra(etiqueta: 'Comisión promedio', valor: _bs(t.promedio), detalle: 'por evento'),
@@ -865,102 +951,26 @@ class _Links extends ConsumerWidget {
 
 // ── GANANCIAS ───────────────────────────────────────────────────────────
 
-class _Ganancias extends ConsumerWidget {
-  const _Ganancias();
+/// Los boliches: con cuáles trabajás, cómo sumarte a otro y, si administrás
+/// uno, entrar a administrarlo.
+///
+/// Antes esto vivía en Perfil, mezclado con la foto, el teléfono y las
+/// legales. Un relacionador entra acá seguido —a ver si lo aprobaron, a
+/// cambiar de boliche— y Perfil es el último lugar donde se busca eso.
+class _Boliches extends ConsumerWidget {
+  const _Boliches();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final per = ref.watch(periodoProvider);
-    final club = ref.watch(filtroClubProvider);
-    return _Pagina(
-      titulo: 'Ganancias',
-      hijos: (todos) {
-        final l = delPeriodo(todos, per, club);
-        final t = Totales.de(l);
-        Widget renglon(String k, String d, num v, {bool total = false}) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(k, style: TextStyle(fontWeight: total ? FontWeight.w600 : FontWeight.w400)),
-                    if (d.isNotEmpty) Text(d, style: TextStyle(fontSize: 12, color: VenueColors.textoTenue)),
-                  ]),
-                ),
-                Text(_bs(v), style: TextStyle(fontWeight: FontWeight.w700, fontSize: total ? 17 : 14.5)),
-              ]),
-            );
-        return [
-          const _Filtros(),
-          Text('Tu comisión en ${per.largo}', style: TextStyle(color: VenueColors.textoSuave, fontSize: 13.5)),
-          Text(_bs(t.comision),
-              style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w700, letterSpacing: -1.2, height: 1.15)),
-          Text('Lo que vendiste para los boliches: ${_bs(t.ventas)}. Eso no es tu ganancia: tu ganancia es la comisión.',
-              style: TextStyle(color: VenueColors.textoSuave, height: 1.4)),
-          const SizedBox(height: 14),
-          Tarjeta(
-            child: Column(children: [
-              renglon('Estimadas', 'eventos todavía abiertos', t.estimado),
-              renglon('Confirmadas', 'evento cerrado, falta pagar', t.confirmado),
-              renglon('Pagadas', 'marcadas por el boliche o tu jefe', t.pagado),
-              Divider(color: VenueColors.lineaSuave),
-              renglon('Total', '', t.comision, total: true),
-            ]),
-          ),
-          const TituloBloque('Por evento'),
-          if (l.isEmpty)
-            const BloqueVacio('Sin comisiones en este período')
-          else
-            _lista([
-              for (final e in l)
-                _filaPasado(context, e,
-                    sub: [
-                      e.club,
-                      if (e.comisionEntradas > 0) 'entradas ${_bs(e.comisionEntradas)}',
-                      if (e.comisionMesas > 0) 'mesas ${_bs(e.comisionMesas)}',
-                      if (e.comisionJefe > 0) 'jefe ${_bs(e.comisionJefe)}',
-                      if (e.bono > 0) 'bono ${_bs(e.bono)}',
-                    ].join(' · ')),
-            ]),
-          const SizedBox(height: 14),
-          Text(
-              'Cada boliche paga distinto: el monto por manilla y por combo sale de la configuración de ese boliche y de tu team. '
-              'Una comisión figura como pagada solo cuando el boliche o tu jefe la marca.',
-              style: TextStyle(color: VenueColors.textoTenue, fontSize: 12.5, height: 1.4)),
-        ];
-      },
-    );
-  }
-}
-
-// ── PERFIL ──────────────────────────────────────────────────────────────
-
-class _Perfil extends ConsumerWidget {
-  const _Perfil();
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final perfil = ref.watch(perfilProvider).value;
-    final user = ref.watch(supabaseProvider).auth.currentUser;
-    final correo = (user?.email ?? '').endsWith('@plataforma.local') ? null : user?.email;
     final boliches = ref.watch(misBolichesProvider).value ?? const <BolicheMio>[];
     final sols = ref.watch(misSolicitudesProvider).value ?? const <SolicitudMia>[];
     final club = ref.watch(clubActivoProvider);
-    final rol = ref.watch(rolProvider).value;
     final todos = ref.watch(rrppEventosProvider).value ?? const <EventoRrpp>[];
     final repo = ref.read(rrppRepositoryProvider);
-    final flecha = const Icon(Icons.chevron_right_rounded);
+    const flecha = Icon(Icons.chevron_right_rounded);
 
     return RefreshIndicator(
       onRefresh: () => _refrescar(ref),
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 28), children: [
-        Row(children: [
-          Inicial(perfil?.nombre ?? '?', lado: 52),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(perfil?.nombre ?? '', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
-              Text(correo ?? '@${perfil?.usuario ?? ''}', style: TextStyle(color: VenueColors.textoSuave)),
-            ]),
-          ),
-        ]),
         TituloBloque('Mis establecimientos',
             accion: TextButton(onPressed: () => abrirExplorar(context, ref), child: const Text('Explorar'))),
         if (boliches.isEmpty)
@@ -1011,29 +1021,61 @@ class _Perfil extends ConsumerWidget {
               ),
           ]),
         ],
-        const SizedBox(height: 10),
-        OutlinedButton(onPressed: () => abrirCodigo(context, ref), child: const Text('Tengo un enlace de invitación')),
-        if (club != null) ...[
-          TituloBloque('Herramientas · ${club.nombre}'),
-          _lista([
-            _fila(inicio: const Icon(Icons.auto_awesome_outlined), titulo: 'Historias en AFTR', sub: 'Publicar fotos, videos y artes con tu atribución', fin: flecha,
-                alTocar: () => abrirHerramienta(context, ref, 'Historias', const HistoriasScreen())),
-            _fila(inicio: const Icon(Icons.how_to_reg_outlined), titulo: 'Listas y entradas', sub: 'Anotar invitados y vender QR', fin: flecha,
-                alTocar: () => abrirHerramienta(context, ref, 'Listas y entradas', const AccesosScreen())),
-            _fila(inicio: const Icon(Icons.table_bar_outlined), titulo: 'Mesas', sub: 'Vender y reservar', fin: flecha,
-                alTocar: () => abrirHerramienta(context, ref, 'Mesas', const MesasScreen())),
-            _fila(inicio: const Icon(Icons.payments_outlined), titulo: 'Pagos', sub: 'Lo que rendís al boliche', fin: flecha,
-                alTocar: () => abrirHerramienta(context, ref, 'Pagos', const PagosScreen())),
-            if (rol == Rol.jefe) ...[
-              _fila(inicio: const Icon(Icons.groups_outlined), titulo: 'Mi team', sub: 'Tu gente y el reparto', fin: flecha,
-                  alTocar: () => abrirHerramienta(context, ref, 'Mi team', const MiTeamScreen())),
-              _fila(inicio: const Icon(Icons.bar_chart_outlined), titulo: 'Stats del team', sub: 'Tu team y el top de teams', fin: flecha,
-                  alTocar: () => abrirHerramienta(context, ref, 'Stats del team', const ReporteScreen())),
-              _fila(inicio: const Icon(Icons.person_add_alt_outlined), titulo: 'Quieren unirse', sub: 'Solicitudes para tu team', fin: flecha,
-                  alTocar: () => abrirGestionSolicitudes(context, ref)),
-            ],
-          ]),
-        ],
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: () => abrirExplorar(context, ref),
+              icon: const Icon(Icons.search_rounded, size: 20),
+              label: const Text('Buscar un boliche'),
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(tocable)),
+            ),
+          ),
+          const SizedBox(width: Esp.sm),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => abrirCodigo(context, ref),
+              icon: const Icon(Icons.link_rounded, size: 20),
+              label: const Text('Tengo un enlace'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(tocable)),
+            ),
+          ),
+        ]),
+      ]),
+    );
+  }
+}
+
+// ── PERFIL ──────────────────────────────────────────────────────────────
+
+class _Perfil extends ConsumerWidget {
+  const _Perfil();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final perfil = ref.watch(perfilProvider).value;
+    final user = ref.watch(supabaseProvider).auth.currentUser;
+    final correo = (user?.email ?? '').endsWith('@plataforma.local') ? null : user?.email;
+    final boliches = ref.watch(misBolichesProvider).value ?? const <BolicheMio>[];
+    final sols = ref.watch(misSolicitudesProvider).value ?? const <SolicitudMia>[];
+    final club = ref.watch(clubActivoProvider);
+    final rol = ref.watch(rolProvider).value;
+    final todos = ref.watch(rrppEventosProvider).value ?? const <EventoRrpp>[];
+    final repo = ref.read(rrppRepositoryProvider);
+    final flecha = const Icon(Icons.chevron_right_rounded);
+
+    return RefreshIndicator(
+      onRefresh: () => _refrescar(ref),
+      child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 28), children: [
+        Row(children: [
+          Inicial(perfil?.nombre ?? '?', lado: 52),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(perfil?.nombre ?? '', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+              Text(correo ?? '@${perfil?.usuario ?? ''}', style: TextStyle(color: VenueColors.textoSuave)),
+            ]),
+          ),
+        ]),
         const TituloBloque('Cuenta'),
         _lista([
           _fila(inicio: const Icon(Icons.manage_accounts_outlined), titulo: 'Mis datos y ajustes', sub: 'Foto, teléfono, contraseña y tema',
