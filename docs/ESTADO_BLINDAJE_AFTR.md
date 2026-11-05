@@ -175,6 +175,20 @@ después los datos, después la experiencia.
   abiertas a los clientes por lo mismo. Sin la ruta no se pueden usar, así que
   no filtran nada por sí solas.
 
+## Verificación al cerrar las nueve fases
+
+- `flutter analyze` sin errores ni advertencias en las dos apps.
+- `flutter test`: 29 en `aftr_mobile`, 156 en `venue_mobile`.
+- `node --check` de toda la web y 16 pruebas de `tests/*.test.mjs`.
+- 32 pruebas de la Edge Function del banco y 7 del validador de medios.
+- 33 pruebas de `tests/social_database_test.py` sobre PostgreSQL descartable.
+- `tests/rpc_con_guarda.py`: ninguna RPC de `public` sin control de permiso.
+- `supabase db lint --level error`: sin errores.
+- Las cinco tablas nuevas (`aftr_intentos`, `aftr_reventa_politica`,
+  `aftr_calor_cache`, y las columnas de `aftr_incidencias` y
+  `aftr_media_validada`) tienen RLS prendida y ninguna política: sólo las
+  funciones `security definer` las leen.
+
 ## Verificado a mano
 
 - Índices parciales vivos (3), uniques viejos borrados (0), `impl.aftr_mesas_vencer`
