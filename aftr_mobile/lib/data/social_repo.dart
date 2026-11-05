@@ -94,8 +94,21 @@ class SocialRepo {
     resultado['_recibido_at'] = DateTime.now().toUtc().toIso8601String();
     return resultado;
   }
-  /// Las semanas seguidas saliendo: la propia y las de su gente.
+  /// Las semanas seguidas saliendo: la propia, los pedidos, su gente, la
+  /// ciudad y los números de la temporada.
   Future<DatosSocial> rachas() async => mapaSocial(await sb.rpc('aftr_rachas'));
+
+  /// Busca por nombre, apellido o usuario. Tres letras mínimo: con dos, el
+  /// servidor devuelve vacío a propósito.
+  Future<List<DatosSocial>> buscarUsuario(String q) async =>
+      listaSocial(await sb.rpc('aftr_buscar_usuario', params: {'p_q': q}));
+
+  /// `accion`: pedir, aceptar o borrar. Devuelve en qué quedó la amistad.
+  Future<String> amistad(String accion, String usuario) async {
+    final r = mapaSocial(await sb.rpc('aftr_amistad',
+        params: {'p_accion': accion, 'p_usuario': usuario}));
+    return r['amistad'] as String? ?? 'no';
+  }
 
   Future<DatosSocial> reventa(String accion, [DatosSocial datos = const {}]) async {
     final resultado = mapaSocial(await sb.rpc('aftr_reventa', params: {
