@@ -331,6 +331,10 @@ class _ConfigState extends ConsumerState<_ConfigReventa> {
   final _form = GlobalKey<FormState>();
   late bool _habilitada;
   late TextEditingController _condiciones;
+
+  /// El techo de precio es del boliche, no de AFTR: es su mercado. Vacío es
+  /// precio libre, como siempre.
+  late TextEditingController _maximo;
   bool _ocupado = false;
   String? _error;
   @override
@@ -339,11 +343,15 @@ class _ConfigState extends ConsumerState<_ConfigReventa> {
     final c = widget.config;
     _habilitada = c['habilitada'] == true;
     _condiciones = TextEditingController(text: '${c['condiciones'] ?? ''}');
+    _maximo = TextEditingController(
+      text: c['max_precio_pct'] == null ? '' : '${c['max_precio_pct']}',
+    );
   }
 
   @override
   void dispose() {
     _condiciones.dispose();
+    _maximo.dispose();
     super.dispose();
   }
 
@@ -359,6 +367,9 @@ class _ConfigState extends ConsumerState<_ConfigReventa> {
       await ref.read(socialAftrProvider).reventa('configurar', {
         'club_id': club,
         'habilitada': _habilitada,
+        'max_precio_pct': _maximo.text.trim().isEmpty
+            ? null
+            : int.parse(_maximo.text.trim()),
         'condiciones': _condiciones.text.trim(),
       });
       if (mounted) Navigator.pop(context, true);
@@ -375,7 +386,6 @@ class _ConfigState extends ConsumerState<_ConfigReventa> {
     final p = widget.politica;
     int n(String k, int def) => (p[k] as num?)?.toInt() ?? def;
     final filas = <(String, String)>[
-      ('Precio máximo', '${n('max_precio_pct', 120)} % de lo que pagó quien revende'),
       ('El vendedor acepta', 'tiene ${n('aceptacion_minutos', 30)} min para responder'),
       ('Luego el comprador paga', 'tiene ${n('pago_minutos', 15)} min'),
       ('Y el vendedor confirma', 'tiene ${n('confirmacion_minutos', 30)} min'),
@@ -389,11 +399,12 @@ class _ConfigState extends ConsumerState<_ConfigReventa> {
         border: Border.all(color: VenueColors.linea),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Las reglas las pone AFTR', style: Tipo.bloque),
+        Text('Los plazos los pone AFTR', style: Tipo.bloque),
         const SizedBox(height: 4),
         Text(
           'Iguales en todos los boliches, para que el público sepa a qué atenerse. '
-          'Los datos de cobro del vendedor no se muestran hasta que acepta el pedido.',
+          'El precio lo decidís vos, acá arriba. Los datos de cobro del vendedor '
+          'no se muestran hasta que acepta el pedido.',
           style: Tipo.apoyo,
         ),
         const SizedBox(height: 12),
@@ -434,6 +445,26 @@ class _ConfigState extends ConsumerState<_ConfigReventa> {
                         : (v) => setState(() => _habilitada = v),
                   ),
                   const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _maximo,
+                    enabled: !_ocupado,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Precio máximo (% de lo que pagó quien revende)',
+                      helperText: 'Vacío: precio libre. 100: hasta lo que pagó.',
+                      helperMaxLines: 2,
+                    ),
+                    validator: (t) {
+                      final v = (t ?? '').trim();
+                      if (v.isEmpty) return null;
+                      final n = int.tryParse(v);
+                      if (n == null || n < 100 || n > 1000) {
+                        return 'De 100 a 1000, o vacío para precio libre';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
                   _reglasDeAftr(),
                   const SizedBox(height: 20),
                   TextFormField(

@@ -89,6 +89,9 @@ class _PulseState extends ConsumerState<PulseScreen> {
               decoration: const InputDecoration(
                 labelText: 'Importe en Bs',
                 hintText: '100.00',
+                // El tope se decide en el servidor; acá se dice antes, para no
+                // mandar a alguien a generar un QR que no va a poder pagar.
+                helperText: 'Hasta Bs 300 por semana',
               ),
             ),
             const SizedBox(height: 16),

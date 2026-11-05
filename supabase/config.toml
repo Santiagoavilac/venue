@@ -11,3 +11,12 @@ import_map = "../db/functions/baneco/import_map.json"
 enabled = true
 verify_jwt = false
 entrypoint = "../db/functions/historias-media/index.ts"
+
+# Faltaba declararla: se desplegaba a mano y por eso quedó con CORS * sin que
+# nadie lo volviera a mirar. verify_jwt = false porque la acción de registro
+# entra con el token del enlace de invitación, no con una sesión; la función
+# valida sesión, invitación y rol según la acción.
+[functions.crear-usuario]
+enabled = true
+verify_jwt = false
+entrypoint = "../db/functions/crear-usuario/index.ts"

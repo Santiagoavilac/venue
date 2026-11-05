@@ -35,6 +35,8 @@ create function cron.schedule(jobname text,schedule text,command text) returns b
 limites = (root/'supabase/migrations/20261106130000_limites_de_uso.sql').read_text()
 sql('set check_function_bodies=on;'+limites.split('-- ── los frenos')[0])
 sql('set check_function_bodies=on;'+(root/'supabase/migrations/20261106150000_reventa_el_vendedor_acepta.sql').read_text())
+# y la corrección: el precio lo pone el boliche, no la plataforma
+sql('set check_function_bodies=on;'+(root/'supabase/migrations/20261106190000_el_precio_lo_pone_el_boliche.sql').read_text())
 
 def uid(n): return f'00000000-0000-4000-8000-{n:012d}'
 C,B,OTHER,ADMIN,CLUBADMIN,EV,ENT,FASE=[uid(n) for n in range(1,9)]
@@ -56,9 +58,8 @@ class SocialDB(unittest.TestCase):
   insert into entradas(id,evento_id,code,cliente,rrpp_id,precio,estado,created_at,cliente_id,canal,fase_id)
   values('{ENT}','{EV}','OLDQR','Seller',null,50,'valida',now(),'{C}','aftr','{FASE}');
   insert into aftr_reventa_config(club_id,habilitada) values('uno',true);
-  -- el techo de la plataforma se afloja para los casos que no lo prueban: con
-  -- el 120 % por defecto, una entrada de 50 Bs no se puede ofrecer a 70
-  update aftr_reventa_politica set max_precio_pct=200;
+  -- el techo es del boliche y arranca vacío (precio libre), así que los casos
+  -- que no lo prueban no se enteran de que existe
   """)
  def offer(self):return call('publicar',{'entrada_id':ENT,'precio_centavos':7000,'metodo':{'titular':'Seller Name','banco':'Banco','cuenta':'123456'},'client_key':uid(100)})
  def pedido(self):
@@ -153,10 +154,10 @@ class SocialDB(unittest.TestCase):
   h=history('publicar',{'storage_path':path,'identidad':'club','club_id':'uno'},CLUBADMIN)
   with self.assertRaises(AssertionError):history('retirar',{'id':h['id']},OTHER)
  def test_17_el_techo_se_mide_contra_lo_que_pago_quien_revende(self):
-  # Antes se medía siempre contra el precio original, así que una cadena de
-  # reventas conservaba el mismo techo: con 100 Bs de original y tope del 120 %,
-  # el tercero podía volver a pedir 120 aunque hubiera pagado 120.
-  sql('update aftr_reventa_politica set max_precio_pct=120')
+  # El techo lo pone el boliche -vacío es precio libre- y se mide contra lo que
+  # pagó quien revende. Antes se medía siempre contra el precio original, así
+  # que una cadena de reventas conservaba para siempre el techo del primero.
+  call('configurar',{'club_id':'uno','habilitada':True,'max_precio_pct':120},CLUBADMIN)
   with self.assertRaisesRegex(AssertionError,'máximo'):self.offer()   # 70 > 60
   f=call('publicar',{'entrada_id':ENT,'precio_centavos':6000,
     'metodo':{'titular':'Seller Name','banco':'Banco','cuenta':'123456'},'client_key':uid(730)})
@@ -223,14 +224,17 @@ class SocialDB(unittest.TestCase):
   sql(f"update aftr_reventa_ofertas set estado='publicada' where id='{o['oferta_id']}'")
   with self.assertRaisesRegex(AssertionError,'por día'):call('comprar',{'oferta_id':o['oferta_id'],'client_key':uid(821)},B)
 
- def test_32_solo_la_plataforma_escribe_la_politica(self):
-  with self.assertRaisesRegex(AssertionError,'Solo AFTR'):call('politica',{'max_precio_pct':300},CLUBADMIN)
-  call('politica',{'max_precio_pct':150},ADMIN)
-  self.assertEqual(sql('select max_precio_pct from aftr_reventa_politica'),'150')
-  # y el boliche ya no puede cambiar los plazos por su cuenta
-  call('configurar',{'club_id':'uno','habilitada':True,'pago_minutos':30,'max_precio_pct':999},CLUBADMIN)
-  self.assertEqual(sql('select max_precio_pct from aftr_reventa_politica'),'150')
-  self.assertEqual(sql("select pago_minutos from aftr_reventa_politica"),'15')
+ def test_32_los_plazos_son_de_la_plataforma_y_el_precio_del_boliche(self):
+  with self.assertRaisesRegex(AssertionError,'Solo AFTR'):call('politica',{'pago_minutos':20},CLUBADMIN)
+  call('politica',{'pago_minutos':20},ADMIN)
+  self.assertEqual(sql('select pago_minutos from aftr_reventa_politica'),'20')
+  # el boliche no cambia los plazos por su cuenta, y sí su techo de precio
+  call('configurar',{'club_id':'uno','habilitada':True,'pago_minutos':30,'max_precio_pct':150},CLUBADMIN)
+  self.assertEqual(sql('select pago_minutos from aftr_reventa_politica'),'20')
+  self.assertEqual(sql("select max_precio_pct from aftr_reventa_config where club_id='uno'"),'150')
+  # y un techo imposible se rechaza con un mensaje, no se guarda
+  with self.assertRaisesRegex(AssertionError,'100'):call('configurar',
+    {'club_id':'uno','habilitada':True,'max_precio_pct':5},CLUBADMIN)
 
  def test_33_la_oferta_en_operacion_sigue_en_el_mercado(self):
   o=self.pedido()

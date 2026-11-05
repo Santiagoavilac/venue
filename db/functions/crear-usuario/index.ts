@@ -30,10 +30,29 @@
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
-};
+/* CORS: era `*`, o sea que cualquier página podía llamar a la función que crea
+   cuentas con la sesión del admin que la estuviera mirando. La web de Venue y
+   la de AFTR viven las dos en aftrvenue.com (Venue en la raíz, AFTR en
+   /aftr_web/), así que la lista es corta. Para un deploy de prueba de Vercel se
+   agrega su dominio en ORIGENES_PERMITIDOS, uno por uno: habilitar todo
+   *.vercel.app sería dejar entrar a cualquier sitio alojado ahí. */
+const PROPIOS = [
+  "https://aftrvenue.com", "https://www.aftrvenue.com",
+  "http://localhost:5173", "http://localhost:8000", "http://127.0.0.1:5173",
+];
+const BASE_CORS = { "Access-Control-Allow-Headers": "authorization, apikey, content-type" };
+function cors(req: Request) {
+  const permitidos = [
+    ...PROPIOS,
+    ...(Deno.env.get("ORIGENES_PERMITIDOS") ?? "").split(",").map((o) => o.trim()).filter(Boolean),
+  ];
+  const origen = req.headers.get("origin");
+  // Sin Origin no hay navegador que autorizar; el permiso real lo da el token.
+  return origen && permitidos.includes(origen)
+    ? { ...BASE_CORS, "Access-Control-Allow-Origin": origen, Vary: "Origin" }
+    : BASE_CORS;
+}
+let CORS: Record<string, string> = BASE_CORS;
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
@@ -103,6 +122,8 @@ async function quienLlama(req: Request) {
 }
 
 Deno.serve(async (req) => {
+  // se resuelve por petición: la cabecera depende del Origin que llegó
+  CORS = cors(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Método no soportado" }, 405);
   let body: Record<string, string | null>;

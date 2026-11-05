@@ -16,7 +16,7 @@ Leyenda: `ok` hecho y verificado · `—` sin empezar.
 | 1.5 | Un solo camino para cancelar | ok `20261106090000` |
 | 1.6 | Crones `aftr-vencer` y `aftr-mesas-vencer` | ok `20261106090000` |
 | 1.7 | `client_key` en `aftr_comprar` y `aftr_reservar_mesa` | ok `20261106110000` |
-| 1.8 | Techo a la recarga de PULSE | ok `20261106110000` |
+| 1.8 | Techo a la recarga de PULSE | ok `20261106190000` · Bs 300 por semana |
 
 **Fase 1 cerrada.**
 
@@ -36,10 +36,16 @@ Leyenda: `ok` hecho y verificado · `—` sin empezar.
 
 | # | Qué | Estado |
 |---|-----|--------|
-| 3.1 | La plataforma fija las reglas, el boliche prende y apaga | ok `20261106150000` |
+| 3.1 | Los PLAZOS los fija la plataforma; el precio y el interruptor, el boliche | ok `20261106150000` + `20261106190000` |
 | 3.2 | El vendedor acepta primero | ok `20261106150000` |
 | 3.3 | La oferta reservada sigue en el mercado, con "vuelve en N min" | ok `20261106150000` |
 | 3.4 | El techo contra lo que se pagó (`precio_base`) | ok `20261106150000` |
+
+**Corregido el 06/11 (`20261106190000`):** el techo de precio de la reventa
+había quedado en la política de la plataforma, con un 120 % que puse yo. El
+precio es del boliche -su mercado, su decisión- y vacío sigue siendo precio
+libre. De la plataforma quedan sólo los plazos. Y el tope de PULSE pasó de
+Bs 2.000 por vez / Bs 10.000 por día a **Bs 300 por semana**, que es el real.
 | 3.5 | La sesión se exige arriba, no por el orden de los `if` | ok `20261106150000` |
 | 3.6 | Lo que no se toca, con pruebas nuevas | ok (33 pruebas) |
 
@@ -60,16 +66,22 @@ todo) queda cerrado igual, y sin depender del orden.
 | 4.3 | CORS acotado, CSP, cabeceras y SRI en los tres CDN | ok |
 | 4.4 | Nonce por intento en Google | ok |
 
-**Fase 4 cerrada**, con dos cosas dichas de frente:
+**Fase 4 cerrada.** Las tres Edge Functions quedaron acotadas a
+`aftrvenue.com`: ahí viven las dos webs (Venue en la raíz, AFTR en
+`/aftr_web/`), así que no había nada que preguntar. `crear-usuario` además
+faltaba declarar en `supabase/config.toml` -se desplegaba a mano, y por eso
+quedó con `CORS *` sin que nadie lo volviera a mirar-.
 
-- `crear-usuario` sigue con `CORS *`. No se toca porque no sé desde qué dominio
-  la llama la web de Venue, y acotarla a ciegas la dejaría sin poder crear
-  cuentas. Hay que confirmar el dominio y agregarlo a la misma lista.
+Dos cosas más, dichas de frente:
+
 - La CSP deja `style-src 'unsafe-inline'`: los templates de la web arman
   estilos en línea en casi cien lugares y sacarlos es otro trabajo. Lo que sí
   quedó cerrado es `script-src` sin `'unsafe-inline'`, que es lo que hace que un
   XSS no pueda ejecutar nada; por eso en los templates ya no hay ni un
   `onclick=` ni un `onload=`.
+- Las cabeceras van en `vercel.json`, que es donde se despliega esto. La CSP
+  estricta está acotada a `/aftr_web/`: la web de Venue, en la raíz, tiene
+  trece `onclick` en línea y con `script-src` estricto se rompe.
 - Los tres scripts de CDN quedaron con SRI y versión fija en vez de bajados a
   `vendor/`: con el hash, un CDN comprometido no puede inyectar nada, y la
   página no carga un megabyte más del repo.
@@ -164,6 +176,27 @@ después los datos, después la experiencia.
   despachador entero: ponerlo ahora obligaría a tocarlo dos veces.
 - El límite por IP de subida de medios va en la Fase 4.1, con el resto de lo de
   la Edge Function.
+
+## El cron, para no volver a preguntarlo
+
+Ocho trabajos agendados con `pg_cron`, todos activos:
+
+| Trabajo | Cada | Qué hace |
+|---------|------|----------|
+| `baneco-barrido` | 1 min | Llama a la Edge Function del banco: anula los QR que pasaron su `limite_at` y concilia los pagos del día. |
+| `aftr-vencer` | 1 min | Vence las órdenes de AFTR sin pagar y devuelve el cupo. |
+| `aftr-mesas-vencer` | 1 min | Libera las mesas de AFTR vencidas que no tengan un cobro vivo. |
+| `aftr-reventa-vencer` | 1 min | Vence las operaciones de reventa y abre la disputa automática. |
+| `aftr-stock-liberar` | 1 min | Suelta el stock de los QR que nunca llegaron a nacer. |
+| `aftr-calor` | 2 min | Refresca la caché del calor del mapa. |
+| `aftr-historias-limpiar` | 15 min | Llama a `historias-media` para borrar las historias vencidas de storage. |
+| `aftr-limpiar-intentos` | 1 h | Borra los intentos de más de un día de la tabla de límites. |
+
+Los dos que llaman a una Edge Function se autentican con un secreto del Vault
+(`baneco_cron_token` y `social_cron_token`) que viaja en una cabecera, y la
+función lo compara en tiempo constante. Son los únicos dos secretos de cron que
+hay; `social_cron_token` se creó el 06/11 para que la limpieza de historias no
+dependa de la llave del banco.
 
 ## Lo que falta cerrar cuando caigan las apps viejas
 
