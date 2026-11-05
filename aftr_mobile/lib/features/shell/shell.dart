@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,13 +32,13 @@ class Shell extends ConsumerWidget {
     return Scaffold(
       extendBody: true,
       body: nav,
+      // Ver la nota del desenfoque: sobre una lista que se desplaza, el filtro
+      // se paga en cada cuadro de scroll.
       bottomNavigationBar: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-          child: Container(
+        child: Container(
             padding: EdgeInsets.fromLTRB(8, 8, 8, abajo > 0 ? abajo - 6 : 10),
             decoration: BoxDecoration(
-              color: Aftr.fondo.withValues(alpha: 0.72),
+              color: Aftr.fondo.withValues(alpha: 0.94),
               border: const Border(top: BorderSide(color: Aftr.borde)),
             ),
             child: Row(children: [
@@ -60,7 +58,6 @@ class Shell extends ConsumerWidget {
                   ),
                 ),
             ]),
-          ),
         ),
       ),
     );

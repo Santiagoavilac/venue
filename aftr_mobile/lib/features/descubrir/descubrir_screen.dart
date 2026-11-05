@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -179,11 +177,13 @@ class _Cabecera extends ConsumerWidget {
       pinned: true,
       backgroundColor: Colors.transparent,
       toolbarHeight: 60,
+// El desenfoque de fondo cuesta una lectura de toda la pantalla en la GPU en
+// CADA cuadro, así que sobre una lista que se desplaza se paga en cada píxel de
+// scroll. Queda sólo sobre el mapa, donde el fondo no se mueve con el dedo y el
+// efecto es el que hace legible la tarjeta. Acá va el mismo color translúcido
+// sin el filtro: se ve casi igual y no cuesta nada.
       flexibleSpace: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(color: Aftr.fondo.withValues(alpha: 0.72)),
-        ),
+        child: Container(color: Aftr.fondo.withValues(alpha: 0.94)),
       ),
       titleSpacing: 20,
       centerTitle: false,

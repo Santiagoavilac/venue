@@ -63,6 +63,10 @@ class ImagenRed extends StatelessWidget {
     if (u == null || u.isEmpty) return fondo;
     return CachedNetworkImage(
       imageUrl: u,
+      // Sin esto, una URL firmada -que cambia su token en cada firma- se
+      // descarga de nuevo cada vez aunque sea el mismo archivo. La clave es la
+      // URL sin la query, el mismo truco que en el avatar.
+      cacheKey: Uri.parse(u).replace(query: '').toString(),
       fit: fit,
       fadeInDuration: Aftr.medio,
       placeholder: (_, _) => fondo,

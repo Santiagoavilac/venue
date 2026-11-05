@@ -136,7 +136,24 @@ vista nativa gane el gesto. Con eso el detector global de la app deja de
 estorbar sin tocarlo: pierde la disputa. Y la hoja baja del 34 % al 18 %, que
 es lo que deja mapa para arrastrar.
 
-## Fase 9
+## Fase 9 · Que vuele
+
+| Qué | Estado |
+|-----|--------|
+| Pedir sólo lo que se muestra (`aftr_eventos`) | ok, en la Fase 2.5 (el servidor recorta el rango y pone techo) |
+| `cacheKey` en `ImagenRed` | ok |
+| El `BackdropFilter`, sólo sobre el mapa | ok |
+| Paginar las listas largas | ok (120 con cursor en historias, 300 en eventos, 30 en el historial de accesos) |
+| Sacar `elegido` de la clave de caché de los pines | no hacía falta |
+
+Sobre los pines: el plan decía que cambiar de selección regeneraba los bitmaps.
+Mirado de cerca, `_iconos` guarda las dos variantes de cada pin -con la
+selección en la clave- y nunca se limpia, así que la segunda vez que se elige un
+lugar ya están hechos. El bitmap del pin elegido ES distinto (se dibuja más
+grande), así que sacar `elegido` de la clave sería mostrar el pin equivocado. Se
+deja como está y queda dicho por qué.
+
+**Las nueve fases están cerradas.**
 
 Sin empezar. El orden del plan es el orden de trabajo: primero la plata,
 después los datos, después la experiencia.
