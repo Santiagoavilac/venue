@@ -76,8 +76,10 @@ trabajo. Última actualización: 2026-11-05.
 
 ## Fase 3 · Pantalla por pantalla
 
-- [~] **Mesas** — la fuga cerrada y la app leyendo `mesas_detalle`. Falta precios
-      condicionados a `eventos.comision_mesas`, el plano y el tutorial
+- [~] **Mesas** — la fuga cerrada, la app leyendo `mesas_detalle` y el total en
+      plata condicionado a `eventos.comision_mesas` (`veDineroDeMesas`, con
+      prueba en `test/mesas_dinero_test.dart`). Falta el plano (tamaño de lo
+      que se toca y contraste) y el tutorial, que sale con la Fase 4
 - [ ] **Eventos / Gestión** — una sola lista con eje temporal, "Crear evento"
       arriba, datos reales en Gestionar evento, arreglar el campo `_cut` que se
       manda sin dibujarse (`gestion_screen.dart:1511,1619`)

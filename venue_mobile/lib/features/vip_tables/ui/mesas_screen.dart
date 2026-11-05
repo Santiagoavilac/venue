@@ -204,10 +204,17 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
             )
             .toList();
         // sólo se suma lo que esta sesión puede ver: un relacionador no
-        // tiene por qué conocer la recaudación de mesas del boliche
+        // tiene por qué conocer la recaudación de mesas del boliche, y si el
+        // evento no paga comisión por mesa tampoco le corresponde un total
+        // "tuyo", porque de ahí no cobra nada
         final mias = vendidas.where((m) => m.mia).toList();
         final total = mias.fold<num>(0, (a, m) => a + m.precio);
         final verTotal = mias.length == vendidas.length;
+        final verDinero = veDineroDeMesas(
+          esAdmin: esAdmin,
+          esPortero: esPortero,
+          comisionMesas: ev.comisionMesas,
+        );
 
         void tocar(Mesa m) {
           if (_editando) {
@@ -241,7 +248,7 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
             children: [
               Text(
                 '${vendidas.length} de ${todas.length} ${esPortero ? 'ocupadas' : 'vendidas'}'
-                '${!esPortero && mias.isNotEmpty ? (verTotal ? ' · $total Bs' : ' · $total Bs tuyos') : ''}',
+                '${verDinero && mias.isNotEmpty ? (verTotal ? ' · $total Bs' : ' · $total Bs tuyos') : ''}',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,

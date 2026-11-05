@@ -41,6 +41,18 @@ List<String> pisosDe(Iterable<Mesa> mesas, {Iterable<String> extra = const []}) 
   return p.isEmpty ? ['alta', 'baja'] : p;
 }
 
+/// Si a esta sesión le corresponde ver plata de mesas en el resumen.
+///
+/// El admin siempre: es su recaudación. El relacionador y el jefe, sólo si el
+/// evento paga comisión por mesa (`eventos.comision_mesas`); si no paga, lo
+/// que entra por mesas es del boliche y mostrarle un total "tuyo" es mentirle.
+/// El portero nunca: en la puerta no se maneja plata.
+bool veDineroDeMesas({
+  required bool esAdmin,
+  required bool esPortero,
+  required bool comisionMesas,
+}) => esAdmin || (!esPortero && comisionMesas);
+
 /// Un tipo de mesa. [lounge] decide cómo se dibuja (redonda o lounge); la
 /// base guarda el id como texto libre, así que sumar tipos no toca la base.
 class TipoMesa {

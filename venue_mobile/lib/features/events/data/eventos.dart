@@ -23,6 +23,7 @@ class Evento {
     this.configV2 = false,
     this.modoComision = 'jefes',
     this.comisionManillas = true,
+    this.comisionMesas = false,
   });
 
   final String id;
@@ -53,6 +54,11 @@ class Evento {
   final String modoComision;
   final bool comisionManillas;
 
+  /// Si las mesas pagan comisión a quien las vende (db/52, por defecto no).
+  /// Cuando no pagan, la plata de una mesa es del boliche y no tiene por qué
+  /// aparecerle al relacionador: él no cobra nada de ahí.
+  final bool comisionMesas;
+
   /// Parte del boliche sobre cada manilla, de 0 a 1: la del evento; la cuenta
   /// vieja usa el 50 % de siempre y, sin comisión, la manilla es del boliche.
   num get pctBolicheManillas => !configV2
@@ -80,6 +86,7 @@ class Evento {
         configV2: j['config_v2'] == true,
         modoComision: j['modo_comision'] as String? ?? 'jefes',
         comisionManillas: j['comision_manillas'] != false,
+        comisionMesas: j['comision_mesas'] == true,
       );
 
   /// ¿Está en curso ahora? Contempla el cruce de medianoche (21:00 → 06:00).
@@ -118,7 +125,7 @@ final eventosProvider = FutureProvider<List<Evento>>((ref) async {
   final filas = await ref
       .watch(supabaseProvider)
       .from('eventos')
-      .select('id, nombre, fecha, hora_inicio, hora_fin, estado, ticket_url, precio_manilla, pct_boliche, venta_por_fases, permite_reserva, horas_reserva, permite_agrupar, combo_obligatorio, combo_por_mesa, config_v2, modo_comision, comision_manillas')
+      .select('id, nombre, fecha, hora_inicio, hora_fin, estado, ticket_url, precio_manilla, pct_boliche, venta_por_fases, permite_reserva, horas_reserva, permite_agrupar, combo_obligatorio, combo_por_mesa, config_v2, modo_comision, comision_manillas, comision_mesas')
       .eq('club_id', club)
       .neq('estado', 'cerrado')
       .order('fecha', ascending: true);
