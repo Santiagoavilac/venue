@@ -33,9 +33,7 @@ class EsqueletoLista extends StatelessWidget {
       itemBuilder: (_, i) => Card(
         margin: EdgeInsets.zero,
         child: ListTile(
-          leading: conFoto
-              ? const CircleAvatar(radius: 20)
-              : null,
+          leading: conFoto ? const CircleAvatar(radius: 20) : null,
           title: Text('Nombre de ejemplo ${'·' * (i % 3)}'),
           subtitle: const Text('Una línea de apoyo con el detalle'),
           trailing: const Text('000'),

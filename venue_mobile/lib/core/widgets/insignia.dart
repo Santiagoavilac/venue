@@ -27,8 +27,12 @@ class Insignia extends StatelessWidget {
     : plana = false;
 
   /// Sin fondo: solo el texto en color. Para filas de una lista larga.
-  const Insignia.texto(this.texto, {super.key, this.tono = Tono.neutro, this.color})
-    : plana = true;
+  const Insignia.texto(
+    this.texto, {
+    super.key,
+    this.tono = Tono.neutro,
+    this.color,
+  }) : plana = true;
 
   final String texto;
 
@@ -43,8 +47,11 @@ class Insignia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ??
-        (tono == Tono.neutro ? VenueColors.textoSuave : colorDeTono(context, tono));
+    final c =
+        color ??
+        (tono == Tono.neutro
+            ? VenueColors.textoSuave
+            : colorDeTono(context, tono));
     final estilo = TextStyle(
       color: c,
       fontSize: 12,

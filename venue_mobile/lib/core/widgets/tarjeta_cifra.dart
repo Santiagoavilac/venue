@@ -86,7 +86,10 @@ class TarjetaCifra extends StatelessWidget {
                 Container(
                   width: 7,
                   height: 7,
-                  decoration: BoxDecoration(color: deTono, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: deTono,
+                    shape: BoxShape.circle,
+                  ),
                 ),
                 const SizedBox(width: Esp.xs + 2),
               ],
@@ -95,7 +98,10 @@ class TarjetaCifra extends StatelessWidget {
                   etiqueta,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Tipo.apoyo.copyWith(color: suave, fontWeight: FontWeight.w600),
+                  style: Tipo.apoyo.copyWith(
+                    color: suave,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               if (alTocar != null)
