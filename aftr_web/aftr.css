@@ -400,3 +400,10 @@ body.con-saldo .mapa-arriba { top: 8px; }
   body.con-saldo .mapa-pag { top: calc(var(--saldo-alto) + 60px); }
   body.con-saldo .mapa-arriba { top: 16px; }
 }
+
+/* Plata cobrada que no entregó nada: el aviso con el WhatsApp de soporte.
+   Rojo porque es un problema de quien lo lee, verde cuando ya se está
+   resolviendo; nunca sólo el color: el título dice qué pasó. */
+.aviso-pago { padding: 16px; margin: 0 0 16px; border-radius: 20px; background: var(--sup2); border: 1px solid color-mix(in srgb, var(--alerta) 45%, transparent); }
+.aviso-pago.ok { border-color: color-mix(in srgb, var(--vivo) 45%, transparent); }
+.aviso-pago .boton { display: inline-block; width: auto; }

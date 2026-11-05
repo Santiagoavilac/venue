@@ -10,6 +10,7 @@ import '../../core/widgets/logo.dart';
 import '../../core/widgets/movimiento.dart';
 import '../../core/widgets/fondo_video.dart';
 import '../../core/widgets/piezas.dart';
+import '../../core/widgets/soporte.dart';
 import '../pulse/pulse_screen.dart';
 import '../../data/aftr_repo.dart';
 import '../auth/asegurar_cuenta.dart';
@@ -110,6 +111,13 @@ class _AccesosScreenState extends ConsumerState<AccesosScreen> {
                 ],
               ),
             ),
+            for (final p in accesos?.revisar ?? const <PagoEnRevision>[])
+              AvisoPagoTarde(
+                monto: p.monto,
+                tarde: p.tarde,
+                resuelta: p.resuelta,
+                evento: p.evento?.nombre,
+              ),
             if (async.isLoading && accesos == null)
               const Esqueleto(alto: 200, radio: 24)
             else if (async.hasError && accesos == null)
@@ -403,7 +411,9 @@ class _AbiertaState extends ConsumerState<_Abierta> {
             a.estado == EstadoAcceso.bloqueada
                 ? 'Entrada bloqueada por reventa. Consultá o retirá la publicación desde Mis operaciones.'
                 : a.tipo == TipoAcceso.pedido
-                ? 'Pagalo con el QR del banco y tus entradas aparecen acá solas.'
+                ? 'Pagalo con el QR del banco y tus entradas aparecen acá solas. '
+                      'El QR se cobra hasta diez minutos después de generarse; '
+                      'si ya pagaste, el pedido no se cancela.'
                 : '${club.nombre} tiene que confirmar tu pedido. Cuando lo haga, tus QR aparecen acá solos.',
             textAlign: TextAlign.center,
             style: Aftr.cuerpo(14, c: Aftr.texto),
@@ -438,7 +448,7 @@ class _AbiertaState extends ConsumerState<_Abierta> {
               const SizedBox(width: 10),
               Expanded(
                 child: BotonAftr(
-                  'Cancelar',
+                  'Pedir que se cancele',
                   secundario: true,
                   cargando: _cancelando,
                   onTap: _cancelar,

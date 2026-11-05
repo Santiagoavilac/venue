@@ -20,6 +20,12 @@ const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "o
 const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 const dia = (s) => { const [y, m, d] = String(s).split("-").map(Number); return new Date(y, m - 1, d); };
 const hoy0 = () => { const h = new Date(); return new Date(h.getFullYear(), h.getMonth(), h.getDate()); };
+// Hora local de un timestamp del servidor: el límite del cobro se dice en la
+// hora de quien mira, no en UTC.
+function hhmm(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? "" : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 function fechaCorta(s) {
   const f = dia(s), d = Math.round((f - hoy0()) / 864e5);
   if (d === 0) return "Hoy";
@@ -557,6 +563,27 @@ async function cobroBanco(accion, orden, tipo = "orden") {
   }
   return data;
 }
+// El cobro con QR vive diez minutos. Si la plata llega después, el cupo ya
+// volvió al evento y no se entrega la entrada: queda una incidencia para que el
+// boliche devuelva la plata. Antes la web no decía nada y el QR se quedaba
+// esperando para siempre.
+const SOPORTE_WHATSAPP = "59175028040";
+function whatsappSoporte(mensaje) {
+  return `https://wa.me/${SOPORTE_WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
+}
+function avisoPagoTarde({ monto, tarde = true, resuelta = false, evento = null }) {
+  const texto = resuelta
+    ? `El boliche ya vio los Bs ${monto} y lo está resolviendo. Si en un rato no tenés novedades, escribinos.`
+    : tarde
+      ? `El QR se cobra hasta diez minutos después de generarse. Los Bs ${monto} entraron después, así que el lugar ya se liberó y la entrada no se emitió. Escribinos y te lo devolvemos.`
+      : `Los Bs ${monto} se cobraron pero la entrada no se pudo emitir. Escribinos y lo resolvemos.`;
+  const titulo = resuelta ? "Tu pago se está resolviendo" : tarde ? "Tu pago llegó tarde" : "Tu pago no se pudo entregar";
+  const caso = `Hola, pagué Bs ${monto} por AFTR${evento ? ` para ${evento}` : ""}${tarde ? " y el pago llegó tarde, así que no recibí la entrada." : " y no recibí la entrada."} Quisiera resolverlo.`;
+  return `<div class="aviso-pago${resuelta ? " ok" : ""}"><b class="fuerte" style="font-size:16px">${esc(titulo)}</b>
+    <p style="margin:8px 0 0">${esc(texto)}</p>${evento ? `<p class="tenue" style="margin:6px 0 0">${esc(evento)}</p>` : ""}
+    <a class="boton sec" style="margin-top:14px" target="_blank" rel="noopener" href="${whatsappSoporte(caso)}">Escribir por WhatsApp</a></div>`;
+}
+
 function hojaPago(orden, titulo, tipo = "orden") {
   let cerrada = false, reloj = null;
   const c = abrirHoja(`<p class="suave">Preparando el QR…</p>`, () => { cerrada = true; clearTimeout(reloj); });
@@ -566,6 +593,18 @@ function hojaPago(orden, titulo, tipo = "orden") {
     c.innerHTML = `<h2 class="fuerte">Revisá tu pedido</h2><p>${esc(texto)}</p>
       <p class="suave">Tu pedido quedó guardado en Accesos.</p><button class="boton" data-accesos>Ver en Accesos</button>`;
     $("[data-accesos]", c).onclick = () => { cerrarHoja(); location.hash = "#/accesos"; };
+  };
+  // Plata cobrada que no entregó nada: se dice qué pasó y se ofrece el WhatsApp.
+  const sinEntrega = (q) => {
+    if (cerrada) return;
+    clearTimeout(reloj);
+    c.innerHTML = avisoPagoTarde({
+      monto: Number(q?.monto || 0).toFixed(2),
+      tarde: q?.nota === "PAGADO_FUERA_DE_PLAZO",
+      evento: titulo,
+    }) + `<button class="boton" data-accesos style="margin-top:14px">Ver en Accesos</button>`;
+    $("[data-accesos]", c).onclick = () => { cerrarHoja(); location.hash = "#/accesos"; };
+    cargarAccesos().catch(() => {});
   };
   const pagado = () => {
     if (cerrada) return;
@@ -580,7 +619,7 @@ function hojaPago(orden, titulo, tipo = "orden") {
       const r = await cobroBanco("estado", orden, tipo);
       if (cerrada) return;
       if (r.pago?.estado === "pagado" && (r.orden === "confirmada" || tipo === "pedido" && ["recibido","en_preparacion","listo","entregado"].includes(r.orden))) return pagado();
-      if (r.pago?.estado === "revisar") return problema("Este cobro necesita revisión. No vuelvas a pagar; contactá al boliche con tu pedido.");
+      if (r.pago?.estado === "revisar") return sinEntrega(r.pago);
       if (["anulado", "vencido"].includes(r.pago?.estado) || ["cancelada", "vencida"].includes(r.orden)) return problema("Este pedido ya no está disponible para pagar.");
     } catch { /* Se reintenta sin abrir otra consulta en paralelo. */ }
     if (!cerrada) reloj = setTimeout(revisar, 4000);
@@ -589,13 +628,13 @@ function hojaPago(orden, titulo, tipo = "orden") {
     if (cerrada) return;
     const q = r.pago;
     if (q?.estado === "pagado") return pagado();
-    if (q?.estado === "revisar") return problema("Este cobro necesita revisión. No vuelvas a pagar.");
+    if (q?.estado === "revisar") return sinEntrega(q);
     const imagen = typeof q?.imagen === "string" ? q.imagen.replace(/\s/g, "") : "";
     if (q?.estado !== "activo" || !/^[A-Za-z0-9+/]+={0,2}$/.test(imagen)) return problema("El QR todavía no está disponible. Podés volver a abrir el pedido desde Accesos.");
     c.innerHTML = `<h2 class="fuerte">${esc(titulo)}</h2><p class="fuerte" style="font-size:28px">Bs ${Number(q.monto).toFixed(2)}</p>
       <div class="qr" style="background:white;padding:18px;border-radius:20px;max-width:280px;margin:20px auto"><img style="display:block;width:100%" alt="QR de pago" src="data:image/png;base64,${imagen}"></div>
       <p>Escanealo con tu app bancaria. Si usás este celular, guardá el QR y abrilo desde tu banco.</p>
-      <p class="suave">Esperando confirmación del banco. Válido hasta ${esc(q.vence)}.</p>
+      <p class="suave">Esperando confirmación del banco. ${q.limite ? `Se puede pagar hasta las ${esc(hhmm(q.limite))}; después se anula y hay que pedir otro QR.` : `Válido hasta ${esc(q.vence)}.`}</p>
       <a class="boton" download="qr-pago-aftr.png" href="data:image/png;base64,${imagen}">Guardar QR</a><p class="tenue">Cobro procesado por Banco Económico</p>`;
     reloj = setTimeout(revisar, 4000);
   }).catch((e) => problema(mensaje(e)));
@@ -808,6 +847,10 @@ async function pintarAccesos() {
   const prox = proximos(E.accesos), pas = pasados(E.accesos);
   if (!prox.find((a) => a.id === abierta)) abierta = null;
   vista.innerHTML = `<div class="pagina"><a class="texto-accion" href="#/mis-mesas">Mis mesas y pedidos</a><button class="texto-accion" style="margin-left:16px" onclick="socialAftr().mineResale().catch(e=>avisar(mensaje(e)))">Reventa y mis operaciones ↗</button><h1 class="titular">Accesos ${abierta ? `<button class="pildora densa" data-cerrar-t>Cerrar</button>` : ""}</h1>
+    ${(E.accesos?.revisar || []).map((p) => avisoPagoTarde({
+      monto: Number(p.monto || 0).toFixed(2), tarde: p.nota === "PAGADO_FUERA_DE_PLAZO",
+      resuelta: p.resuelta === true, evento: p.evento?.nombre || null,
+    })).join("")}
     ${prox.length ? `<div class="pila" id="pila">${prox.map((a, i) => tarjetaWallet(a, i)).join("")}</div>`
       : `<div class="vacio-caja"><img src="img/marca.svg" alt=""><h3 class="fuerte" style="font-size:20px;margin:0 0 6px">Tu próxima noche va acá</h3>
         <p class="suave" style="margin:0 0 20px">Las entradas, listas y mesas que consigas aparecen con su QR.</p><a class="boton" href="#/">Explorar eventos</a></div>`}
@@ -838,9 +881,9 @@ function abiertaHtml(a) {
       ${club.lat != null ? `<a class="circ" target="_blank" rel="noopener" href="${comoLlegar(club)}">${ICO.ir}</a>` : ""}</div></div>`;
   }
   return `<div class="tw-abierta"><b class="fuerte" style="font-size:20px">${esc(a.titulo)}</b>
-    <p style="margin:6px 0 10px">Pagá el pedido con PULSE o QR. Tus entradas aparecen cuando se confirma el pago.</p>
+    <p style="margin:6px 0 10px">Pagá el pedido con PULSE o QR. Tus entradas aparecen cuando se confirma el pago. El QR se cobra hasta diez minutos después de generarse; si ya pagaste, el pedido no se cancela.</p>
     ${a.total != null ? `<b class="fuerte" style="font-size:24px">${bs(a.total)}</b>` : ""}
-    <div class="acciones">${a.tipo === "pedido" ? `<button class="boton" data-pagar>Pagar</button><button class="boton sec" data-cancelar>Cancelar pedido</button>` : ""}</div></div>`;
+    <div class="acciones">${a.tipo === "pedido" ? `<button class="boton" data-pagar>Pagar</button><button class="boton sec" data-cancelar>Pedir que se cancele</button>` : ""}</div></div>`;
 }
 function apilar(prox) {
   const pila = $("#pila");

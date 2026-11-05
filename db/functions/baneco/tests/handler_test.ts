@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { Banco, type Datos, ErrorBanco } from "../bank.ts";
 import { crearHandler } from "../handler.ts";
 const id = "11111111-1111-4111-8111-111111111111";
+const VIVOS = ["generando", "activo", "pagado", "revisar"];
 const igual = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 
 function escenario() {
@@ -17,7 +18,9 @@ function escenario() {
         select: (_?: string) => query,
         eq: (campo: string, valor: unknown) => { filas = filas.filter((x) => x[campo] === valor); return query; },
         not: (campo: string, _: string, valor: unknown) => { filas = filas.filter((x) => x[campo] !== valor); return query; },
-        order: () => query, limit: () => query,
+        // el handler pide el último QR: acá "último" es el insertado al final
+        order: () => { filas = [...filas].reverse(); return query; },
+        limit: () => query,
         update: (datos: Datos) => { cambios = datos; return query; },
         single: () => { singular = true; return query; },
         maybeSingle: () => { singular = true; return query; },
@@ -31,9 +34,11 @@ function escenario() {
     rpc(nombre: string, p: Datos) {
       llamadas.push(nombre);
       if (nombre === "baneco_reservar_qr" || nombre === "baneco_reservar_destino") {
-        let q = tablas.pago_qr[0];
+        // como el SQL: devuelve el cobro VIVO si lo hay, y si no crea otro.
+        // Los anulados quedan de histórico y no bloquean un QR nuevo.
+        let q = [...tablas.pago_qr].reverse().find((x) => VIVOS.includes(String(x.estado)));
         const reservado = !q;
-        q ??= { id: "fila", [p.p_tipo === 'recarga' ? 'recarga_id' : p.p_tipo === 'pedido' ? 'pedido_id' : 'orden_id']: id, estado: "generando", generacion_id: "generacion",
+        q ??= { id: `fila${tablas.pago_qr.length}`, [p.p_tipo === 'recarga' ? 'recarga_id' : p.p_tipo === 'pedido' ? 'pedido_id' : 'orden_id']: id, estado: "generando", generacion_id: "generacion",
           transaction_id: "comercio", monto: 25.50, moneda: "BOB", vence: "2030-01-01", ambiente: "certificacion" };
         if (reservado) tablas.pago_qr.push(q);
         return Promise.resolve({ data: { reservado, pago: { ...q } }, error: null });
@@ -106,6 +111,22 @@ Deno.test("no devuelve el QR de un pedido vencido", async () => {
   const s = escenario(); s.tablas.aftr_ordenes[0].vence_at = "2026-10-30T00:00:00Z";
   s.tablas.pago_qr.push({ orden_id: id, qr_id: "qr", estado: "activo", ambiente: "certificacion" });
   igual((await s.request({ accion: "qr", orden: id }, { Authorization: "Bearer sesion" })).status, 409);
+});
+Deno.test("un QR anulado a los diez minutos no impide pedir otro", async () => {
+  const s = escenario();
+  s.tablas.pago_qr.push({ id: "viejo", orden_id: id, qr_id: "qr-viejo", estado: "anulado", ambiente: "certificacion" });
+  igual((await s.request({ accion: "qr", orden: id }, { Authorization: "Bearer sesion" })).status, 200);
+  igual(s.tablas.pago_qr.length, 2);
+  igual(s.tablas.pago_qr[1].estado, "activo");
+  igual(s.tablas.pago_qr[0].estado, "anulado");
+});
+Deno.test("el estado y el QR informan el límite y la nota del cobro", async () => {
+  const s = escenario();
+  s.tablas.pago_qr.push({ id: "fila", orden_id: id, qr_id: "qr", estado: "revisar", ambiente: "certificacion",
+    monto: 25.50, moneda: "BOB", vence: "2030-01-01", limite_at: "2026-11-05T15:00:00Z", nota: "PAGADO_FUERA_DE_PLAZO" });
+  const r = await (await s.request({ accion: "estado", orden: id }, { Authorization: "Bearer sesion" })).json();
+  igual(r.pago.nota, "PAGADO_FUERA_DE_PLAZO");
+  igual(r.pago.limite, "2026-11-05T15:00:00Z");
 });
 Deno.test("notificación falsificada no consulta banco ni confirma entradas", async () => {
   const s = escenario();

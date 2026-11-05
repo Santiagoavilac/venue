@@ -345,10 +345,44 @@ class Acceso {
       };
 }
 
+/// Plata que el banco cobró y que no entregó nada: llegó después de los diez
+/// minutos, o la emisión falló. El boliche la tiene que resolver a mano, así
+/// que la app lo dice y ofrece el WhatsApp de soporte.
+class PagoEnRevision {
+  const PagoEnRevision({
+    required this.id,
+    required this.monto,
+    required this.tarde,
+    required this.resuelta,
+    this.evento,
+    this.pagadoAt,
+  });
+
+  final String id;
+  final int monto;
+  /// Llegó fuera del plazo. Si no, la emisión falló por otra razón.
+  final bool tarde;
+  final bool resuelta;
+  final Evento? evento;
+  final DateTime? pagadoAt;
+
+  factory PagoEnRevision.desde(Map<String, dynamic> j) => PagoEnRevision(
+        id: '${j['id']}',
+        monto: _i(j['monto']) ?? 0,
+        tarde: j['nota'] == 'PAGADO_FUERA_DE_PLAZO',
+        resuelta: j['resuelta'] == true,
+        evento: j['evento'] is Map ? Evento.desde(_m(j['evento'])) : null,
+        pagadoAt: DateTime.tryParse('${j['pagado_at'] ?? ''}')?.toLocal(),
+      );
+}
+
 class Accesos {
-  const Accesos(this.todos);
+  const Accesos(this.todos, {this.revisar = const []});
 
   final List<Acceso> todos;
+
+  /// Cobros sin entrega que el boliche todavía no resolvió.
+  final List<PagoEnRevision> revisar;
 
   /// Lo que todavía sirve: pedidos pendientes y QR válidos de eventos que no
   /// terminaron, el más cercano primero.
@@ -421,6 +455,8 @@ class Accesos {
     // la mesa confirmada ya aparece como sus manillas; la reserva pendiente,
     // como pedido: no se repite
     out.removeWhere((a) => a.tipo == TipoAcceso.mesa && a.estado == EstadoAcceso.pendiente);
-    return Accesos(out);
+    return Accesos(out, revisar: [
+      for (final x in _l(j['revisar'])) PagoEnRevision.desde(x),
+    ]);
   }
 }

@@ -22,8 +22,9 @@ class RepoSimulado extends AftrRepo {
         ),
       );
   final String estado;
+  String? nota;
   int consultas = 0;
-  final resultado = Completer<({String? estado, String? orden})>();
+  final resultado = Completer<({String? estado, String? nota, String? orden})>();
 
   @override
   Future<Map<String, dynamic>> qrDePago(
@@ -34,10 +35,11 @@ class RepoSimulado extends AftrRepo {
     'monto': 25.50,
     'imagen': png,
     'vence': '2026-11-01',
+    if (nota != null) 'nota': nota,
   };
 
   @override
-  Future<({String? estado, String? orden})> estadoPago(
+  Future<({String? estado, String? nota, String? orden})> estadoPago(
     String orden, {
     String tipo = 'orden',
   }) {
@@ -73,12 +75,34 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(
-      find.text('Este cobro necesita revisión. No vuelvas a pagar.'),
-      findsOneWidget,
-    );
+    expect(find.text('Tu pago no se pudo entregar'), findsOneWidget);
+    expect(find.text('Escribir por WhatsApp'), findsOneWidget);
     expect(find.text('Guardar QR'), findsNothing);
     expect(repo.consultas, 0);
+  });
+
+  testWidgets('el pago fuera de plazo lo dice y ofrece el WhatsApp', (
+    tester,
+  ) async {
+    final repo = RepoSimulado('revisar')..nota = 'PAGADO_FUERA_DE_PLAZO';
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          repoProvider.overrideWithValue(repo),
+          accesosProvider.overrideWith((ref) async => const Accesos([])),
+        ],
+        child: const MaterialApp(
+          home: PagoQrScreen(orden: 'orden', titulo: 'Evento'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Tu pago llegó tarde'), findsOneWidget);
+    expect(
+      find.textContaining('diez minutos', findRichText: true),
+      findsWidgets,
+    );
+    expect(find.text('Escribir por WhatsApp'), findsOneWidget);
   });
 
   testWidgets('una consulta lenta no dispara otras en paralelo', (
@@ -101,7 +125,7 @@ void main() {
     await tester.pump(const Duration(seconds: 8));
     expect(repo.consultas, 1);
     expect(find.text('Bs 25.50'), findsOneWidget);
-    repo.resultado.complete((estado: 'pagado', orden: 'confirmada'));
+    repo.resultado.complete((estado: 'pagado', nota: null, orden: 'confirmada'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('Pago confirmado'), findsOneWidget);

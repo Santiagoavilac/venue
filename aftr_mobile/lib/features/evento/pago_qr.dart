@@ -11,6 +11,7 @@ import '../../core/networking/supabase.dart';
 import '../../core/theme/aftr_theme.dart';
 import '../../core/widgets/movimiento.dart';
 import '../../core/widgets/piezas.dart';
+import '../../core/widgets/soporte.dart';
 import '../../data/aftr_repo.dart';
 import '../../data/pulse_repo.dart';
 
@@ -52,6 +53,10 @@ class _PagoQrState extends ConsumerState<PagoQrScreen> {
   _Fase _fase = _Fase.cargando;
   PagoQr? _pago;
   String? _error;
+
+  /// Nota del cobro en revisión: con PAGADO_FUERA_DE_PLAZO se muestra la
+  /// tarjeta con el WhatsApp en vez del cartel genérico.
+  String? _nota;
   Timer? _consulta;
   bool _consultando = false;
 
@@ -72,6 +77,7 @@ class _PagoQrState extends ConsumerState<PagoQrScreen> {
     setState(() {
       _fase = _Fase.cargando;
       _error = null;
+      _nota = null;
     });
     try {
       final p = PagoQr.desde(
@@ -87,6 +93,7 @@ class _PagoQrState extends ConsumerState<PagoQrScreen> {
           _fase = _Fase.esperando;
         } else {
           _fase = _Fase.problema;
+          _nota = p.estado == 'revisar' ? (p.nota ?? 'REVISION') : null;
           _error = p.estado == 'revisar'
               ? 'Este cobro necesita revisión. No vuelvas a pagar.'
               : 'Este QR no está disponible para pagar. Revisá tu pedido en Accesos.';
@@ -143,8 +150,10 @@ class _PagoQrState extends ConsumerState<PagoQrScreen> {
         });
       } else if (r.estado == 'revisar') {
         _consulta?.cancel();
+        ref.invalidate(accesosProvider);
         setState(() {
           _fase = _Fase.problema;
+          _nota = r.nota ?? 'REVISION';
           _error =
               'Este cobro necesita revisión. No vuelvas a pagar; contactá al boliche con tu pedido.';
         });
@@ -196,11 +205,23 @@ class _PagoQrState extends ConsumerState<PagoQrScreen> {
             titulo: widget.titulo,
             tipo: widget.tipo,
           ),
-          _Fase.problema => _Problema(
-            key: const ValueKey('x'),
-            texto: _error ?? '',
-            onReintentar: _pedirQr,
-          ),
+          // La plata entró y no entregó nada: no alcanza con "necesita
+          // revisión", hay que decir qué pasó y cómo se resuelve.
+          _Fase.problema => _nota != null
+              ? SingleChildScrollView(
+                  key: const ValueKey('r'),
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                  child: AvisoPagoTarde(
+                    monto: (_pago?.monto ?? 0).round(),
+                    tarde: _nota == 'PAGADO_FUERA_DE_PLAZO',
+                    evento: widget.titulo,
+                  ),
+                )
+              : _Problema(
+                  key: const ValueKey('x'),
+                  texto: _error ?? '',
+                  onReintentar: _pedirQr,
+                ),
           _Fase.esperando => ListView(
             key: const ValueKey('e'),
             padding: EdgeInsets.fromLTRB(24, 8, 24, 24 + abajo),
@@ -262,10 +283,13 @@ class _PagoQrState extends ConsumerState<PagoQrScreen> {
                 textAlign: TextAlign.center,
                 style: Aftr.cuerpo(13.5),
               ),
-              if (_pago?.vence != null) ...[
+              if (_pago?.limite != null || _pago?.vence != null) ...[
                 const SizedBox(height: 6),
                 Text(
-                  'Vale hasta el ${_pago!.vence}',
+                  _pago?.limite != null
+                      ? 'Se puede pagar hasta las ${_hhmm(_pago!.limite!)}. '
+                            'Después se anula y hay que pedir otro QR.'
+                      : 'Vale hasta el ${_pago!.vence}',
                   textAlign: TextAlign.center,
                   style: Aftr.cuerpo(12.5, c: Aftr.texto3),
                 ),
@@ -397,6 +421,9 @@ class _Problema extends StatelessWidget {
   );
 }
 
+String _hhmm(DateTime t) =>
+    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
 /// Mensaje claro para errores del cobro (sin detalles técnicos del banco).
 String mensajeDePago(Object e) {
   final s = '$e';
@@ -409,11 +436,17 @@ String mensajeDePago(Object e) {
 
 /// QR de pago tal como lo devuelve el servidor.
 class PagoQr {
-  const PagoQr({required this.estado, this.monto, this.vence, this.imagen});
+  const PagoQr({required this.estado, this.monto, this.vence, this.imagen, this.nota, this.limite});
   final String estado;
   final num? monto;
   final String? vence;
   final Uint8List? imagen;
+
+  /// Por qué quedó en revisión: PAGADO_FUERA_DE_PLAZO y compañía.
+  final String? nota;
+
+  /// Cuando el banco deja de cobrarlo: diez minutos desde que se generó.
+  final DateTime? limite;
 
   factory PagoQr.desde(Map<String, dynamic> j) {
     final img = j['imagen'] as String?;
@@ -423,6 +456,8 @@ class PagoQr {
           ? j['monto'] as num
           : num.tryParse('${j['monto']}'),
       vence: j['vence'] as String?,
+      nota: j['nota'] as String?,
+      limite: DateTime.tryParse('${j['limite'] ?? ''}')?.toLocal(),
       imagen: img == null || img.isEmpty
           ? null
           : base64Decode(

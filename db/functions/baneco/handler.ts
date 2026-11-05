@@ -8,7 +8,17 @@ const CORS = {
 };
 const publico = (q: Datos | null, imagen = true) => q && ({
   estado: q.estado, qrId: q.qr_id, ...(imagen ? { imagen: q.qr_imagen } : {}), monto: q.monto, moneda: q.moneda, vence: q.vence,
+  // limite es cuando deja de cobrarse (diez minutos); nota, por qué quedó en
+  // revisión. Sin esto la app no puede decirle a la persona qué le pasó.
+  limite: q.limite_at, nota: q.nota,
 });
+// El cobro vive diez minutos: una orden puede tener varios QR, y sólo uno
+// vivo. Los anulados quedan de histórico y no deben contestar por el actual.
+const VIVOS = ["generando", "activo", "pagado", "revisar"];
+const vivo = (q: Datos | null | undefined) => !!q && VIVOS.includes(String(q.estado));
+const ultimoQr = (c: SupabaseClient, columna: string, id: string) =>
+  c.from("pago_qr").select("*").eq(columna, id)
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
 const fallar = (error: unknown) => { if (error) throw new Error("No se pudo registrar el cobro."); };
 const destinos = {
   orden: { tabla: "aftr_ordenes", columna: "orden_id" },
@@ -63,10 +73,11 @@ export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, 
   }
   async function pedirQr(req: Request, id: unknown, tipo: Tipo) {
     const o = await ordenDe(req, id, tipo);
-    const anterior = await admin.from("pago_qr").select("*").eq(destinos[tipo].columna, o.id).maybeSingle();
+    const anterior = await ultimoQr(admin, destinos[tipo].columna, String(o.id));
     fallar(anterior.error);
-    if (anterior.data && anterior.data.ambiente !== banco.config.ambiente) rechazar("Este pedido corresponde a otro ambiente de cobro.", 409);
-    if (anterior.data?.qr_id) {
+    // Un QR muerto de otro ambiente es histórico y no estorba; uno vivo sí.
+    if (vivo(anterior.data) && anterior.data!.ambiente !== banco.config.ambiente) rechazar("Este pedido corresponde a otro ambiente de cobro.", 409);
+    if (anterior.data?.qr_id && vivo(anterior.data)) {
       if (anterior.data.estado === "activo" && (o.estado !== "pendiente" || Date.parse(String(o.vence_at)) <= ahora())) {
         rechazar("Este pedido ya no está disponible para pagar.", 409);
       }
@@ -105,11 +116,11 @@ export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, 
   }
   async function estado(req: Request, id: unknown, tipo: Tipo) {
     const o = await ordenDe(req, id, tipo);
-    const r = await admin.from("pago_qr").select("*").eq(destinos[tipo].columna, o.id).maybeSingle();
+    const r = await ultimoQr(admin, destinos[tipo].columna, String(o.id));
     fallar(r.error);
     if (!r.data) return { pago: null, orden: o.estado };
     const q = r.data;
-    if (q.ambiente !== banco.config.ambiente) rechazar("Este pedido corresponde a otro ambiente de cobro.", 409);
+    if (vivo(q) && q.ambiente !== banco.config.ambiente) rechazar("Este pedido corresponde a otro ambiente de cobro.", 409);
     if (q.estado === "activo" && q.qr_id && (!q.ultimo_chequeo || ahora() - Date.parse(q.ultimo_chequeo) >= 4000)) await confirmar(q);
     const [pago, orden] = await Promise.all([
       admin.from("pago_qr").select("*").eq("id", q.id).single(),

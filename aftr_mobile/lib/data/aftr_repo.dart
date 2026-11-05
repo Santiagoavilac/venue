@@ -144,7 +144,7 @@ class AftrRepo {
   }
 
   /// Le pregunta al servidor si EL BANCO ya confirmó el pago.
-  Future<({String? estado, String? orden})> estadoPago(
+  Future<({String? estado, String? nota, String? orden})> estadoPago(
     String orden, {
     String tipo = 'orden',
   }) async {
@@ -155,6 +155,7 @@ class AftrRepo {
     });
     return (
       estado: (r['pago'] as Map?)?['estado'] as String?,
+      nota: (r['pago'] as Map?)?['nota'] as String?,
       orden: r['orden'] as String?,
     );
   }
