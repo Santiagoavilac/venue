@@ -74,7 +74,21 @@ todo) queda cerrado igual, y sin depender del orden.
   `vendor/`: con el hash, un CDN comprometido no puede inyectar nada, y la
   página no carga un megabyte más del repo.
 
-## Fases 5 a 9
+## Fase 5 · Las incidencias, con pantalla
+
+Hecho, `20261106170000`. Dos RPC -listar y resolver- y un panel en Venue con el
+contador en el menú lateral: quién pagó, cuánto, cuándo, qué dijo el banco, y
+tres salidas (emitir, devolver, cerrar) más el botón para escribirle. Siempre
+con una nota, que queda con el nombre de quien la escribió.
+
+El permiso se comprueba adentro en vez de entrar por la matriz de `db/19` como
+decía el plan: la matriz se genera con un bloque `do` de cien líneas que vive en
+un archivo de historia, y copiarlo a una migración para dos funciones es justo
+lo que se desincroniza después. Son dos de las 98 que ya comprueban adentro, y
+`tests/rpc_con_guarda.py` las ve igual. El portero y el jefe quedan afuera:
+probado con los dos contra la base real.
+
+## Fases 6 a 9
 
 Sin empezar. El orden del plan es el orden de trabajo: primero la plata,
 después los datos, después la experiencia.
@@ -167,6 +181,13 @@ después los datos, después la experiencia.
 - 32 pruebas de la Edge Function del banco (una nueva de CORS) y 7 del
   validador de medios (dos nuevas: un HTML, un .exe, un PDF y un GIF no pasan
   como comprobante, y un video no sirve de foto de perfil).
+- El ciclo completo de una incidencia, contra la base real en una transacción
+  que vuelve atrás: un pago tardío por el camino de verdad deja la incidencia
+  con su monto y su transacción, el admin la ve con el nombre de quien pagó, la
+  resuelve emitiendo (una entrada, orden confirmada), el contador baja a cero y
+  un segundo intento de resolverla avisa que ya se resolvió. El portero y el
+  jefe reciben "Solo el administrador del boliche ve los cobros a resolver".
+- `venue_mobile`: 153 pruebas, cinco nuevas del panel de incidencias.
 - Edge Function `baneco` desplegada: era obligatorio, porque ahora una orden
   puede tener más de un QR y el `maybeSingle()` anterior habría fallado.
 

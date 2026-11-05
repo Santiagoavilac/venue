@@ -23,6 +23,8 @@ import '../../bar/ui/pos_screen.dart';
 import '../../bar/ui/aftr_operacion_screen.dart';
 import '../../aftr_social/ui/historias_screen.dart';
 import '../../aftr_social/ui/reventa_screen.dart';
+import '../../payments/data/incidencias.dart';
+import '../../payments/ui/incidencias_screen.dart';
 import '../../caja/caja.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/ui/eventos_screen.dart';
@@ -89,6 +91,11 @@ List<_Seccion> _secciones(Rol rol) => [
   if (rol == Rol.admin)
     const _Seccion('Reventa', Icons.currency_exchange_outlined,
       Icons.currency_exchange_rounded, ReventaScreen(), grupo: 'AFTR'),
+  // Lo que la Fase 1 dejó de resolver sola: cobros que entraron y no
+  // entregaron nada. El portero no lo ve, igual que no ve la plata.
+  if (rol == Rol.admin)
+    const _Seccion('Cobros a resolver', Icons.error_outline_rounded,
+      Icons.error_rounded, IncidenciasScreen(), grupo: 'AFTR'),
   if ([Rol.admin, Rol.propietario, Rol.barra, Rol.jefe, Rol.rrpp].contains(rol))
     const _Seccion(
       'AFTR',
@@ -1093,6 +1100,7 @@ class _Lateral extends ConsumerWidget {
     final perfil = ref.watch(perfilProvider).value;
     final varios = (ref.watch(clubsProvider).value?.length ?? 0) > 1;
     final esq = Theme.of(context).colorScheme;
+    final pendientes = ref.watch(incidenciasAbiertasProvider);
     Widget item(int k) {
       final s = secciones[k];
       final on = k == actual;
@@ -1128,6 +1136,20 @@ class _Lateral extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  // Cuántos cobros esperan: si no se ve el número, el panel
+                  // existe pero nadie entra a mirarlo.
+                  if (s.titulo == 'Cobros a resolver' && pendientes > 0)
+                    Container(
+                      margin: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: VenueColors.mal,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text('$pendientes',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                    ),
                 ],
               ),
             ),

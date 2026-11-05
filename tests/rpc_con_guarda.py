@@ -70,6 +70,7 @@ SEÑALES = (
     'impl.exigir', 'exigir_sesion', 'rol_en_club', 'es_platform_admin',
     'auth.uid()', 'rol_en(', 've_registro', 'impl.aftr_yo', 'impl.aftr_staff',
     'impl.team_en_club', 'mi_team_en_club', 'impl.aftr_bar_staff',
+    'impl.incidencias_admin',
 )
 
 
