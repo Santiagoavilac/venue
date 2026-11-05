@@ -39,8 +39,10 @@ abstract final class Esp {
   static const EdgeInsets tarjeta = EdgeInsets.all(lg);
 }
 
-/// Radios. `radioTarjeta` ya existía en venue_theme y se respeta.
-abstract final class Radio_ {
+/// Radios de las esquinas. Se llama Redondeo y no Radio porque Flutter ya
+/// tiene un Radio (el botón de opción) y dos nombres iguales se confunden.
+/// `radioTarjeta` ya existía en venue_theme y se respeta.
+abstract final class Redondeo {
   /// 10 — chips y botones chicos.
   static const chico = 10.0;
 

@@ -94,7 +94,7 @@ class EsqueletoBloque extends StatelessWidget {
       margin: const EdgeInsets.all(Esp.lg),
       decoration: BoxDecoration(
         color: VenueColors.superficie,
-        borderRadius: BorderRadius.circular(Radio_.tarjeta),
+        borderRadius: BorderRadius.circular(Redondeo.tarjeta),
       ),
     ),
   );

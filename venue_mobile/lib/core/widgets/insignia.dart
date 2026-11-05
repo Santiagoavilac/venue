@@ -70,7 +70,7 @@ class Insignia extends StatelessWidget {
         color: tono == Tono.neutro && color == null
             ? VenueColors.superficie2
             : c.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(Radio_.pildora),
+        borderRadius: BorderRadius.circular(Redondeo.pildora),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

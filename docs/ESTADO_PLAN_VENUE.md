@@ -3,6 +3,11 @@
 Avance de `PLAN_EXPERIENCIA_VENUE.md`. Se actualiza en el mismo commit que el
 trabajo. Última actualización: 2026-11-05.
 
+**Las cuatro fases están cerradas.** Lo único que queda del plan es lo que no
+se puede hacer desde acá: probar la privacidad con `curl` contra un proyecto
+real y aplicar las migraciones en Supabase. Está al final, en Pendiente de
+verdad.
+
 ## Fase 0 · Cimientos
 
 - [x] Librerías: `flutter_animate`, `skeletonizer`, `lucide_icons_flutter` en `pubspec.yaml`
@@ -59,8 +64,10 @@ trabajo. Última actualización: 2026-11-05.
       adentro, o sea una excepción con el motivo escrito. Hoy da 79 / 104 / 10
       y ninguna sin control. Las cuatro del plan comprueban adentro: revisadas
       una por una
-- [ ] Probar con `curl`, no con la app: token de rrpp contra `mesas`, `bonos` y
-      `team_reparto`; repetir con un jefe; y un rrpp en dos boliches, jefe en uno
+- [ ] **Pendiente de verdad**: probar con `curl`, no con la app. Token de rrpp
+      contra `mesas`, `bonos` y `team_reparto`; repetir con un jefe; y un rrpp
+      en dos boliches, jefe en uno. Necesita un proyecto real con datos, así
+      que no se puede cerrar desde una sesión sin credenciales
 
 ## Fase 2 · Evento activo
 
@@ -128,3 +135,19 @@ trabajo. Última actualización: 2026-11-05.
   en las dos apps
 - AFTR: foto de perfil en las historias, y publicar reventa sin número de cuenta
   cuando hay QR de cobro
+
+## Pendiente de verdad
+
+Nada de esto se puede cerrar sin un proyecto real delante:
+
+1. **Aplicar las migraciones en Supabase**, en orden:
+   `20261105060000` y `20261105061000` (privacidad de mesas, parte 1 y 2 — el
+   orden importa: la 2 cierra la tabla recién cuando la app ya lee la vista),
+   `20261105070000` (foto del autor en historias) y `20261105080000`
+   (comisión de jefe por boliche). Hasta entonces la app funciona, pero sin
+   esos arreglos.
+2. **Probar la privacidad con `curl`**, como pide el plan: la interfaz ya
+   ocultaba los datos y salían igual por el endpoint REST.
+3. **Mirar las pantallas en un teléfono.** Todo lo de acá está verificado con
+   `flutter analyze`, 140 pruebas y las de base sobre PostgreSQL descartable,
+   pero el contraste y los tamaños reales se ven mirando.

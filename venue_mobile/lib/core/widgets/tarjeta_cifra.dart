@@ -153,7 +153,7 @@ class TarjetaCifra extends StatelessWidget {
         color: sobreImagen
             ? Oscuro.fondo.withValues(alpha: .45)
             : VenueColors.superficie,
-        borderRadius: BorderRadius.circular(Radio_.tarjeta),
+        borderRadius: BorderRadius.circular(Redondeo.tarjeta),
         border: sobreImagen ? null : bordeTarjeta,
         boxShadow: sobreImagen ? const [] : sombraTarjeta,
       ),
