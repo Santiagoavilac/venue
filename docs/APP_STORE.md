@@ -118,13 +118,78 @@ Responder **desde cero**, sin copiar de otra app. Lo que corresponde a AFTR:
 - Controles parentales: **no**. No marcar que sí: eso provocó un rechazo real.
 - La app es para mayores de 18, como dicen los términos.
 
-## VENUE · pendiente
+## VENUE · estado al 05/11/2026
 
-Auditoría en curso. Puntos que ya se sabe que hay que resolver:
+Auditada y con sus bloqueantes resueltos.
 
-- Cómo accede el revisor: la app sirve a personal de boliches, así que hay que
-  darle una cuenta demo con datos de ejemplo y, si hay roles, una por rol.
-- Verificar si se pueden crear cuentas y, en ese caso, que exista eliminación.
-- Riesgo 4.2.6 / 4.3: es **una sola app que sirve a muchos boliches**, no una
-  plantilla replicada por cliente. Eso es el patrón correcto, pero conviene
-  dejarlo dicho en las notas.
+| Requisito | Estado | Dónde |
+|---|---|---|
+| Eliminación de cuenta (5.1.1(v)) | **Hecho** | Cuenta → Eliminar mi cuenta, en el shell del relacionador y en el panel de perfil |
+| Privacidad, términos, normas y soporte | **Hecho** | Cuenta → Ayuda y legales |
+| `PrivacyInfo.xcprivacy` | **Hecho** | `ios/Runner/PrivacyInfo.xcprivacy` |
+| Cuentas demo | **Hecho** | `applereview` y `reviewrrpp`, en Burtown |
+| Purpose strings | Ya estaban bien | Los tres coinciden con el uso real |
+| `ITSAppUsesNonExemptEncryption` | Ya estaba | `false` |
+| Target iOS 13+ | Cumple | iOS 15 |
+
+### Lo que hace `venue_eliminar_mi_cuenta()`
+
+Reusa `impl.eliminar_usuario`, que ya decidía entre borrar y archivar según
+hubiera actividad. Lo que agrega: cuando el perfil queda archivado para la
+contabilidad del boliche, se borran igual nombre, foto, teléfono y cupos, y en
+todos los casos se elimina el usuario de `auth` para que el acceso se corte.
+
+Si la persona es **administradora principal** de un boliche, la función se
+niega y le pide pasar la administración primero. Sin ese freno, un dueño podía
+dejar su club sin administrador.
+
+### Pendientes menores de VENUE
+
+- `Info.plist` declara landscape mientras `main.dart` fuerza vertical.
+- Sin Associated Domains, los enlaces `venuebol.com/?invite=…` no abren la app;
+  solo funciona el esquema `venue://`.
+- Subir el build number antes de cada envío.
+- Sign in with Apple va por OAuth web, sin capability declarada. Si el proveedor
+  no está habilitado en Supabase, el botón falla y eso es rechazo por bug:
+  **probarlo antes de enviar**.
+
+## Review Notes · VENUE
+
+> **App Review Information — VENUE**
+>
+> **Purpose:** VENUE is the staff-side tool for nightclubs in Bolivia. Club
+> managers and promoters use it to run an event night: guest lists, QR ticket
+> sales, table bookings, door scanning and settlements. The public-facing app
+> is a separate one called AFTR.
+>
+> **Demo login:** open the app, choose the **"Boliches"** door and sign in with
+> username and password.
+> Username: `applereview` — Password: `[en App Store Connect]`
+> This is an admin account for the demo club "Burtown", with events, tables and
+> lists already loaded.
+> A second account shows the promoter side: `reviewrrpp` (same door).
+>
+> **Why a demo account is required:** a newly registered account belongs to no
+> club until a club approves it, so it would show an empty screen.
+>
+> **Main features and paths:**
+> 1. Event management → Eventos → "Gestionar evento"
+> 2. Guest lists and QR tickets → Accesos
+> 3. Door scanner → Accesos → Escáner (needs a ticket QR; ask us for a test one)
+> 4. Tables → Mesas
+> 5. Account deletion → Cuenta → Eliminar mi cuenta
+> 6. Privacy, Terms and Community Guidelines → Cuenta → Ayuda y legales
+>
+> **Not a template app:** this is a single app serving many clubs, not one
+> rebranded app per client. Each club is a tenant inside the same app
+> (Guideline 4.2.6 / 4.3).
+>
+> **User content:** staff can publish 24-hour stories that appear in the public
+> AFTR app, and they receive and act on reports from AFTR users. Community
+> guidelines are at aftrvenue.com/normas.
+>
+> **Third-party services:** Supabase (database, auth, storage), Apple Maps
+> (venue location), Banco Económico (payment QR shown to customers).
+>
+> The backend and both demo accounts will remain available during the review.
+

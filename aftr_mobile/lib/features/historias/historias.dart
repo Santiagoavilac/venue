@@ -234,9 +234,16 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
     if (accion != null) {
       try {
         if (!await asegurarCuenta(context, ref) || !mounted) return;
+        // el motivo era un texto fijo: quien modera no sabía de qué se
+        // trataba el reporte hasta abrir la historia
+        String? motivo;
+        if (accion == 'reportar') {
+          motivo = await _motivoDelReporte();
+          if (motivo == null || !mounted) { _menu = false; _sincronizar(); return; }
+        }
         await ref.read(socialRepoProvider).historias(accion, {
           if (accion == 'bloquear') 'usuario': _h['autor_id'] else 'id': _h['id'],
-          if (accion == 'reportar') 'motivo': 'Contenido inapropiado reportado desde el visor',
+          if (motivo != null) 'motivo': motivo,
         });
         ref.invalidate(historiasProvider);
         if (mounted) {
@@ -251,6 +258,31 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
     }
     _menu = false; _sincronizar();
   }
+  /// Por qué se reporta. Devuelve null si la persona se arrepiente.
+  Future<String?> _motivoDelReporte() => showModalBottomSheet<String>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 18, 20, 8),
+          child: Text('¿Por qué la reportás?',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+        ),
+        for (final m in const [
+          'Desnudez o contenido sexual',
+          'Violencia o amenazas',
+          'Odio o discriminación',
+          'Acoso a una persona',
+          'Drogas ilegales',
+          'Estafa o spam',
+          'Es de un menor de edad',
+          'Otro motivo',
+        ])
+          ListTile(title: Text(m), onTap: () => Navigator.pop(ctx, m)),
+      ]),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     ref.listen(historiasProvider, (_, siguiente) {
