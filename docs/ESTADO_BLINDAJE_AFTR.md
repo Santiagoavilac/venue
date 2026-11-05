@@ -104,7 +104,25 @@ de un relacionador de burtown, contra la base real: `jefe_fijar_cupos` contesta
 sí fija el cupo general de la lista y el de cada persona, que es lo que el plan
 pedía para los boliches sin jefes, y ya estaba en la pantalla de gestión.
 
-## Fases 7 a 9
+## Fase 7 · Historias como Instagram
+
+| # | Qué | Estado |
+|---|-----|--------|
+| 7.1 | No se entra hasta que esté lista, con el anillo girando | ok |
+| 7.2 | Las firmas dejan de vencerse antes de usarse | ok (en la Fase 2.2) |
+| 7.3 | Se precargan las dos siguientes, videos incluidos | ok |
+| 7.4 | El visor deja de repintarse veinte veces por segundo | ok |
+
+Sobre 7.4: el reloj de 50 ms sigue existiendo -es el que mide el avance de una
+foto y el vencimiento- pero ya no hace `setState`: mueve un `ValueNotifier` que
+sólo escucha la barra. Antes reconstruía el visor entero -imagen, video, gestos,
+cabecera- veinte veces por segundo para mover tres píxeles.
+
+Sobre 7.3: en la app se adelanta **un** video a la vez, no dos. Dos
+controladores de video en memoria por historias que pueden no mirarse no se
+pagan; las imágenes sí van las dos.
+
+## Fases 8 y 9
 
 Sin empezar. El orden del plan es el orden de trabajo: primero la plata,
 después los datos, después la experiencia.

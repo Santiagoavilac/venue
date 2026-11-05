@@ -47,30 +47,63 @@ class HistoriasFila extends ConsumerWidget {
           if (i == 0) {
             return _CirculoHistoria(nombre: 'Tu historia', agregar: true,
               foto: yo?.foto, archivo: yo?.archivoFoto,
-              onTap: () async {
-                if (!await asegurarCuenta(context, ref) || !context.mounted) return;
+              alAbrir: () async {
+                if (!await asegurarCuenta(context, ref) || !context.mounted) return false;
                 await Navigator.of(context, rootNavigator: true).push<void>(
                   MaterialPageRoute(builder: (_) => const CrearHistoriaScreen()));
+                return true;
               });
           }
           final h = grupos[i - 1].first;
           return _CirculoHistoria(nombre: '${h['nombre'] ?? h['autor'] ?? 'AFTR'}',
             foto: h['foto'] as String?, clave: h['foto_key'] as String?,
-            onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
-              MaterialPageRoute(builder: (_) => HistoriasVisor(
-                grupos: grupos, grupoInicial: i - 1,
-                desfase: desfaseSocial(feed.value ?? {})))));
+            // No se abre el visor hasta que la primera historia está lista:
+            // antes se abría en negro y ahí adentro firmaba y descargaba.
+            alAbrir: () async {
+              final url = await prepararHistoria(context, ref, h);
+              if (url == null || !context.mounted) return false;
+              await Navigator.of(context, rootNavigator: true).push<void>(
+                MaterialPageRoute(builder: (_) => HistoriasVisor(
+                  grupos: grupos, grupoInicial: i - 1, urlInicial: url,
+                  desfase: desfaseSocial(feed.value ?? {}))));
+              return true;
+            });
         },
       ),
     );
   }
 }
 
-class _CirculoHistoria extends StatelessWidget {
-  const _CirculoHistoria({required this.nombre, required this.onTap,
+/// Firma y deja descargada una historia. Devuelve la URL, o null si no se
+/// pudo: así quien la llama decide, en vez de abrir un visor vacío.
+Future<String?> prepararHistoria(
+    BuildContext context, WidgetRef ref, DatosSocial h) async {
+  try {
+    final clave = h['media_key'] as String?;
+    final url = clave != null && clave.isNotEmpty
+        ? await ref.read(firmasProvider).url(clave)
+        : await ref.read(socialRepoProvider)
+            .firmar('aftr-historias', '${h['storage_path']}');
+    if (url == null) return null;
+    // el video se abre con su propio estado de carga adentro; la foto entra
+    // ya decodificada, que es lo que evita ver media imagen
+    if (h['tipo'] != 'video' && context.mounted) {
+      await precacheImage(NetworkImage(url), context);
+    }
+    return url;
+  } catch (_) {
+    return null;
+  }
+}
+
+class _CirculoHistoria extends StatefulWidget {
+  const _CirculoHistoria({required this.nombre, required this.alAbrir,
     this.agregar = false, this.foto, this.archivo, this.clave});
   final String nombre;
-  final VoidCallback onTap;
+
+  /// Prepara y abre. Devuelve false si no se pudo: el anillo se detiene y se
+  /// avisa, en vez de abrir el visor en negro.
+  final Future<bool> Function() alAbrir;
   final bool agregar;
   /// Foto del autor: URL directa (logo del boliche) o ruta por firmar.
   final String? foto;
@@ -78,36 +111,88 @@ class _CirculoHistoria extends StatelessWidget {
 
   /// Clave opaca de la foto del autor, que firma el servidor.
   final String? clave;
+  @override
+  State<_CirculoHistoria> createState() => _CirculoState();
+}
+
+class _CirculoState extends State<_CirculoHistoria>
+    with SingleTickerProviderStateMixin {
+  /// Gira el anillo mientras se firma y se descarga. Es el único aviso que
+  /// hace falta: la historia se abre cuando está, no antes.
+  late final _giro = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  );
+  bool _abriendo = false;
+
+  @override
+  void dispose() {
+    _giro.dispose();
+    super.dispose();
+  }
+
   bool get _conFoto =>
-    (foto ?? '').isNotEmpty || (archivo ?? '').isNotEmpty || (clave ?? '').isNotEmpty;
+    (widget.foto ?? '').isNotEmpty || (widget.archivo ?? '').isNotEmpty ||
+    (widget.clave ?? '').isNotEmpty;
+
+  Future<void> _tocar() async {
+    if (_abriendo) return;
+    setState(() => _abriendo = true);
+    _giro.repeat();
+    bool ok = false;
+    try {
+      ok = await widget.alAbrir();
+    } finally {
+      _giro.stop();
+      _giro.value = 0;
+      if (mounted) setState(() => _abriendo = false);
+    }
+    if (!ok && mounted && !widget.agregar) {
+      avisar(context, 'No pudimos abrir esta historia. Probá de nuevo.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Semantics(
-    button: true, label: agregar ? 'Publicar una historia' : 'Historias de $nombre',
-    child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(40), child: SizedBox(
+    button: true,
+    label: widget.agregar ? 'Publicar una historia' : 'Historias de ${widget.nombre}',
+    child: InkWell(onTap: _tocar, borderRadius: BorderRadius.circular(40), child: SizedBox(
       width: 70,
       child: Column(children: [
-        Container(width: 66, height: 66, padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(shape: BoxShape.circle,
-            gradient: agregar ? null : const LinearGradient(colors: [Aftr.acento, Color(0xFFBD7D49), Aftr.acento]),
-            border: agregar ? Border.all(color: Aftr.bordeFuerte) : null),
-          child: Container(alignment: Alignment.center,
-            decoration: const BoxDecoration(color: Aftr.superficie2, shape: BoxShape.circle,
-              border: Border.fromBorderSide(BorderSide(color: Aftr.fondo, width: 3))),
-            // la foto de perfil del autor; sin foto queda la inicial, y en el
-            // propio círculo el + sigue visible en una esquina
-            child: !_conFoto
-              ? (agregar ? const Icon(Icons.add_rounded, color: Aftr.texto) :
-                  Text(nombre.isEmpty ? 'A' : nombre.substring(0, 1).toUpperCase(), style: Aftr.titular(28)))
-              : Stack(alignment: Alignment.bottomRight, children: [
-                  AvatarRemoto(nombre: nombre, foto: foto, archivo: archivo, clave: clave, radio: 27),
-                  if (agregar) Container(
-                    decoration: BoxDecoration(color: Aftr.acento, shape: BoxShape.circle,
-                      border: Border.all(color: Aftr.fondo, width: 2)),
-                    child: const Icon(Icons.add_rounded, size: 13, color: Aftr.fondo)),
-                ])),
+        // el anillo es el mismo de siempre; girando sólo mientras carga
+        AnimatedBuilder(
+          animation: _giro,
+          builder: (_, hijo) => Transform.rotate(
+            angle: _giro.value * 6.283185307179586,
+            child: hijo,
+          ),
+          child: Container(width: 66, height: 66, padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(shape: BoxShape.circle,
+              gradient: widget.agregar ? null : const SweepGradient(
+                colors: [Aftr.acento, Color(0xFFBD7D49), Color(0xFFF4E3AC), Aftr.acento]),
+              border: widget.agregar ? Border.all(color: Aftr.bordeFuerte) : null),
+            child: Container(alignment: Alignment.center,
+              decoration: const BoxDecoration(color: Aftr.superficie2, shape: BoxShape.circle,
+                border: Border.fromBorderSide(BorderSide(color: Aftr.fondo, width: 3))),
+              // la foto de perfil del autor; sin foto queda la inicial, y en el
+              // propio círculo el + sigue visible en una esquina
+              child: !_conFoto
+                ? (widget.agregar ? const Icon(Icons.add_rounded, color: Aftr.texto) :
+                    Text(widget.nombre.isEmpty ? 'A' : widget.nombre.substring(0, 1).toUpperCase(),
+                      style: Aftr.titular(28)))
+                : Stack(alignment: Alignment.bottomRight, children: [
+                    AvatarRemoto(nombre: widget.nombre, foto: widget.foto,
+                      archivo: widget.archivo, clave: widget.clave, radio: 27),
+                    if (widget.agregar) Container(
+                      decoration: BoxDecoration(color: Aftr.acento, shape: BoxShape.circle,
+                        border: Border.all(color: Aftr.fondo, width: 2)),
+                      child: const Icon(Icons.add_rounded, size: 13, color: Aftr.fondo)),
+                  ])),
+          ),
         ),
         const SizedBox(height: 7),
-        Text(nombre, maxLines: 1, overflow: TextOverflow.ellipsis, style: Aftr.cuerpo(11, c: Aftr.texto)),
+        Text(widget.nombre, maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: Aftr.cuerpo(11, c: Aftr.texto)),
       ]),
     )),
   );
@@ -115,10 +200,14 @@ class _CirculoHistoria extends StatelessWidget {
 
 class HistoriasVisor extends ConsumerStatefulWidget {
   const HistoriasVisor({super.key, required this.grupos, required this.grupoInicial,
-    this.desfase = Duration.zero});
+    this.desfase = Duration.zero, this.urlInicial});
   final List<List<DatosSocial>> grupos;
   final int grupoInicial;
   final Duration desfase;
+
+  /// La primera historia ya firmada y descargada por el círculo: por eso el
+  /// visor no abre en negro.
+  final String? urlInicial;
   @override
   ConsumerState<HistoriasVisor> createState() => _VisorState();
 }
@@ -134,9 +223,18 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
   bool _saliendo = false;
   Duration _imagen = Duration.zero;
   DateTime _ultimo = DateTime.now();
+
+  /// El avance de la barra, aparte del resto del estado. Antes el reloj de 50
+  /// ms hacía setState y reconstruía el visor entero -imagen, video, gestos,
+  /// cabecera- veinte veces por segundo para mover tres píxeles de barra.
+  final _avanceN = ValueNotifier<double>(0);
   /// Las que ya se dejaron descargadas, para no precargarlas dos veces. Las
   /// URL no se guardan acá: las guarda Firmas, que sabe cuándo vencen.
   final Set<String> _precargadas = {};
+
+  /// Videos ya inicializados de las que vienen. Cuesta un controlador por
+  /// video, y es lo que hace que avanzar no espere la descarga.
+  final Map<String, VideoPlayerController> _videosListos = {};
   Timer? _reloj;
   DatosSocial get _h => widget.grupos[_grupo][_indice];
   bool get _detenida => _pausa || _fondo || _menu || !_lista;
@@ -158,12 +256,14 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
       }
       if (_detenida || _video?.value.isBuffering == true || _error != null) return;
       if (!_esVideo) _imagen += transcurrido;
-      if (_avance >= 0.999) { _siguiente(); } else { setState(() {}); }
+      if (_avance >= 0.999) { _siguiente(); } else { _avanceN.value = _avance; }
     });
   }
   @override
   void dispose() {
     _generacion++; _reloj?.cancel(); _video?.dispose();
+    _avanceN.dispose();
+    for (final v in _videosListos.values) { v.dispose(); }
     WidgetsBinding.instance.removeObserver(this); super.dispose();
   }
   @override
@@ -186,10 +286,12 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
     final version = ++_generacion;
     final anterior = _video; _video = null; anterior?.dispose();
     _lista = false; _error = null; _url = null; _imagen = Duration.zero;
+    _avanceN.value = 0;
     if (mounted) setState(() {});
     try {
-      // la firma de la siguiente ya puede estar pedida: abrir sin esperarla
-      final url = await _firmar(_h);
+      // la primera la trae lista el círculo; las que siguen, la precarga
+      final listo = _videosListos.remove(_h['id']);
+      final url = (version == 1 ? widget.urlInicial : null) ?? await _firmar(_h);
       if (!mounted || version != _generacion || url == null) {
         if (url == null && mounted && version == _generacion) {
           setState(() => _error = 'No pudimos abrir esta historia.');
@@ -198,8 +300,8 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
       }
       _precargadas.add(_h['id'] as String);
       if (_esVideo) {
-        final video = VideoPlayerController.networkUrl(Uri.parse(url));
-        await video.initialize();
+        final video = listo ?? VideoPlayerController.networkUrl(Uri.parse(url));
+        if (listo == null) await video.initialize();
         if (!mounted || version != _generacion) { video.dispose(); return; }
         _video = video; _lista = true; _sincronizar();
       } else {
@@ -207,6 +309,7 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
         await precacheImage(NetworkImage(url), context);
         if (!mounted || version != _generacion) return;
       }
+      if (listo != null && _video != listo) await listo.dispose();
       setState(() => _url = url);
       _precargarSiguiente();
     } catch (e) {
@@ -214,18 +317,38 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
     }
   }
 
-  /// Deja lista la que sigue mientras se mira la actual, como Instagram: al
-  /// tocar para avanzar ya está firmada y descargada.
+  /// Deja listas las DOS que siguen mientras se mira la actual, como
+  /// Instagram: al tocar para avanzar ya están firmadas y descargadas. Antes
+  /// era una sola y sólo si era imagen, así que cada video arrancaba con su
+  /// propia espera.
   Future<void> _precargarSiguiente() async {
-    final h = _despuesDe(_grupo, _indice);
-    if (h == null || _precargadas.contains(h['id'])) return;
-    try {
-      final url = await _firmar(h);
-      if (!mounted || url == null) return;
-      _precargadas.add(h['id'] as String);
-      if (h['tipo'] != 'video') await precacheImage(NetworkImage(url), context);
-    } catch (_) {
-      // si falla, la siguiente se pide igual cuando toque: no molestamos acá
+    var g = _grupo, i = _indice;
+    for (var n = 0; n < 2; n++) {
+      final h = _despuesDe(g, i);
+      if (h == null) return;
+      // avanzar la posición para la próxima vuelta
+      if (i + 1 < widget.grupos[g].length) { i++; } else { g++; i = 0; }
+      final id = h['id'] as String;
+      if (_precargadas.contains(id)) continue;
+      try {
+        final url = await _firmar(h);
+        if (!mounted || url == null) return;
+        _precargadas.add(id);
+        if (h['tipo'] == 'video') {
+          // un solo video adelantado a la vez: dos controladores de video en
+          // memoria por una historia que puede no mirarse no se paga
+          if (_videosListos.isEmpty) {
+            final v = VideoPlayerController.networkUrl(Uri.parse(url));
+            await v.initialize();
+            if (!mounted) { await v.dispose(); return; }
+            _videosListos[id] = v;
+          }
+        } else {
+          await precacheImage(NetworkImage(url), context);
+        }
+      } catch (_) {
+        // si falla, se pide igual cuando toque: no molestamos acá
+      }
     }
   }
 
@@ -380,10 +503,15 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
         padding: const EdgeInsets.fromLTRB(14, 8, 8, 26),
         decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black87, Colors.transparent])),
         child: Column(children: [
-          Row(children: [for (var i = 0; i < grupo.length; i++) Expanded(child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: LinearProgressIndicator(value: i < _indice ? 1 : i == _indice ? _avance : 0,
-              minHeight: 3, color: Aftr.texto, backgroundColor: Colors.white30, borderRadius: BorderRadius.circular(3))))]),
+          ValueListenableBuilder<double>(
+            valueListenable: _avanceN,
+            builder: (_, avance, _) => Row(children: [
+              for (var i = 0; i < grupo.length; i++) Expanded(child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: LinearProgressIndicator(value: i < _indice ? 1 : i == _indice ? avance : 0,
+                  minHeight: 3, color: Aftr.texto, backgroundColor: Colors.white30,
+                  borderRadius: BorderRadius.circular(3))))]),
+          ),
           const SizedBox(height: 8),
           Row(children: [
             AvatarRemoto(nombre: '${_h['nombre'] ?? _h['autor'] ?? 'AFTR'}',

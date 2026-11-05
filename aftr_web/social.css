@@ -7,3 +7,9 @@
 /* Estados nuevos de la reventa. Dorado = algo está pasando y hay un plazo
    corriendo; nunca sólo el color: al lado va siempre el texto del estado. */
 .social .so-state.esperando_vendedor,.social .so-state.reservada{color:var(--so-gold);background:#e8c26a12}
+
+/* El anillo gira mientras se firma y se descarga la historia: es el único
+   aviso que hace falta, porque el visor se abre cuando está lista y no antes.
+   Antes se abría con un "Cargando historia…" adentro. */
+.social .so-story-author.so-cargando .so-ring{animation:so-girar 1.1s linear infinite}
+@keyframes so-girar{to{transform:rotate(1turn)}}

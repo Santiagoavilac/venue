@@ -152,6 +152,32 @@
     const errorBox = (text,action='Reintentar') => `<div class="so-empty"><span class="so-empty-icon">↻</span><p>${html(text)}</p><button class="so-btn so-secondary" data-retry>${action}</button></div>`;
     const heading = (over,title,sub='') => `<div class="so-heading"><span class="so-eyebrow">${html(over)}</span><h1>${html(title)}</h1>${sub?`<p>${html(sub)}</p>`:''}</div>`;
     const cardOrder = o => `<button type="button" class="so-order-card" data-order="${html(o.id)}"><div><span class="so-state ${html(o.estado)}">${html(estado(o.estado))}</span><h3>${html(nombre(o.evento))}</h3><small>${html(o.vendedor||o.comprador||fecha(o.created_at))}</small></div><div><strong>${dinero(o.precio_centavos)}</strong><span>Ver operación ↗</span></div></button>`;
+    /* Firma y deja decodificada una historia. Devuelve la URL o null: así
+       quien la llama decide, en vez de abrir un visor vacío. */
+    async function preparar(h) {
+      try {
+        const url=h?.media_key?await firmar(h.media_key):await sign('aftr-historias',h?.storage_path);
+        if(!url)return null;
+        if(h.tipo!=='video')await new Promise((listo,falla)=>{
+          const i=new Image();i.onload=()=>listo();i.onerror=falla;i.src=url;
+        });
+        return url;
+      } catch { return null; }
+    }
+    // Las dos que siguen, mientras se mira la actual. Los videos también: con
+    // preload="auto" el navegador empieza a bajarlo sin que se vea.
+    function precargar(grupos,gi,si) {
+      let g=gi,i=si;
+      for(let n=0;n<2;n++){
+        const grupo=grupos[g];if(!grupo)return;
+        if(i+1<grupo.length){i++;}else{g++;i=0;}
+        const h=grupos[g]?.[i];if(!h)return;
+        void (async()=>{
+          const url=await preparar(h);
+          if(url&&h.tipo==='video'){const v=document.createElement('video');v.preload='auto';v.src=url;}
+        })();
+      }
+    }
     async function mountFeed(container) {
       if(!container)return;
       const refresh=async()=>{
@@ -161,14 +187,25 @@
           const groups=agrupar(d.historias||[],now());
           container.innerHTML=`<div class="social so-feed"><button type="button" class="so-story-add" data-create-story><span>+</span><small>Tu historia</small></button>${groups.map((g,i)=>`<button type="button" class="so-story-author" data-group="${i}"><span class="so-ring"><span>${html((g[0].nombre||g[0].autor||'?').slice(0,2).toUpperCase())}</span></span><small>${html(g[0].nombre||g[0].autor)}</small>${g[0].identidad!=='usuario'?`<i>${g[0].identidad==='club'?'Boliche':'RRPP'}</i>`:''}</button>`).join('')}${!groups.length?'<p class="so-feed-empty">La noche empieza acá.<br><span>Compartí tu primera historia.</span></p>':''}</div>`;
           bind(container,'[data-create-story]',async()=>{if(await auth())await composer();});
-          bind(container,'[data-group]',b=>viewer(groups,Number(b.dataset.group)));
+          // No se abre el visor hasta que la primera historia está lista:
+          // antes se abría con un "Cargando historia…" y ahí adentro firmaba
+          // y descargaba, que es la parte que se siente lenta.
+          bind(container,'[data-group]',async b=>{
+            if(b.dataset.cargando)return;
+            b.dataset.cargando='1';b.classList.add('so-cargando');
+            try {
+              const url=await preparar(groups[Number(b.dataset.group)][0]);
+              if(!url){notify('No pudimos abrir esta historia. Probá de nuevo.');return;}
+              viewer(groups,Number(b.dataset.group),url);
+            } finally { delete b.dataset.cargando;b.classList.remove('so-cargando'); }
+          });
           container.querySelectorAll('[data-group]').forEach(b=>void pintarFoto(b.querySelector('.so-ring>span'),groups[Number(b.dataset.group)][0]));
         }catch(e){if(container.isConnected){container.innerHTML=`<div class="social so-feed-error">Historias no disponibles <button data-retry>Reintentar</button></div>`;bind(container,'[data-retry]',refresh);}}
       };
       feedRefresh=refresh;await refresh();
       pageClean?.();pageClean=watch(['aftr_historias'],refresh,30000);
     }
-    async function viewer(groups,gi=0) {
+    async function viewer(groups,gi=0,urlInicial=null) {
       const box=modal('Historias','',true);const d=dialog;d.classList.add('so-viewer-dialog');
       let si=0,frame,loadVersion=0,progress=0,last=0,held=false,buffering=true,disposed=false,video=null,startX=0,startY=0,pressAt=0;
       let current=null;
@@ -184,7 +221,7 @@
         const version=++loadVersion;cancelAnimationFrame(frame);video?.pause();video=null;progress=0;buffering=true;last=performance.now();
         current=groups[gi]?.[si];if(!current){close();return;}
         if(Date.parse(current.vence_at)<=now()){notify('Esta historia ya venció.');next();return;}
-        box.innerHTML=`<div class="so-story-stage"><div class="so-story-media"><span class="so-loading">Cargando historia…</span></div><div class="so-story-top"><div class="so-segments">${groups[gi].map((_,i)=>`<span><i style="transform:scaleX(${i<si?1:0})" data-segment="${i}"></i></span>`).join('')}</div><div class="so-story-id"><span class="so-avatar">${html((current.nombre||current.autor||'?').slice(0,2))}</span><div><strong>${html(current.nombre||current.autor)}</strong><small>${html(fecha(current.created_at))}</small></div><button type="button" class="so-icon" data-story-pause aria-label="Pausar historia">Ⅱ</button>${current.tipo==='video'?'<button type="button" class="so-icon" data-sound aria-label="Activar sonido">♫</button>':''}<button type="button" class="so-icon" data-story-menu aria-label="Opciones de historia">⋯</button></div></div><div class="so-story-foot">${current.evento_id?`<p>${html(nombre(current.evento))}</p>`:''}${current.cta?`<button class="so-btn" data-story-cta>${current.cta==='mesa'?'Reservar mesa':'Comprar entradas'} ↗</button>`:''}</div></div>`;
+        box.innerHTML=`<div class="so-story-stage"><div class="so-story-media"></div><div class="so-story-top"><div class="so-segments">${groups[gi].map((_,i)=>`<span><i style="transform:scaleX(${i<si?1:0})" data-segment="${i}"></i></span>`).join('')}</div><div class="so-story-id"><span class="so-avatar">${html((current.nombre||current.autor||'?').slice(0,2))}</span><div><strong>${html(current.nombre||current.autor)}</strong><small>${html(fecha(current.created_at))}</small></div><button type="button" class="so-icon" data-story-pause aria-label="Pausar historia">Ⅱ</button>${current.tipo==='video'?'<button type="button" class="so-icon" data-sound aria-label="Activar sonido">♫</button>':''}<button type="button" class="so-icon" data-story-menu aria-label="Opciones de historia">⋯</button></div></div><div class="so-story-foot">${current.evento_id?`<p>${html(nombre(current.evento))}</p>`:''}${current.cta?`<button class="so-btn" data-story-cta>${current.cta==='mesa'?'Reservar mesa':'Comprar entradas'} ↗</button>`:''}</div></div>`;
         const stage=q('.so-story-stage',box);const media=q('.so-story-media',box);
         void pintarFoto(q('.so-avatar',box),current);
         bind(box,'[data-story-pause]',b=>{held=!held;b.textContent=held?'▶':'Ⅱ';if(video){if(held)video.pause();else video.play().catch(()=>{});}});
@@ -203,7 +240,8 @@
         stage.addEventListener('pointerup',e=>{if(e.target.closest('button'))return;held=false;const dx=e.clientX-startX,dy=e.clientY-startY;if(Math.abs(dy)>90&&dy>0){close();return;}if(Math.abs(dx)>65){dx<0?next():prev();return;}if(performance.now()-pressAt<220){e.clientX<stage.getBoundingClientRect().left+stage.clientWidth*.35?prev():next();return;}video?.play().catch(()=>{});});
         stage.addEventListener('pointercancel',()=>{held=false;video?.play().catch(()=>{});});
         try {
-          const url=current.media_key ? await firmar(current.media_key) : await sign('aftr-historias',current.storage_path);
+          // la primera ya viene lista del círculo; las que siguen, de la precarga
+          const url=(version===1&&urlInicial)||(current.media_key ? await firmar(current.media_key) : await sign('aftr-historias',current.storage_path));
           if(disposed||version!==loadVersion)return;
           if(!url)throw new Error('No pudimos abrir esta historia.');
           if(current.tipo==='video'){
@@ -215,6 +253,7 @@
             const image=new Image();image.alt=`Historia de ${current.nombre||current.autor}`;image.onload=()=>{if(version===loadVersion){buffering=false;last=performance.now();}};image.onerror=failed;image.src=url;media.replaceChildren(image);
           }
           frame=requestAnimationFrame(tick);
+          precargar(groups,gi,si);
         }catch(e){if(!disposed&&version===loadVersion)failed();}
       }
       function failed(){buffering=true;const m=q('.so-story-media',box);if(m){m.innerHTML=errorBox('No se pudo cargar esta historia.');bind(m,'[data-retry]',draw);}}
