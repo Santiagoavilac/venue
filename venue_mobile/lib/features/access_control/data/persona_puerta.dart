@@ -29,7 +29,8 @@ class PersonaPuerta {
   final String? rrpp;
   final String? estado;
 
-  /// Entrada "de la casa": sin tope de horario y no se puede filtrar.
+  /// Entrada "de la casa" o con pase libre: sin tope de horario y no se
+  /// puede filtrar.
   final bool sinTope;
   final DateTime? ingresoAt;
   final DateTime? filtroAt;

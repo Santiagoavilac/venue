@@ -15,6 +15,7 @@ PersonaPuerta p(String nombre,
     });
 
 void main() {
+  _paseLibre();
   _qrInhabilitado();
   test('fila de entrada y de lista desde el servidor', () {
     final e = PersonaPuerta.desde({
@@ -119,5 +120,50 @@ void _qrInhabilitado() {
     final otra = PersonaPuerta.desde({'id': 'dos', 'tipo': 'lista', 'nombre': 'Beto'});
     expect(otra.qrAnulado, isFalse);
     expect(otra.anulada, isFalse);
+  });
+}
+
+// Pase libre: el QR del dueño entra siempre, entra y sale, y el portero no lo
+// puede frenar. Antes "de la casa" era por persona y marcaba todas sus
+// entradas; esto es por entrada y lo da el admin.
+void _paseLibre() {
+  test('un pase libre dice que pasa y que puede volver a entrar', () {
+    final r = ResultadoEscaneo.desdeServidor(
+      {
+        'resultado': 'valida',
+        'cliente': 'Dueño',
+        'sin_tope': true,
+        'pase_libre': true,
+      },
+      codigo: 'LIBRE1',
+      esLista: false,
+      ahora: DateTime(2026, 11, 5),
+    );
+    expect(r.veredicto.dejaPasar, isTrue);
+    expect(r.detalle, contains('las veces que quiera'));
+  });
+
+  test('una entrada de la casa sigue diciendo lo suyo', () {
+    final r = ResultadoEscaneo.desdeServidor(
+      {'resultado': 'valida', 'cliente': 'Ana', 'sin_tope': true},
+      codigo: 'CASA1',
+      esLista: false,
+      ahora: DateTime(2026, 11, 5),
+    );
+    expect(r.veredicto.dejaPasar, isTrue);
+    expect(r.detalle, 'Sin tope de horario');
+  });
+
+  test('el pase libre llega al buscador como intocable', () {
+    final p = PersonaPuerta.desde({
+      'id': 'uno',
+      'tipo': 'entrada',
+      'nombre': 'Dueño',
+      'code': 'LIBRE1',
+      'sin_tope': true,
+      'pase_libre': true,
+    });
+    // sinTope es lo que esconde el botón de "no pasó el control"
+    expect(p.sinTope, isTrue);
   });
 }

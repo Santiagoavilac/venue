@@ -67,6 +67,9 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
   String? _comprobanteUrl;
   bool _subiendo = false;
   bool _generando = false;
+
+  /// Pase libre: la entrada que entra siempre. Sólo la da el admin.
+  bool _paseLibre = false;
   int? _progreso;
   int _escritos = 0;
   _Alcance _alcance = _Alcance.mias;
@@ -147,7 +150,9 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
     for (final nombre in nombres) {
       try {
         creadas.add(await repo.generar(ev.id, nombre,
-            comprobanteUrl: _comprobanteUrl, metodo: _comprobanteUrl == null ? null : 'transferencia'));
+            comprobanteUrl: _comprobanteUrl,
+            metodo: _comprobanteUrl == null ? null : 'transferencia',
+            paseLibre: _paseLibre));
         if (mounted && _progreso != null) setState(() => _progreso = creadas.length);
       } catch (e) {
         corte = mensajeDeError(e);
@@ -425,6 +430,20 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
               // Para los boliches que no venden por AFTR: el cliente le paga
               // al relacionador por fuera y le manda la captura. Queda pegada
               // a la entrada, así el jefe rinde con la prueba en la mano.
+              // Una sola línea, sin pantallas ni menús: lo que hace está
+              // escrito abajo del título.
+              if (rol == Rol.admin)
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  value: _paseLibre,
+                  onChanged: _generando ? null : (v) => setState(() => _paseLibre = v),
+                  title: const Text('Pase libre'),
+                  subtitle: Text(
+                    'Entra siempre y las veces que quiera. El portero no la puede frenar.',
+                    style: Tipo.apoyo,
+                  ),
+                ),
               Row(children: [
                 // la miniatura de lo que se adjuntó: antes de generar veinte
                 // entradas conviene ver que la captura es la que se eligió
@@ -765,6 +784,7 @@ class _FilaEntrada extends StatelessWidget {
                         '#${e.codigo}',
                         '${e.precio} Bs',
                         ?fase,
+                        if (e.paseLibre) 'pase libre',
                         if (deLaCasa) 'de la casa',
                         if (e.filtrada) 'no pasó filtro',
                         texto,

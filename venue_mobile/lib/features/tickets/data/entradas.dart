@@ -20,6 +20,7 @@ class Entrada {
     this.filtrada = false,
     this.comprobanteUrl,
     this.metodoPago,
+    this.paseLibre = false,
   });
   final String id;
   final String codigo;
@@ -38,6 +39,10 @@ class Entrada {
 
   /// La foto del pago, cuando la entrada se vendió por fuera de AFTR.
   final String? comprobanteUrl;
+
+  /// Entra siempre: sin hora tope, sin consumirse y sin que la puerta la pueda
+  /// frenar.
+  final bool paseLibre;
   final String? metodoPago;
 
   bool get conComprobante => (comprobanteUrl ?? '').isNotEmpty;
@@ -57,6 +62,7 @@ class Entrada {
         usedAt: DateTime.tryParse(j['used_at'] as String? ?? '')?.toLocal(),
         comprobanteUrl: j['comprobante_url'] as String?,
         metodoPago: j['metodo_pago'] as String?,
+        paseLibre: j['pase_libre'] == true,
       );
 }
 
@@ -119,7 +125,7 @@ class EntradasRepository {
   Future<List<Entrada>> mias(String eventoId, String usuarioId) async {
     final r = await _sb
         .from('entradas')
-        .select('id, code, cliente, precio, estado, used_at, rrpp_id, fase_id, filtro_at, comprobante_url, metodo_pago')
+        .select('id, code, cliente, precio, estado, used_at, rrpp_id, fase_id, filtro_at, comprobante_url, metodo_pago, pase_libre')
         .eq('evento_id', eventoId)
         .eq('rrpp_id', usuarioId)
         .isFilter('mesa_id', null)
@@ -134,13 +140,17 @@ class EntradasRepository {
   /// AFTR: el cliente le paga al relacionador por fuera y le manda la captura.
   /// El servidor comprueba que el archivo sea del bucket de comprobantes y de
   /// la carpeta de quien vende.
+  /// [paseLibre] marca la entrada que entra siempre: no le corre la hora
+  /// tope, no se consume -entra y sale- y el portero no la puede frenar. Sólo
+  /// el administrador del boliche puede darla; el servidor lo comprueba.
   Future<Entrada> generar(String eventoId, String cliente,
-      {String? comprobanteUrl, String? metodo}) async {
+      {String? comprobanteUrl, String? metodo, bool paseLibre = false}) async {
     final r = await _sb.rpc('generar_entrada', params: {
       'p_evento': eventoId,
       'p_cliente': cliente.trim(),
       if (comprobanteUrl != null) 'p_comprobante_url': comprobanteUrl,
       if (metodo != null) 'p_metodo': metodo,
+      if (paseLibre) 'p_pase_libre': true,
     });
     return Entrada.desde(Map<String, dynamic>.from(r as Map));
   }
@@ -157,7 +167,7 @@ class EntradasRepository {
     final filas = await traerTodo((d, h) => _sb
         .from('entradas')
         .select('id, code, cliente, precio, estado, used_at, rrpp_id, fase_id, filtro_at, '
-            'comprobante_url, metodo_pago, rrpp:profiles!entradas_rrpp_id_fkey(nombre)')
+            'comprobante_url, metodo_pago, pase_libre, rrpp:profiles!entradas_rrpp_id_fkey(nombre)')
         .eq('evento_id', eventoId)
         .isFilter('mesa_id', null)
         .order('created_at', ascending: false)

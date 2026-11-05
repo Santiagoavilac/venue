@@ -1714,9 +1714,11 @@ async function loadSinTope(forzar) {
   sinTopeIds = new Set(data || []);
   cacheClub.sinTope = club;
 }
-const esInnegable = t => !!t && sinTopeIds.has(t.rrpp_id || me.id);
+/* Entra siempre: o la entrada tiene pase libre -la marca el admin al
+   generarla- o quien la vendió está en la lista de "de la casa". */
+const esInnegable = t => !!t && (t.pase_libre === true || sinTopeIds.has(t.rrpp_id || me.id));
 
-async function ticketImage(t, oro, fase, arte) {
+async function ticketImage(t, fase, arte) {
   // arte: {url, propio} para la vista previa de Gestionar evento
   const propio = arte ? arte.propio : arteDeFase(t);
   const img = await loadImg(arte ? arte.url : (propio || ev.ticket_url));
@@ -1743,7 +1745,9 @@ async function ticketImage(t, oro, fase, arte) {
   ctx.fillText(t.cliente, W / 2, nameY);
   // si la fase trae su propio arte, el sello sobra: la imagen ya la distingue
   if (fase && !propio) marcaFase(ctx, W, H, fase);
-  if (oro) marcaOro(ctx, W, H);
+  // El marco dorado y el sello "ACCESO LIBRE" se sacaron: la imagen se
+  // reenvía por WhatsApp y no tiene por qué anunciarle a nadie que ese QR
+  // entra siempre. El pase libre es cosa de la puerta, no del dibujo.
   return cnv.toDataURL("image/png");
 }
 
@@ -1765,25 +1769,6 @@ function marcaFase(ctx, W, H, txt) {
   ctx.textBaseline = "alphabetic";
 }
 
-/* marco dorado + sello, encima del arte del evento */
-function marcaOro(ctx, W, H) {
-  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
-  const m = W * 0.022, r = W * 0.035;
-  const oro = ctx.createLinearGradient(0, 0, W, H);
-  oro.addColorStop(0, "#ffe9a3"); oro.addColorStop(.5, "#e8b530"); oro.addColorStop(1, "#ffdf7a");
-  ctx.strokeStyle = oro; ctx.lineWidth = W * 0.016;
-  ctx.beginPath(); ctx.roundRect(m, m, W - 2 * m, H - 2 * m, r); ctx.stroke();
-  // sello arriba, sobre el marco
-  const txt = "ACCESO LIBRE";
-  ctx.font = `800 ${Math.round(W * 0.037)}px "Space Grotesk", sans-serif`;
-  const pw = ctx.measureText(txt).width + W * 0.075, ph = W * 0.078;
-  const px = (W - pw) / 2, py = m - ph / 2;
-  ctx.fillStyle = oro;
-  ctx.beginPath(); ctx.roundRect(px, py, pw, ph, ph / 2); ctx.fill();
-  ctx.fillStyle = "#2a1c00"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(txt, W / 2, py + ph / 2 + W * 0.002);
-  ctx.textBaseline = "alphabetic";
-}
 /* Mandar varias entradas de una.
    El flujo era: generás 5 y las mandás una por una, entrando y saliendo de
    cada ticket. Ahora se marcan varias y salen todas juntas en la hoja de
@@ -1799,8 +1784,7 @@ async function enviarTanda(tks) {
     const files = [];
     for (let i = 0; i < tks.length; i++) {
       paso(i + 1);
-      const oro = esInnegable(tks[i]);
-      const png = arteTicket(tks[i]) ? await ticketImage(tks[i], oro, nombreFase(tks[i])) : null;
+      const png = arteTicket(tks[i]) ? await ticketImage(tks[i], nombreFase(tks[i])) : null;
       if (!png) break;                       // sin arte del evento no hay imagen que mandar
       files.push(new File([await dataUrlToBlob(png)], `entrada-${tks[i].code}.png`, { type: "image/png" }));
     }
@@ -1958,10 +1942,9 @@ function sheetDetalleEntrada(t, nombreVend, vendedores) {
 async function renderTicket(t) {
   const view = $("#tkView"); if (!view) return;
   await loadSinTope();
-  const oro = esInnegable(t);
   if (arteTicket(t)) {
     try {
-      lastTkPng = await ticketImage(t, oro, nombreFase(t));
+      lastTkPng = await ticketImage(t, nombreFase(t));
       // Compacta: el arte ocupaba toda la pantalla y empujaba la lista
       // hacia abajo. Se ve en chico y se abre en grande si hace falta.
       view.innerHTML = `
@@ -2012,10 +1995,9 @@ async function sheetTicket(t) {
   sheet(`<div class="sh-h">Entrada${t.gratis ? " gratis" : ""} · ${esc(t.cliente)}</div><div id="stkView"><div class="empty">Generando…</div></div>`);
   const view = $("#stkView");
   await loadSinTope();
-  const oro = esInnegable(t);
   if (arteTicket(t)) {
     try {
-      lastTkPng = await ticketImage(t, oro, nombreFase(t));
+      lastTkPng = await ticketImage(t, nombreFase(t));
       view.innerHTML = `<img src="${lastTkPng}" style="width:100%;border-radius:18px;border:1px solid var(--line-2);margin-bottom:10px">
         <div class="tk-actions"><button class="btn wa" onclick="waTk()">WhatsApp</button><button class="btn ghost2" onclick="dlTk()">Descargar</button></div>`;
       return;
@@ -6103,7 +6085,7 @@ async function screenEventoDetalle() {
   const arteFase = elegida?.ticket_url || null, arteUrl = arteFase || ev.ticket_url;
   if (arteUrl) ticketImage(
     { payload: `EVT:${ev.id}:VISTA-PREVIA`, code: "VISTAPREVIA", cliente: "Nombre del cliente" },
-    false, elegida?.nombre || null, { url: arteUrl, propio: arteFase })
+    elegida?.nombre || null, { url: arteUrl, propio: arteFase })
     .then(src => { const v = $("#edVista"); if (v && evDetalle) v.innerHTML = `<img src="${src}" alt="Vista previa de la entrada">`; })
     .catch(() => { const v = $("#edVista"); if (v) v.innerHTML = `<p>No se pudo dibujar la vista previa.</p>`; });
 

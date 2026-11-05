@@ -191,7 +191,11 @@ class ResultadoEscaneo {
           nombre: nombre,
           tipo: tipoBase(),
           quien: quien.isEmpty ? null : quien,
-          detalle: r['sin_tope'] == true ? 'Sin tope de horario' : null,
+          detalle: r['pase_libre'] == true
+              ? 'Pase libre: entra las veces que quiera'
+              : r['sin_tope'] == true
+              ? 'Sin tope de horario'
+              : null,
           hora: ahora,
         );
       case 'usada':
