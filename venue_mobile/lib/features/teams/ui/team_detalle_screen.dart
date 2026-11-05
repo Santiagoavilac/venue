@@ -11,6 +11,7 @@ import '../../clubs/data/clubs.dart';
 import '../../events/data/eventos.dart';
 import '../data/equipo.dart';
 import '../data/gente.dart';
+import '../../../core/widgets/insignia.dart';
 
 /// Abre la página de un team: su gente con lo que vendió cada uno.
 Future<void> abrirTeam(BuildContext context, TeamInfo team) => Navigator.of(context)
@@ -579,7 +580,7 @@ class _Ventas extends StatelessWidget {
                     ]),
                   ),
                   const SizedBox(width: 8),
-                  PillEstado(filas[i].estado, tono: filas[i].tono),
+                  Insignia(filas[i].estado, tono: filas[i].tono),
                 ]),
               ),
             ],

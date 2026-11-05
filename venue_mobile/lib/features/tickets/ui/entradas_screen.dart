@@ -623,7 +623,7 @@ class _FilaEntrada extends StatelessWidget {
           color: VenueColors.superficie,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-              color: deLaCasa ? const Color(0xFFE8B530) : VenueColors.linea),
+              color: deLaCasa ? VenueColors.cortesia : VenueColors.linea),
         ),
         child: Row(children: [
           if (alMarcar != null)

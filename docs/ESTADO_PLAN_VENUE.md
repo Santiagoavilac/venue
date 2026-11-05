@@ -15,7 +15,11 @@ trabajo. Última actualización: 2026-11-05.
 - [x] `TarjetaCifra` único (`core/widgets/tarjeta_cifra.dart`) con su `GrillaCifras`.
       Reemplazó a `Indicador`, `FichaDato`, `Kpi`, `_Dato` de Accesos y `_Cifra`
       del relacionador: 45 llamadas migradas. Prueba: `test/tarjeta_cifra_test.dart`
-- [ ] Badge de estado único que reemplace las siete
+- [x] `Insignia` único (`core/widgets/insignia.dart`), con `Insignia.texto` sin
+      fondo para las listas densas de la puerta. Reemplazó a `PillEstado`,
+      `_ChipPagado` y `_Estado` de Pagos, `_Estado` del relacionador,
+      `_Etiqueta` de Eventos y los dos `_EstadoTexto`. El dorado de las
+      cortesías pasó a `VenueColors.cortesia`. Prueba: `test/insignia_test.dart`
 - [ ] `EsqueletoLista` con `skeletonizer` en lugar de las 46 ruleditas
 - [ ] Sacar `HeroEvento` de `gestion_screen.dart` a `core/widgets/`
 - [~] Borrar lo muerto: ya salieron `Indicador`, `GrillaIndicadores`, `FichaDato`

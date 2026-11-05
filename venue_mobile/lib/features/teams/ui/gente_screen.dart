@@ -19,6 +19,7 @@ import '../../rrpp/ui/gestion_solicitudes.dart';
 import '../data/equipo.dart';
 import '../data/gente.dart';
 import 'team_detalle_screen.dart';
+import '../../../core/widgets/insignia.dart';
 
 Future<T?> _hoja<T>(BuildContext context, Widget child) =>
     showModalBottomSheet<T>(
@@ -529,8 +530,8 @@ class _UsuariosState extends ConsumerState<_Usuarios> {
             nombre: team ?? '',
           );
           final estado = u.activo
-              ? const PillEstado('Activo')
-              : const PillEstado('Pausado', tono: Tono.neutro);
+              ? const Insignia('Activo')
+              : const Insignia('Pausado', tono: Tono.neutro);
           if (tabla) {
             return InkWell(
               onTap: () => abrir(u),

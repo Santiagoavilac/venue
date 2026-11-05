@@ -143,6 +143,10 @@ class VenueColors {
   static Color get info => paleta.info;
 
   static const marcaPorDefecto = Color(0xFF7C3AED);
+
+  /// Dorado de las cortesías: entrada de la casa, lista free, manilla regalada.
+  /// Es el mismo en los dos modos, como el verde y el rojo de la puerta.
+  static const cortesia = Color(0xFFE8B530);
 }
 
 /// Tipografía de toda la app (empaquetada en assets/fonts).

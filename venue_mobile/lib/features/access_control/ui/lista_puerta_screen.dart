@@ -12,6 +12,7 @@ import '../../events/data/eventos.dart';
 import '../data/persona_puerta.dart';
 import '../data/puerta_repository.dart';
 import '../data/resultado.dart';
+import '../../../core/widgets/insignia.dart';
 
 /// Lista en puerta: buscar por nombre y marcar el ingreso. Sirve para los
 /// invitados de lista y para quien compró manilla y no tiene el QR a mano.
@@ -293,7 +294,7 @@ class _Fila extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: p.sinTope
-                ? const Color(0xFFE8B530)
+                ? VenueColors.cortesia
                 : p.ingreso
                 ? VenueColors.ok.withValues(alpha: .5)
                 : VenueColors.linea,
@@ -327,11 +328,11 @@ class _Fila extends StatelessWidget {
                         spacing: 6,
                         children: [
                           if (p.sinTope)
-                            const _EstadoTexto('de la casa', Color(0xFFE8B530)),
+                            Insignia.texto('de la casa', color: VenueColors.cortesia),
                           if (p.filtrada)
-                            _EstadoTexto('no pasó filtro', VenueColors.mal),
+                            const Insignia.texto('no pasó filtro', tono: Tono.mal),
                           if (p.anulada)
-                            _EstadoTexto('anulada', VenueColors.mal),
+                            const Insignia.texto('anulada', tono: Tono.mal),
                         ],
                       ),
                     ),

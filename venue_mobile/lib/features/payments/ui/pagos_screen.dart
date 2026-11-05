@@ -15,6 +15,7 @@ import '../../events/data/eventos.dart';
 import '../../teams/data/equipo.dart';
 import '../../vip_tables/ui/mesa_hojas.dart';
 import '../data/pagos.dart';
+import '../../../core/widgets/insignia.dart';
 
 Future<T?> _hoja<T>(BuildContext context, Widget child) => showModalBottomSheet<T>(
       context: context,
@@ -219,7 +220,7 @@ class PagosScreen extends ConsumerWidget {
                     await _hoja(context, _Comprobante(pago: p));
                     recargar();
                   },
-                  leading: _Estado(p.estado),
+                  leading: _insignia(context, p.estado),
                   title: Text('${p.monto} Bs — ${p.rrppNombre}',
                       style: const TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: Text([
@@ -273,7 +274,7 @@ class _MiCuenta extends StatelessWidget {
           Row(children: [
             const Expanded(
                 child: Text('Tu cuenta', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
-            if (x != null) _ChipPagado(x),
+            if (x != null) Insignia(x.pagado ? 'Pagado' : 'Pendiente', tono: x.pagado ? Tono.ok : Tono.aviso),
           ]),
           const SizedBox(height: 10),
           if (x == null)
@@ -325,23 +326,6 @@ class _Linea extends StatelessWidget {
           Text(v, style: const TextStyle(fontWeight: FontWeight.w700)),
         ]),
       );
-}
-
-class _ChipPagado extends StatelessWidget {
-  const _ChipPagado(this.r);
-  final Rendicion r;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = r.pagado ? VenueColors.ok : VenueColors.aviso;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-          color: c.withValues(alpha: .14), borderRadius: BorderRadius.circular(99)),
-      child: Text(r.pagado ? 'Pagado ✓' : 'Pendiente',
-          style: TextStyle(color: c, fontWeight: FontWeight.w800, fontSize: 12.5)),
-    );
-  }
 }
 
 /// Totales de lo que se controla: cuánto hay que cobrar y cuánto ya tiene check.
@@ -493,26 +477,14 @@ class _Caja extends StatelessWidget {
       );
 }
 
-class _Estado extends StatelessWidget {
-  const _Estado(this.estado);
-  final String estado;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = switch (estado) {
-      'verificado' => VenueColors.ok,
-      'pagado' => Theme.of(context).colorScheme.primary,
-      _ => VenueColors.aviso,
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-          color: c.withValues(alpha: .16), borderRadius: BorderRadius.circular(8)),
-      child: Text(etiquetaPago[estado] ?? estado,
-          style: TextStyle(color: c, fontSize: 11.5, fontWeight: FontWeight.w800)),
-    );
-  }
-}
+/// El estado de un pago, con el color que le toca. El pagado usa el color de
+/// la marca, que no es un tono de estado.
+Insignia _insignia(BuildContext context, String estado) => switch (estado) {
+  'verificado' => Insignia(etiquetaPago[estado] ?? estado, tono: Tono.ok),
+  'pagado' => Insignia(etiquetaPago[estado] ?? estado,
+      color: Theme.of(context).colorScheme.primary),
+  _ => Insignia(etiquetaPago[estado] ?? estado, tono: Tono.aviso),
+};
 
 /// Registrar una rendición: QR a quien se transfiere, monto, concepto y la
 /// foto de la transferencia (obligatoria salvo para el admin).
@@ -713,7 +685,7 @@ class _Comprobante extends ConsumerWidget {
             child: Text('${p.monto} Bs',
                 style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
           ),
-          _Estado(p.estado),
+          _insignia(context, p.estado),
         ]),
         Text(p.rrppNombre, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         Text(

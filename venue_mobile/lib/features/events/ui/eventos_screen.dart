@@ -9,6 +9,7 @@ import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../data/eventos.dart';
 import 'gestion_screen.dart';
+import '../../../core/widgets/insignia.dart';
 
 /// Eventos abiertos del boliche. Tocar uno lo deja como evento de trabajo
 /// para el resto de la app (escáner, listas…).
@@ -154,33 +155,12 @@ class _FilaEvento extends StatelessWidget {
               ]),
             ),
             if (vivo)
-              _Etiqueta('EN VIVO', VenueColors.ok)
+              const Insignia('EN VIVO', tono: Tono.ok)
             else if (hoy)
-              _Etiqueta('HOY', VenueColors.aviso),
+              const Insignia('HOY', tono: Tono.aviso),
             Icon(Icons.chevron_right_rounded, color: VenueColors.textoTenue),
           ]),
         ),
-      ),
-    );
-  }
-}
-
-class _Etiqueta extends StatelessWidget {
-  const _Etiqueta(this.texto, this.color);
-  final String texto;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .16),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        texto,
-        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w800),
       ),
     );
   }

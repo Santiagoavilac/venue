@@ -15,6 +15,7 @@ import '../../teams/data/equipo.dart';
 import '../../teams/ui/team_detalle_screen.dart';
 import '../data/reporte.dart';
 import 'reporte_hojas.dart';
+import '../../../core/widgets/insignia.dart';
 
 /// Reporte del evento. Admin: cierre completo. Jefe: su team. Relacionador:
 /// lo suyo. Los datos que llegan ya vienen recortados por RLS a lo que cada
@@ -788,7 +789,7 @@ class _Liquidacion extends ConsumerWidget {
     final unit = c.entUsadas > 0 ? (c.entBruto / c.entUsadas).round() : 0;
     final cerrado = ev.estado == 'cerrado';
     final angosto = MediaQuery.sizeOf(context).width < 600;
-    final estado = PillEstado(
+    final estado = Insignia(
       cerrado ? 'Cerrado' : 'Pendiente de cierre',
       tono: cerrado ? Tono.ok : Tono.aviso,
     );

@@ -22,6 +22,7 @@ import '../../teams/ui/gente_screen.dart';
 import '../../vip_tables/ui/mesas_screen.dart';
 import '../data/rrpp.dart';
 import 'gestion_solicitudes.dart';
+import '../../../core/widgets/insignia.dart';
 
 const _aftr = 'https://www.aftrvenue.com/';
 
@@ -232,23 +233,11 @@ class _Vacio extends StatelessWidget {
       );
 }
 
-class _Estado extends StatelessWidget {
-  const _Estado(this.estado);
-  final String estado;
-  @override
-  Widget build(BuildContext context) {
-    final (t, c) = switch (estado) {
-      'pagada' => ('Pagada', VenueColors.ok),
-      'confirmada' => ('Por cobrar', VenueColors.aviso),
-      _ => ('Estimada', VenueColors.textoTenue),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: c.withValues(alpha: .12), borderRadius: BorderRadius.circular(99)),
-      child: Text(t, style: TextStyle(color: c, fontSize: 11.5, fontWeight: FontWeight.w600)),
-    );
-  }
-}
+Insignia _insignia(String estado) => switch (estado) {
+  'pagada' => const Insignia('Pagada', tono: Tono.ok),
+  'confirmada' => const Insignia('Por cobrar', tono: Tono.aviso),
+  _ => const Insignia('Estimada', tono: Tono.neutro),
+};
 
 Widget _dia(DateTime f) => Container(
       width: 44,
@@ -324,7 +313,7 @@ Widget _filaPasado(BuildContext context, EventoRrpp e, {String? sub}) => _fila(
       fin: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
         Text(_bs(e.comisionTotal), style: const TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
-        _Estado(e.estadoComision),
+        _insignia(e.estadoComision),
       ]),
       alTocar: () => _abrirPasado(context, e),
     );
@@ -634,7 +623,7 @@ void _abrirPasado(BuildContext context, EventoRrpp e) {
         TarjetaCifra(etiqueta: 'Mesas', valor: _miles(e.mesasConfirmadas), detalle: e.mesasReservadas > 0 ? '${e.mesasReservadas} reservadas' : 'confirmadas'),
         TarjetaCifra(etiqueta: 'Ventas', valor: _bs(e.ventas), detalle: 'para el boliche'),
       ]),
-      TituloBloque('Tu comisión', accion: _Estado(e.estadoComision)),
+      TituloBloque('Tu comisión', accion: _insignia(e.estadoComision)),
       Tarjeta(
         child: Column(children: [
           for (final (k, v) in filas)

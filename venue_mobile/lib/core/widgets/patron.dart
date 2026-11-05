@@ -4,8 +4,8 @@ import '../theme/venue_theme.dart';
 
 export 'tarjeta_cifra.dart';
 
-/// Piezas del patrón de pantalla: toda sección arranca con un [Encabezado],
-/// sigue con [Indicador]es y usa [PillEstado] para los estados.
+/// Piezas del patrón de pantalla: toda sección arranca con un [Encabezado] y
+/// sigue con [TarjetaCifra] para los números e [Insignia] para los estados.
 ///
 /// Criterio visual (como Fourvenues): superficies planas, sin íconos en
 /// recuadros ni brillos. El dato manda: etiqueta chica gris arriba, número
@@ -131,35 +131,6 @@ class IconoRecuadro extends StatelessWidget {
         height: lado * .6,
         child: Icon(icono, size: lado * .5, color: colorDeTono(context, tono)),
       );
-}
-
-/// Estado con punto de color: Activo, Pendiente de cierre, Pausado…
-class PillEstado extends StatelessWidget {
-  const PillEstado(this.texto, {super.key, this.tono = Tono.ok});
-
-  final String texto;
-  final Tono tono;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = tono == Tono.neutro ? VenueColors.textoTenue : colorDeTono(context, tono);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: tono == Tono.neutro ? VenueColors.superficie2 : color.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(texto, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-      ]),
-    );
-  }
 }
 
 /// Tarjeta del patrón: blanca con sombra suave en claro, borde fino en oscuro.

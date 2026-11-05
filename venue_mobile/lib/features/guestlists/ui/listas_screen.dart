@@ -17,6 +17,7 @@ import '../../tickets/data/entradas.dart';
 import '../../tickets/ui/ticket_sheet.dart';
 import '../data/listas.dart';
 import 'limites_jefe.dart';
+import '../../../core/widgets/insignia.dart';
 
 /// Reglas de quién puede qué sobre un invitado. Son las mismas de la web;
 /// el servidor las vuelve a aplicar en cada RPC.
@@ -523,20 +524,19 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
                             spacing: 6,
                             runSpacing: 6,
                             children: [
-                              _EstadoTexto('${rs.length} anotados'),
-                              _EstadoTexto(
+                              Insignia.texto('${rs.length} anotados'),
+                              Insignia.texto(
                                 '${rs.where((i) => i.ingreso).length} ingresaron',
-                                color: VenueColors.ok,
+                                tono: Tono.ok,
                               ),
                               if (l.ingresoHasta != null)
-                                _EstadoTexto(
+                                Insignia.texto(
                                   'hasta ${l.ingresoHasta}',
-                                  color: VenueColors.aviso,
+                                  tono: Tono.aviso,
                                 ),
-                              _EstadoTexto(
+                              Insignia.texto(
                                 (l.precio ?? 0) > 0 ? '${l.precio} Bs' : 'Free',
-                                color: const Color(0xFFE8B530),
-                                borde: true,
+                                color: VenueColors.cortesia,
                               ),
                             ],
                           ),
@@ -771,25 +771,6 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
       ),
     );
   }
-}
-
-class _EstadoTexto extends StatelessWidget {
-  const _EstadoTexto(this.texto, {this.color, this.borde = false});
-  final String texto;
-  final Color? color;
-  final bool borde;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Text(
-      texto,
-      style: TextStyle(
-        color: color ?? VenueColors.textoSuave,
-        fontSize: 12.5,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-  );
 }
 
 class _FilaInvitado extends StatelessWidget {
