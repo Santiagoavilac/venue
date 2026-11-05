@@ -163,10 +163,12 @@ Nada de esto se puede cerrar sin un proyecto real delante:
      boliches, `rol_en_club` devuelve `jefe` en uno y `rrpp` en el otro, que es
      lo que ahora mira `rrpp_eventos`.
 
-   **Pendiente de revisar, no es un error del plan**: el portero ve los `bonos`
-   de los relacionadores. Sale de `impl.ve_registro`, que le da todo para poder
-   trabajar en la puerta; para listas y entradas está bien, para la plata de
-   otro habría que decidir si corresponde.
+   **Corregido** (migración `20261105110000`): el portero veía los `bonos` de
+   los relacionadores y el precio de cada mesa, porque `impl.ve_registro` le da
+   todo. Ahora la plata pasa por `impl.ve_plata`, que es lo mismo menos el
+   portero; lo operativo —cliente, estado, quién vendió— le queda igual, que
+   es de lo que depende la puerta. Probado con las cuentas de Burtown: el
+   portero ve el cliente de la mesa y no su precio, y cero bonos.
 
    La prueba se hizo en el boliche de demo Aurora, que después se borró a
    pedido. Para repetirla hay cuentas de prueba en Burtown: `prueba.admin`,
