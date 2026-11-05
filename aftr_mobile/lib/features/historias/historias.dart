@@ -122,6 +122,9 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
   VideoPlayerController? _video;
   String? _url, _error;
   bool _lista = false, _pausa = false, _fondo = false, _menu = false;
+  /// Ya se pidió cerrar el visor. El reloj sigue latiendo mientras la pantalla
+  /// se va, y sin esto volvía a pedir el cierre en cada latido.
+  bool _saliendo = false;
   Duration _imagen = Duration.zero;
   DateTime _ultimo = DateTime.now();
   DateTime? _firmada;
@@ -140,7 +143,7 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
   void initState() {
     super.initState(); WidgetsBinding.instance.addObserver(this); _cargar();
     _reloj = Timer.periodic(const Duration(milliseconds: 50), (_) {
-      if (!mounted) return;
+      if (!mounted || _saliendo) return;
       final ahora = DateTime.now();
       final transcurrido = ahora.difference(_ultimo); _ultimo = ahora;
       if (tiempoRestante(_h['vence_at'], ahora.add(widget.desfase)) == Duration.zero) {
@@ -222,13 +225,26 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
     if (grupo + 1 < widget.grupos.length) return widget.grupos[grupo + 1][0];
     return null;
   }
+  /// Cierra el visor una sola vez.
+  ///
+  /// Al terminar la última historia la pantalla quedaba negra: el reloj de 50
+  /// ms seguía corriendo mientras la pantalla se iba, veía el avance completo
+  /// otra vez y volvía a cerrar, así que después de la última historia se
+  /// llevaba también la pantalla de abajo.
+  void _salir() {
+    if (_saliendo) return;
+    _saliendo = true; _reloj?.cancel();
+    if (mounted) Navigator.of(context).pop();
+  }
   void _siguiente({bool autor = false}) {
+    if (_saliendo) return;
     if (!autor && _indice + 1 < widget.grupos[_grupo].length) { _indice++; }
     else if (_grupo + 1 < widget.grupos.length) { _grupo++; _indice = 0; }
-    else { if (mounted) Navigator.of(context).pop(); return; }
+    else { _salir(); return; }
     _cargar();
   }
   void _anterior({bool autor = false}) {
+    if (_saliendo) return;
     if (!autor && _indice > 0) { _indice--; }
     else if (_grupo > 0) { _grupo--; _indice = 0; }
     else { _imagen = Duration.zero; _video?.seekTo(Duration.zero); return; }
@@ -306,8 +322,9 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
   Widget build(BuildContext context) {
     ref.listen(historiasProvider, (_, siguiente) {
       final datos = siguiente.value;
-      if (datos != null && !listaSocial(datos['historias']).any((h) => h['id'] == _h['id'])) {
-        if (mounted) Navigator.of(context).pop();
+      if (datos != null && !_saliendo &&
+          !listaSocial(datos['historias']).any((h) => h['id'] == _h['id'])) {
+        _salir();
       }
     });
     final grupo = widget.grupos[_grupo];
@@ -332,7 +349,7 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
         onLongPressStart: (_) { _pausa = true; _sincronizar(); },
         onLongPressEnd: (_) { _pausa = false; _sincronizar(); },
         onHorizontalDragEnd: (d) { if ((d.primaryVelocity ?? 0) < -150) _siguiente(autor: true); else if ((d.primaryVelocity ?? 0) > 150) _anterior(autor: true); },
-        onVerticalDragEnd: (d) { if ((d.primaryVelocity ?? 0) > 200) Navigator.pop(context); })),
+        onVerticalDragEnd: (d) { if ((d.primaryVelocity ?? 0) > 200) _salir(); })),
       Positioned(top: 0, left: 0, right: 0, child: Container(
         padding: const EdgeInsets.fromLTRB(14, 8, 8, 26),
         decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black87, Colors.transparent])),
@@ -348,7 +365,7 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
             const SizedBox(width: 10),
             Expanded(child: Text('${_h['nombre'] ?? _h['autor'] ?? 'AFTR'}', style: Aftr.fuerte(16))),
             IconButton(onPressed: _opciones, icon: const Icon(Icons.more_horiz)),
-            IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+            IconButton(onPressed: _salir, icon: const Icon(Icons.close)),
           ]),
         ]))),
       if (_h['evento_id'] != null) Positioned(bottom: 24, left: 24, right: 24, child: Column(children: [
@@ -357,7 +374,7 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
         BotonAftr(_h['cta'] == 'mesa' ? 'Reservar mesa' : _h['cta'] == 'entrada' ? 'Comprar entradas' : 'Ver evento',
           onTap: () {
             final h = _h; final router = GoRouter.of(context);
-            Navigator.pop(context);
+            _salir();
             router.push('/evento/${h['evento_id']}?historia=${Uri.encodeQueryComponent('${h['id']}')}${h['cta'] == null ? '' : '&accion=${h['cta']}'}');
           }),
       ])),
