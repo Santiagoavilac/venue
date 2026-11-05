@@ -90,7 +90,10 @@ trabajo. Última actualización: 2026-11-05.
       consulta en vez de cuatro conteos sueltos. "Gestionar evento" abre con
       la plata de la noche (`liquidacion_evento`, sólo admin), que antes había
       que ir a buscar al Reporte
-- [ ] **Pagos** — hoy no usa ninguna primitiva del sistema
+- [x] **Pagos** — pasa a las piezas compartidas: `_Caja` (la sexta "tarjeta con
+      un número", que se me había escapado) es `TarjetaCifra`, los títulos son
+      `TituloBloque`, las tarjetas son `Tarjeta` y los tamaños salen de `Tipo`.
+      Ya tenía `DeQueEvento` y las insignias de estado
 - [ ] **Accesos** — unificar `_Dato` con `TarjetaCifra`
 - [ ] **Reporte** — tokens y gráficos con `fl_chart`
 - [ ] **Shell del relacionador** — `_Cifra`, `_Vacio` y `_Estado` a los compartidos

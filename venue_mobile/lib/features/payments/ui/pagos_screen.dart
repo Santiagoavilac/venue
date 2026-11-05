@@ -17,6 +17,8 @@ import '../../vip_tables/ui/mesa_hojas.dart';
 import '../data/pagos.dart';
 import '../../../core/widgets/insignia.dart';
 import '../../events/ui/cambiar_evento.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/patron.dart';
 
 Future<T?> _hoja<T>(BuildContext context, Widget child) => showModalBottomSheet<T>(
       context: context,
@@ -273,13 +275,10 @@ class _MiCuenta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final x = r;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return Tarjeta(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            const Expanded(
-                child: Text('Tu cuenta', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
+            Expanded(child: Text('Tu cuenta', style: Tipo.bloque)),
             if (x != null) Insignia(x.pagado ? 'Pagado' : 'Pendiente', tono: x.pagado ? Tono.ok : Tono.aviso),
           ]),
           const SizedBox(height: 10),
@@ -313,8 +312,7 @@ class _MiCuenta extends StatelessWidget {
             const SizedBox(height: 10),
             _Capturas(x.comprobantes),
           ],
-        ]),
-      ),
+      ]),
     );
   }
 }
@@ -346,12 +344,25 @@ class _ResumenTeams extends StatelessWidget {
     final pag = lista.where((r) => r.pagado);
     final pen = lista.where((r) => !r.pagado);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text(titulo, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 8),
+      TituloBloque(titulo),
       Row(children: [
-        Expanded(child: _Caja('Pagaron (${pag.length})', '${suma(pag)} Bs', VenueColors.ok)),
-        const SizedBox(width: 10),
-        Expanded(child: _Caja('Falta pagar (${pen.length})', '${suma(pen)} Bs', VenueColors.aviso)),
+        Expanded(
+          child: TarjetaCifra(
+            etiqueta: 'Pagaron',
+            valor: '${suma(pag)} Bs',
+            detalle: '${pag.length} de ${lista.length}',
+            tono: Tono.ok,
+          ),
+        ),
+        const SizedBox(width: Esp.md),
+        Expanded(
+          child: TarjetaCifra(
+            etiqueta: 'Falta pagar',
+            valor: '${suma(pen)} Bs',
+            detalle: '${pen.length} de ${lista.length}',
+            tono: Tono.aviso,
+          ),
+        ),
       ]),
     ]);
   }
@@ -373,15 +384,15 @@ class _TarjetaTeam extends StatelessWidget {
   Widget build(BuildContext context) {
     final todos = filas.every((r) => r.pagado);
     final total = filas.fold<num>(0, (a, r) => a + r.aPagar);
-    return Card(
-      margin: const EdgeInsets.only(top: 10),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 8, 8),
+    return Padding(
+      padding: const EdgeInsets.only(top: Esp.md),
+      child: Tarjeta(
+        padding: const EdgeInsets.fromLTRB(Esp.lg, Esp.md, Esp.sm, Esp.sm),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(nombre, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                Text(nombre, style: Tipo.fila),
                 Text(
                     '${filas.where((r) => r.pagado).length}/${filas.length} pagaron · $total Bs en total',
                     style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
@@ -458,27 +469,6 @@ class _Capturas extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      );
-}
-
-class _Caja extends StatelessWidget {
-  const _Caja(this.titulo, this.valor, this.color);
-  final String titulo;
-  final String valor;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(titulo,
-                style: TextStyle(color: VenueColors.textoSuave, fontSize: 12.5)),
-            const SizedBox(height: 3),
-            Text(valor,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
-          ]),
         ),
       );
 }
