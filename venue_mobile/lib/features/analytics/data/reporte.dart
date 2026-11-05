@@ -316,8 +316,13 @@ class ReporteRepository {
   }
 
   /// Mesas que vendió una persona en un evento (a quién y por cuánto).
+  ///
+  /// Va por `mesas_detalle` y no por `mesas`: el cliente y el precio ya no
+  /// están concedidos sobre la tabla, justamente para que no salgan con un
+  /// curl. La vista los da fila por fila a quien le corresponde, que para
+  /// esta pantalla es el admin o el jefe de ese team.
   Future<List<Map<String, dynamic>>> mesasDe(String eventoId, String usuarioId) => _sb
-      .from('mesas')
+      .from('mesas_detalle')
       .select('etiqueta, cliente, precio, estado, manillas, pago_verificado')
       .eq('evento_id', eventoId)
       .eq('vendido_por', usuarioId)
