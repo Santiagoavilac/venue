@@ -1250,6 +1250,18 @@ class _NuevoEventoState extends ConsumerState<_NuevoEvento> {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        // este campo se mandaba fijo en 15 sin estar dibujado: con un evento
+        // gratis o de menos de 15 Bs, "Crear evento" fallaba con un error
+        // sobre una comisión que no se veía en ningún lado
+        TextField(
+          controller: _cut,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Bs por manilla al RRPP',
+            helperText: 'No puede ser mayor al precio de la manilla',
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Text(

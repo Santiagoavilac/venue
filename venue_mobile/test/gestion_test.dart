@@ -11,6 +11,11 @@ void main() {
     expect(v(p: -1), contains('precio'));
     expect(v(pct: 120), contains('%'));
     expect(v(c: 70), contains('comisión')); // más que el precio
+    // un evento gratis es válido, pero sólo si la comisión por manilla
+    // también baja: con el 15 fijo de antes, "Crear evento" fallaba y el
+    // campo para corregirlo ni siquiera estaba dibujado
+    expect(v(p: 0, c: 15), contains('comisión'));
+    expect(v(p: 0, c: 0), isNull);
   });
 
   test('acciones según el estado del evento', () {
