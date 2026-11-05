@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/routing/router.dart';
 import '../core/theme/apariencia.dart';
+import '../core/widgets/teclado.dart';
 import '../core/theme/venue_theme.dart';
 import '../features/clubs/data/clubs.dart';
 
@@ -24,10 +25,12 @@ class VenueApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         theme: tema,
         routerConfig: ref.watch(routerProvider),
-        builder: (context, child) => GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: _ConSplash(child: child ?? const SizedBox.shrink()),
+        builder: (context, child) => VigilanteDelTeclado(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: esconderTeclado,
+            child: _ConSplash(child: child ?? const SizedBox.shrink()),
+          ),
         ),
       ),
     );

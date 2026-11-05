@@ -872,7 +872,9 @@ Future<void> _cambiarClub(BuildContext context, WidgetRef ref) async {
 Future<void> _cambiarEvento(BuildContext context, WidgetRef ref) async {
   final eventos = ref.read(eventosProvider).value ?? const <Evento>[];
   final actual = ref.read(eventoActivoProvider)?.id;
-  if (eventos.length < 2) return;
+  // antes esto volvía sin hacer nada si había un solo evento, así que la
+  // píldora parecía un cartel y nadie descubría que ahí se cambia de evento
+  if (eventos.isEmpty) return;
   final elegido = await showModalBottomSheet<String>(
     context: context,
     builder: (c) => SafeArea(
@@ -969,7 +971,6 @@ class _BarraSuperior extends ConsumerWidget {
     final varios =
         (ref.watch(clubsProvider).value?.length ?? 0) > 1 ||
         (ref.watch(plataformaProvider).value ?? false);
-    final variosEv = (ref.watch(eventosProvider).value?.length ?? 0) > 1;
 
     // boliche como en Fourvenues: logo y "Club / Nombre ▾"
     final pClub = InkWell(
@@ -1048,7 +1049,7 @@ class _BarraSuperior extends ConsumerWidget {
       style: const TextStyle(fontSize: 15),
     );
     final pEv = _Pildora(
-      alTocar: variosEv ? () => _cambiarEvento(context, ref) : null,
+      alTocar: () => _cambiarEvento(context, ref),
       child: Row(
         mainAxisSize: ancho ? MainAxisSize.min : MainAxisSize.max,
         children: [
@@ -1059,14 +1060,12 @@ class _BarraSuperior extends ConsumerWidget {
           ),
           const SizedBox(width: 12),
           ancho ? Flexible(child: textoEv) : Expanded(child: textoEv),
-          if (variosEv) ...[
-            const SizedBox(width: 6),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 22,
-              color: VenueColors.textoSuave,
-            ),
-          ],
+          const SizedBox(width: 6),
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 22,
+            color: VenueColors.textoSuave,
+          ),
         ],
       ),
     );

@@ -139,18 +139,39 @@ class EventoElegido extends Notifier<String?> {
 final eventoElegidoProvider =
     NotifierProvider<EventoElegido, String?>(EventoElegido.new);
 
-/// Evento sobre el que se opera: el elegido; si no, el que está en curso; si
-/// no, el primero de la lista.
-final eventoActivoProvider = Provider<Evento?>((ref) {
-  final lista = ref.watch(eventosProvider).value ?? const <Evento>[];
+/// Cuál de los eventos abiertos es "el de ahora".
+///
+/// Está aparte del provider para poder probarlo: es la regla que decide qué
+/// ve toda la app, y antes estaba mal. El último recurso era el primero de la
+/// lista, y como la lista va de más vieja a más nueva y nada cierra los
+/// eventos solos, devolvía el evento más antiguo que quedó abierto. La app
+/// decía "tu evento" y mostraba uno de hace semanas, con sus mesas y sus
+/// pagos, sin avisar nada.
+///
+/// El orden ahora es: el que elegiste, el que está en curso, el próximo por
+/// empezar, y recién si todos pasaron, el más reciente.
+Evento? elegirEventoActivo(
+  List<Evento> lista,
+  String? elegido,
+  DateTime ahora,
+) {
   if (lista.isEmpty) return null;
-  final elegido = ref.watch(eventoElegidoProvider);
   for (final e in lista) {
     if (e.id == elegido) return e;
   }
-  final ahora = DateTime.now();
   for (final e in lista) {
     if (e.enCurso(ahora)) return e;
   }
-  return lista.first;
-});
+  final hoy = DateTime(ahora.year, ahora.month, ahora.day);
+  for (final e in lista) {
+    if (!e.fecha.isBefore(hoy)) return e;
+  }
+  return lista.last;
+}
+
+/// Evento sobre el que se opera.
+final eventoActivoProvider = Provider<Evento?>((ref) => elegirEventoActivo(
+      ref.watch(eventosProvider).value ?? const <Evento>[],
+      ref.watch(eventoElegidoProvider),
+      DateTime.now(),
+    ));
