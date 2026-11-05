@@ -72,6 +72,11 @@ class DescubrirScreen extends ConsumerWidget {
               child: Aparecer(child: Text('Descubrir', style: Aftr.titular(32))),
             ),
           ),
+          // Lo primero que se ve después del título, sin scrollear, y en el
+          // mismo lugar que en la web. Estaba detrás de un botón de texto en
+          // Accesos, y después la puse entre los eventos y los lugares, que es
+          // igual de escondida: para verla había que bajar toda la pantalla.
+          const SliverToBoxAdapter(child: ReventaEnInicio()),
           SliverToBoxAdapter(
             child: FechasAftr(
               elegida: noche,
@@ -83,10 +88,6 @@ class DescubrirScreen extends ConsumerWidget {
             error: (e, _) => [SliverToBoxAdapter(child: _Vacio(mensajeDeError(e), reintentar: () => ref.invalidate(eventosProvider)))],
             data: (todos) => _secciones(todos, noche, ahora),
           ),
-          // La reventa estaba sólo detrás de un botón de texto en Accesos, o
-          // sea escondida para quien no fue a buscarla. Es un mercado: vive
-          // donde la gente mira.
-          const SliverToBoxAdapter(child: ReventaEnInicio()),
           ...lugares.maybeWhen(
             data: (l) => l.isEmpty
                 ? const <Widget>[]
@@ -308,7 +309,7 @@ class ReventaEnInicio extends ConsumerWidget {
     if (mercado.isLoading && mercado.value == null) return const SizedBox.shrink();
     if (ofertas.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 30, 20, 0),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
         child: Presionable(
           onTap: () => context.push('/reventa'),
           child: Container(
@@ -334,8 +335,19 @@ class ReventaEnInicio extends ConsumerWidget {
       );
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      TituloSeccion('Reventa oficial',
-        accion: 'Ver todo', onAccion: () => context.push('/reventa')),
+      // 18 arriba y no los 30 de TituloSeccion: va pegado al título de la
+      // pantalla, no separando dos bloques
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+        child: Row(children: [
+          Expanded(child: Text('Reventa oficial', style: Aftr.fuerte(22))),
+          GestureDetector(
+            onTap: () => context.push('/reventa'),
+            child: Text('Ver todo',
+              style: Aftr.cuerpo(14, c: Aftr.texto, w: FontWeight.w600)),
+          ),
+        ]),
+      ),
       SizedBox(
         height: 164,
         child: ListView.separated(
