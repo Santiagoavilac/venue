@@ -19,6 +19,7 @@ class Club {
     this.usaTeams = true,
     this.comisionManillas = true,
     this.comisionCombos = true,
+    this.exigeComprobante = false,
     this.lat,
     this.lng,
     this.direccion,
@@ -37,6 +38,12 @@ class Club {
   /// Cómo trabaja con relacionadores (db/33). Sin tocar: como siempre.
   final bool usaRelacionadores, usaTeams, comisionManillas, comisionCombos;
 
+  /// El boliche pide la foto del pago para generar una entrada con precio.
+  /// Se usa donde la plata se mueve por fuera de AFTR: el relacionador le
+  /// rinde al jefe y el jefe al boliche, y el administrador quiere ver el
+  /// comprobante de cada persona.
+  final bool exigeComprobante;
+
   /// Dónde queda (db/35): con esto sale en el mapa de AFTR.
   final double? lat, lng;
   final String? direccion;
@@ -44,7 +51,7 @@ class Club {
   bool get ubicado => lat != null && lng != null;
 
   /// Opciones que cambia el admin, como las guarda la base.
-  static const opciones = ['usa_relacionadores', 'usa_teams', 'comision_manillas', 'comision_combos'];
+  static const opciones = ['usa_relacionadores', 'usa_teams', 'comision_manillas', 'comision_combos', 'exige_comprobante'];
 
   String get inicial {
     final t = (inicialTexto?.isNotEmpty ?? false) ? inicialTexto! : nombre;
@@ -63,6 +70,7 @@ class Club {
         usaTeams: j['usa_teams'] as bool? ?? true,
         comisionManillas: j['comision_manillas'] as bool? ?? true,
         comisionCombos: j['comision_combos'] as bool? ?? true,
+        exigeComprobante: j['exige_comprobante'] as bool? ?? false,
         lat: (j['lat'] as num?)?.toDouble(),
         lng: (j['lng'] as num?)?.toDouble(),
         direccion: j['direccion'] as String?,

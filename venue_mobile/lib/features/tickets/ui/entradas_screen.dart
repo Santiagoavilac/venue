@@ -253,6 +253,7 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
       for (final f in ref.watch(fasesProvider).value ?? const <Fase>[]) f.id: f
     };
     final vigente = ref.watch(faseVigenteProvider).value;
+    final club = ref.watch(clubActivoProvider);
     final casa = ref.watch(sinTopeProvider).value ?? const <String>{};
     final cerrada = motivoVentaCerrada(
         ref.watch(ventanaProvider).value ?? (desde: null, hasta: null),
@@ -261,6 +262,12 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
     // lo que se cobra ahora: la fase abierta o, sin fases, el precio del evento
     final num? precioAhora =
         ev.ventaPorFases ? vigente?.precio : (ev.precioManilla > 0 ? ev.precioManilla : null);
+    // Cuando el boliche pide el comprobante, una entrada con precio no se
+    // genera sin la foto del pago: es lo que después mira el administrador.
+    // Las gratis no lo necesitan, porque no hay pago que mostrar.
+    final faltaComprobante = (club?.exigeComprobante ?? false) &&
+        (precioAhora ?? 0) > 0 &&
+        _comprobanteUrl == null;
     final emitidas = veOtras
         ? ref.watch(entradasProvider).value?.where((e) => e.estado != 'anulada').length
         : null;
@@ -353,7 +360,7 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                       style: FilledButton.styleFrom(
                           minimumSize: const Size(118, 52),
                           padding: const EdgeInsets.symmetric(horizontal: 14)),
-                      onPressed: _generando || cerrada != null
+                      onPressed: _generando || cerrada != null || faltaComprobante
                           ? null
                           : () => _generar(ev, fases, casa),
                       child: _generando
@@ -383,7 +390,11 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                           size: 20, color: _comprobanteUrl != null ? VenueColors.ok : null),
                   label: Text(_comprobanteUrl != null
                       ? 'Comprobante listo · cambiar'
-                      : 'Adjuntar comprobante del pago'),
+                      : faltaComprobante
+                          ? 'Falta el comprobante del pago'
+                          : 'Adjuntar comprobante del pago'),
+                  style: TextButton.styleFrom(
+                      foregroundColor: faltaComprobante ? VenueColors.aviso : null),
                 ),
               ),
               if (veOtras) ...[

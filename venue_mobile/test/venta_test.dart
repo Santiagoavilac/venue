@@ -147,4 +147,24 @@ void main() {
       expect(desde({'comprobante_url': ''}).conComprobante, isFalse);
     });
   });
+
+  group('cuándo hace falta el comprobante', () {
+    // La misma regla que aplica el servidor, para que la pantalla no ofrezca
+    // vender algo que la base va a rechazar.
+    bool falta({required bool exige, required num precio, required bool subido}) =>
+        exige && precio > 0 && !subido;
+
+    test('el boliche que lo exige no deja vender sin la foto', () {
+      expect(falta(exige: true, precio: 100, subido: false), isTrue);
+      expect(falta(exige: true, precio: 100, subido: true), isFalse);
+    });
+
+    test('una entrada gratis nunca lo pide: no hay pago que mostrar', () {
+      expect(falta(exige: true, precio: 0, subido: false), isFalse);
+    });
+
+    test('el boliche que no lo exige vende como siempre', () {
+      expect(falta(exige: false, precio: 100, subido: false), isFalse);
+    });
+  });
 }
