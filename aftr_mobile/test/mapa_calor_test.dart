@@ -3,6 +3,7 @@ import 'package:aftr_mobile/features/mapa/mapa_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  _corrimiento();
   // El radio era 160 + 380 × intensidad metros, así que el que más vendió
   // dibujaba 540 m siempre: una mancha a zoom de ciudad, invisible a zoom de
   // calle. Ahora lo que es constante es lo que se ve en pantalla.
@@ -34,5 +35,25 @@ void main() {
     double alfa(String id) =>
         c.firstWhere((x) => x.circleId.value == 'calor-$id-0').fillColor.a;
     expect(alfa('lleno'), greaterThan(alfa('flojo')));
+  });
+}
+
+// El corrimiento de la cámara por la hoja estaba en grados fijos (0,0035°):
+// a zoom de ciudad son unos metros y a zoom de calle, 390 m. Por eso al
+// acercarse, elegir un boliche mandaba el mapa a cualquier lado.
+void _corrimiento() {
+  test('el corrimiento de la cámara es el mismo en pantalla a cualquier zoom', () {
+    const lat = -17.78, alto = 844.0; // un iPhone de pie
+    final px = <double>[];
+    for (var z = 11.0; z <= 18.0; z += 1) {
+      final grados = gradosDeAlto(alto * 0.18 / 2, z, lat);
+      // de vuelta a píxeles: tiene que dar siempre lo mismo
+      px.add(grados * 111320 / metrosPorPixel(z, lat));
+    }
+    for (final p in px) {
+      expect(p, closeTo(px.first, 0.001));
+    }
+    // y en grados cambia muchísimo, que es lo que antes estaba fijo
+    expect(gradosDeAlto(76, 11, lat), greaterThan(gradosDeAlto(76, 18, lat) * 100));
   });
 }

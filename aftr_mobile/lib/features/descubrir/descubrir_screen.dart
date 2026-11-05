@@ -15,6 +15,7 @@ import '../auth/asegurar_cuenta.dart';
 import '../../data/modelos.dart';
 import '../splash/splash.dart';
 import '../historias/historias.dart';
+import '../rachas/rachas.dart';
 import '../reventa/reventa.dart' show precioReventa;
 import '../../data/social_repo.dart';
 
@@ -198,6 +199,9 @@ class _Cabecera extends ConsumerWidget {
         const Spacer(),
         const PalabraAftr(alto: 16),
         const Spacer(),
+        // La racha, pegada a la foto: se ve de entrada y se toca para
+        // compararla con la de tu gente.
+        const LlamaDeRacha(),
         Presionable(
           onTap: () => logueado ? context.go('/cuenta') : asegurarCuenta(context, ref),
           child: AvatarAftr(nombre: perfil?.nombre, foto: perfil?.foto),

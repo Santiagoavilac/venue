@@ -94,6 +94,9 @@ class SocialRepo {
     resultado['_recibido_at'] = DateTime.now().toUtc().toIso8601String();
     return resultado;
   }
+  /// Las semanas seguidas saliendo: la propia y las de su gente.
+  Future<DatosSocial> rachas() async => mapaSocial(await sb.rpc('aftr_rachas'));
+
   Future<DatosSocial> reventa(String accion, [DatosSocial datos = const {}]) async {
     final resultado = mapaSocial(await sb.rpc('aftr_reventa', params: {
         'p_accion': accion, 'p_datos': datos,

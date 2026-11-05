@@ -100,11 +100,19 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
     if (cambio && mounted) setState(() {});
   }
 
+  /// Lo que hay que correr la cámara para que el punto quede centrado en el
+  /// mapa visible, con la hoja tapando la parte de abajo.
+  double _corrimiento(double lat, double zoom) =>
+      gradosDeAlto(MediaQuery.sizeOf(context).height * _peek / 2, zoom, lat);
+
   void _elegir(int i, List<PinLugar> pines, {bool desdePin = false}) {
     if (i < 0 || i >= pines.length) return;
     setState(() => _elegido = i);
     final p = pines[i].lugar;
-    _mapa?.animateCamera(CameraUpdate.newLatLng(LatLng(p.lat! - 0.0035, p.lng!)));
+    final z = _zoom == 0 ? encuadre(pines).zoom : _zoom;
+    _mapa?.animateCamera(
+      CameraUpdate.newLatLng(LatLng(p.lat! - _corrimiento(p.lat!, z), p.lng!)),
+    );
     if (desdePin) {
       HapticFeedback.selectionClick();
       _moviendoPorTarjeta = true;
@@ -119,7 +127,8 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
 
   void _centrar(List<PinLugar> pines) {
     final c = encuadre(pines);
-    _mapa?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(c.lat - 0.004, c.lng), c.zoom));
+    _mapa?.animateCamera(CameraUpdate.newLatLngZoom(
+      LatLng(c.lat - _corrimiento(c.lat, c.zoom), c.lng), c.zoom));
   }
 
   @override
@@ -189,7 +198,8 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
             ),
       };
       _mapaArmado = AppleMap(
-        initialCameraPosition: CameraPosition(target: LatLng(c.lat - 0.004, c.lng), zoom: c.zoom),
+        initialCameraPosition: CameraPosition(
+          target: LatLng(c.lat - _corrimiento(c.lat, c.zoom), c.lng), zoom: c.zoom),
         onMapCreated: (m) => _mapa = m,
         annotations: anotaciones,
         circles: circulosDeCalor(lugares, calor, zoom: _zoom == 0 ? c.zoom : _zoom),
@@ -484,6 +494,16 @@ class _TarjetaPin extends StatelessWidget {
   }
 }
 
+/// Cuántos grados de latitud son N píxeles de pantalla, a este zoom.
+///
+/// La cámara se corre hacia abajo para que el pin elegido no quede tapado por
+/// la hoja. Estaba corrida 0,0035° fijos, que a zoom de ciudad son unos metros
+/// y a zoom de calle son 390 m: por eso al acercarse, elegir un boliche
+/// mandaba el mapa a cualquier lado. En píxeles el corrimiento es siempre el
+/// mismo en pantalla, que es lo que se quería.
+double gradosDeAlto(double pixeles, double zoom, double lat) =>
+    pixeles * metrosPorPixel(zoom, lat) / 111320;
+
 /// Cuántos metros mide un píxel de pantalla, a este zoom y a esta latitud.
 ///
 /// Es la fórmula del mosaico web de siempre: la Tierra entera en 256 px al
@@ -496,8 +516,10 @@ double metrosPorPixel(double zoom, double lat) =>
 double radioDeCalor(double zoom, double lat) =>
     _pixelesDeCalor * metrosPorPixel(zoom, lat);
 
-/// Lo que el círculo mide en pantalla: 46 px de radio, poco más que el pin.
-const _pixelesDeCalor = 46.0;
+/// Lo que el círculo mide en pantalla: 26 px de radio. Tiene que leerse como
+/// un resplandor detrás del pin, no como una mancha que se come la cuadra: con
+/// 46 px, dos boliches de la misma zona se tapaban entre ellos.
+const _pixelesDeCalor = 26.0;
 
 /// Calor de ventas como círculos nativos del mapa: van pegados a la dirección
 /// del boliche y se mueven con el mapa (no se dibujan encima).

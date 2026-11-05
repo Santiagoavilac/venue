@@ -18,8 +18,12 @@ class Pines {
     final hecho = _cache[clave];
     if (hecho != null) return hecho;
 
-    final lado = (elegido ? 52.0 : 40.0);
-    final halo = hoy || elegido ? 10.0 : 4.0;
+    // 40 y 52 px eran demasiado: a zoom de calle dos boliches de la misma
+    // cuadra se tapaban y no se distinguía cuál era cuál. El elegido crece
+    // poco -lo que lo distingue es el color, no el tamaño- y el halo del de
+    // hoy baja, que era la mitad de lo que ocupaba el pin.
+    final lado = (elegido ? 38.0 : 30.0);
+    final halo = hoy || elegido ? 6.0 : 3.0;
     final total = (lado + halo * 2) * escala;
     final rec = ui.PictureRecorder();
     final c = Canvas(rec)..scale(escala);
@@ -31,7 +35,7 @@ class Pines {
         lado / 2 + halo * 0.6,
         Paint()
           ..color = (elegido ? Aftr.texto : Aftr.acento).withValues(alpha: 0.28)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
       );
     }
     c.drawCircle(centro, lado / 2, Paint()..color = elegido ? Aftr.texto : const Color(0xFF111114));
@@ -48,7 +52,7 @@ class Pines {
         text: inicial,
         style: TextStyle(
           fontFamily: Aftr.serif,
-          fontSize: lado * 0.5,
+          fontSize: lado * 0.52,
           color: elegido ? Aftr.fondo : (apagado ? Aftr.texto3 : Aftr.texto),
         ),
       ),
