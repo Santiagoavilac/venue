@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../authentication/ui/eliminar_cuenta.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show UserAttributes;
 
@@ -220,6 +221,13 @@ class PanelPerfil extends ConsumerWidget {
                 color: VenueColors.mal,
                 sinFlecha: true,
                 alTocar: () => cerrarYHacer(() => _salir(context, ref)),
+              ),
+              _Fila(
+                inicio: _Circulo(Icons.delete_outline_rounded, VenueColors.mal),
+                titulo: 'Eliminar mi cuenta',
+                color: VenueColors.mal,
+                sinFlecha: true,
+                alTocar: () => cerrarYHacer(() => eliminarMiCuenta(context, ref)),
               ),
             ]),
           ],

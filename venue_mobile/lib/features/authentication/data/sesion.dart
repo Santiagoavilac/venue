@@ -171,6 +171,15 @@ class AuthRepository {
 
   Future<void> salir() => _sb.auth.signOut();
 
+  /// Borra la propia cuenta. Si la persona ya trabajó eventos, el servidor
+  /// conserva el historial sin sus datos personales; en cualquier caso el
+  /// acceso se corta. Exigido por la App Store (5.1.1(v)).
+  Future<String> eliminarMiCuenta() async {
+    final r = await _sb.rpc('venue_eliminar_mi_cuenta');
+    await _sb.auth.signOut();
+    return (r is Map && r['modo'] is String) ? r['modo'] as String : 'eliminado';
+  }
+
   /// Alta de relacionador con el link de invitación de un team. La cuenta la
   /// crea la Edge Function `crear-usuario` (valida la invitación y limita
   /// los intentos); después se inicia sesión normalmente.

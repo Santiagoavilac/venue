@@ -3333,7 +3333,7 @@ class _AftrState extends ConsumerState<_Aftr> {
   late bool _on = widget.evento['aftr_publico'] as bool? ?? true;
   bool _guardando = false;
   String get _id => widget.evento['id'] as String;
-  String get _enlace => 'https://aftr-web.vercel.app/#/evento/$_id';
+  String get _enlace => 'https://www.aftrvenue.com/#/evento/$_id';
 
   @override
   Widget build(BuildContext context) {

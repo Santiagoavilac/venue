@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/networking/supabase.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
+import '../../authentication/ui/eliminar_cuenta.dart';
 import '../../../core/widgets/patron.dart';
 import '../../access_control/ui/accesos_screen.dart';
 import '../../aftr_social/ui/historias_screen.dart';
@@ -1066,6 +1067,19 @@ class _Perfil extends ConsumerWidget {
                 fin: flecha, alTocar: () => _agregarCorreo(context, ref)),
           _fila(inicio: const Icon(Icons.logout_rounded), titulo: 'Cerrar sesión', sub: 'Salir de VENUE en este teléfono',
               alTocar: () => ref.read(authRepositoryProvider).salir()),
+          _fila(inicio: const Icon(Icons.delete_outline_rounded), titulo: 'Eliminar mi cuenta', sub: 'Borra tu acceso y tus datos personales',
+              alTocar: () => eliminarMiCuenta(context, ref)),
+        ]),
+        const TituloBloque('Ayuda y legales'),
+        _lista([
+          _fila(inicio: const Icon(Icons.mail_outline_rounded), titulo: 'Soporte', sub: 'Escribinos si algo no anda',
+              fin: flecha, alTocar: () => abrirEnlace(venueSoporte)),
+          _fila(inicio: const Icon(Icons.verified_user_outlined), titulo: 'Normas de comunidad', sub: 'Qué se puede publicar en historias',
+              fin: flecha, alTocar: () => abrirEnlace(venueNormas)),
+          _fila(inicio: const Icon(Icons.lock_outline_rounded), titulo: 'Política de privacidad', sub: 'Qué datos guardamos y por qué',
+              fin: flecha, alTocar: () => abrirEnlace(venuePrivacidad)),
+          _fila(inicio: const Icon(Icons.description_outlined), titulo: 'Términos de uso', sub: 'Condiciones del servicio',
+              fin: flecha, alTocar: () => abrirEnlace(venueTerminos)),
         ]),
       ]),
     );
