@@ -13,6 +13,48 @@ typedef Fila = Map<String, dynamic>;
       eliminar: true,
     );
 
+/// En qué parte del tiempo cae un evento. La pantalla de gestión mostraba
+/// todo en una pila ordenada por fecha descendente, así que lo primero que
+/// veía el admin era el evento más reciente —muchas veces uno que ya pasó— y
+/// los próximos quedaban más abajo, mezclados con los cerrados.
+enum TramoEvento {
+  hoy('Hoy'),
+  proximo('Próximos'),
+  pasado('Pasados');
+
+  const TramoEvento(this.titulo);
+  final String titulo;
+}
+
+TramoEvento tramoDeEvento(DateTime fecha, DateTime ahora) {
+  final d = DateTime(fecha.year, fecha.month, fecha.day);
+  final hoy = DateTime(ahora.year, ahora.month, ahora.day);
+  if (d == hoy) return TramoEvento.hoy;
+  return d.isAfter(hoy) ? TramoEvento.proximo : TramoEvento.pasado;
+}
+
+/// Los eventos agrupados por tramo y en el orden en que se buscan: hoy
+/// primero, después los que vienen del más cercano al más lejano, y al final
+/// los pasados del más reciente al más viejo. Los tramos vacíos no aparecen.
+List<({TramoEvento tramo, List<Fila> eventos})> agruparPorTramo(
+  List<Fila> eventos,
+  DateTime ahora,
+) {
+  final porTramo = <TramoEvento, List<Fila>>{};
+  for (final e in eventos) {
+    final f = DateTime.tryParse('${e['fecha']}');
+    if (f == null) continue;
+    porTramo.putIfAbsent(tramoDeEvento(f, ahora), () => []).add(e);
+  }
+  DateTime fechaDe(Fila e) => DateTime.parse('${e['fecha']}');
+  porTramo[TramoEvento.proximo]?.sort((a, b) => fechaDe(a).compareTo(fechaDe(b)));
+  porTramo[TramoEvento.pasado]?.sort((a, b) => fechaDe(b).compareTo(fechaDe(a)));
+  return [
+    for (final t in TramoEvento.values)
+      if (porTramo[t]?.isNotEmpty ?? false) (tramo: t, eventos: porTramo[t]!),
+  ];
+}
+
 /// Valida lo mínimo de un evento antes de mandarlo. Devuelve el problema o
 /// null. El servidor valida igual; esto es para avisar sin ir a la red.
 String? validarEvento({required String nombre, required String fecha,

@@ -82,9 +82,12 @@ trabajo. Última actualización: 2026-11-05.
       44 como mínimo aunque la mesa se dibuje más chica, y cada estado lleva su
       ícono además del color, en las mesas y en la leyenda
       (`test/plano_test.dart`). Falta el tutorial, que sale con la Fase 4
-- [ ] **Eventos / Gestión** — una sola lista con eje temporal, "Crear evento"
-      arriba, datos reales en Gestionar evento, arreglar el campo `_cut` que se
-      manda sin dibujarse (`gestion_screen.dart:1511,1619`)
+- [~] **Eventos / Gestión** — hecho: el campo `_cut` que se mandaba sin estar
+      dibujado (con un evento gratis, "Crear evento" fallaba sin salida),
+      "Crear evento" siempre arriba, y la lista agrupada por tramo
+      (`agruparPorTramo`: hoy, próximos del más cercano, pasados del más
+      reciente). Falta que "Gestionar evento" muestre datos reales en vez de
+      cuatro contadores y seis filas
 - [ ] **Pagos** — hoy no usa ninguna primitiva del sistema
 - [ ] **Accesos** — unificar `_Dato` con `TarjetaCifra`
 - [ ] **Reporte** — tokens y gráficos con `fl_chart`

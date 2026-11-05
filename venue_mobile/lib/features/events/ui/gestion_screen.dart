@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/media/imagenes.dart';
 import '../../../core/networking/supabase.dart';
 import '../../../core/routing/secciones.dart';
+import '../../../core/theme/tokens.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
@@ -190,19 +191,23 @@ class GestionEventosScreen extends ConsumerWidget {
           final hayHero = lista.any(
             (e) => e['id'] == activo?.id && e['estado'] != 'cerrado',
           );
-          final orden = [
-            ...lista.where((e) => hayHero && e['id'] == activo?.id),
-            ...lista.where((e) => !(hayHero && e['id'] == activo?.id)),
-          ];
+          // el evento de trabajo arriba en grande; el resto, por tramo
+          final hero = hayHero
+              ? lista.where((e) => e['id'] == activo?.id).toList()
+              : const <Fila>[];
+          final resto = lista
+              .where((e) => !(hayHero && e['id'] == activo?.id))
+              .toList();
+          final tramos = agruparPorTramo(resto, DateTime.now());
+          Future<void> crearEvento() async {
+            if (await _hoja<bool>(context, const _NuevoEvento()) == true) {
+              recargar();
+            }
+          }
           final accionesRapidas = <Widget>[
             const TituloBloque('Accesos rápidos'),
             GrillaAcciones(
               children: [
-                AccionRapida(icono: Icons.calendar_today_outlined, titulo: 'Crear evento', alTocar: () async {
-                    if (await _hoja<bool>(context, const _NuevoEvento()) ==
-                        true)
-                      recargar();
-                  }),
                 AccionRapida(icono: Icons.groups_outlined, titulo: 'Ver invitados', alTocar: () =>
                       ref.read(seccionPedidaProvider.notifier).ir('Accesos')),
                 AccionRapida(icono: Icons.campaign_outlined, titulo: 'Avisos', alTocar: () => _hoja(context, const _Avisos())),
@@ -210,29 +215,10 @@ class GestionEventosScreen extends ConsumerWidget {
                       ref.read(seccionPedidaProvider.notifier).ir('Reporte')),
               ],
             ),
-            if (orden.length > 1) const TituloBloque('Otros eventos'),
           ];
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            children: [
-              Saludo(
-                nombre: perfil?.primerNombre ?? '',
-                detalle: hayHero
-                    ? 'Gestioná tu próximo evento'
-                    : 'Elegí un evento para trabajar',
-              ),
-              if (!hayHero) ...accionesRapidas,
-              if (lista.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 40),
-                  child: MensajeVista(
-                    icono: Icons.event_outlined,
-                    titulo: 'Todavía no hay eventos',
-                    detalle:
-                        'Creá el primero. Nace como borrador: nadie lo ve hasta que lo publiques.',
-                  ),
-                ),
-              for (final (k, e) in orden.indexed) ...[
+          // una sola tarjeta, usada por el evento de trabajo y por los
+          // de cada tramo
+          Widget tarjeta(Fila e) =>
                 _TarjetaEvento(
                   evento: e,
                   seleccionado: e['id'] == activo?.id,
@@ -316,8 +302,44 @@ class GestionEventosScreen extends ConsumerWidget {
                         }
                     }
                   },
+                );
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              Saludo(
+                nombre: perfil?.primerNombre ?? '',
+                detalle: hayHero
+                    ? 'Gestioná tu próximo evento'
+                    : 'Elegí un evento para trabajar',
+              ),
+              // crear un evento vivía dentro de "Accesos rápidos", y los
+              // accesos rápidos sólo aparecían cuando NO había evento de
+              // trabajo: con uno elegido no había forma de crear otro
+              FilledButton.icon(
+                onPressed: crearEvento,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Crear evento'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(tocable),
                 ),
-                if (k == 0 && hayHero) ...accionesRapidas,
+              ),
+              const SizedBox(height: Esp.lg),
+              if (!hayHero) ...accionesRapidas,
+              if (lista.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: MensajeVista(
+                    icono: Icons.event_outlined,
+                    titulo: 'Todavía no hay eventos',
+                    detalle:
+                        'Creá el primero. Nace como borrador: nadie lo ve hasta que lo publiques.',
+                  ),
+                ),
+              for (final e in hero) tarjeta(e),
+              for (final t in tramos) ...[
+                TituloBloque(t.tramo.titulo),
+                  for (final e in t.eventos) tarjeta(e),
               ],
             ],
           );
