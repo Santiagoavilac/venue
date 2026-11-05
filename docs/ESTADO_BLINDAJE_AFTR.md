@@ -122,7 +122,21 @@ Sobre 7.3: en la app se adelanta **un** video a la vez, no dos. Dos
 controladores de video en memoria por historias que pueden no mirarse no se
 pagan; las imágenes sí van las dos.
 
-## Fases 8 y 9
+## Fase 8 · Mapa
+
+| # | Qué | Estado |
+|---|-----|--------|
+| 8.1 | El círculo de calor escala con el zoom | ok |
+| 8.2 | El mapa se deja arrastrar | ok |
+| 8.3 | Un build por frame de arrastre, no de toda la pantalla | ok |
+| 8.4 | Android queda anotado | ok |
+
+Sobre 8.2: el arreglo de fondo es el `EagerGestureRecognizer`, que hace que la
+vista nativa gane el gesto. Con eso el detector global de la app deja de
+estorbar sin tocarlo: pierde la disputa. Y la hoja baja del 34 % al 18 %, que
+es lo que deja mapa para arrastrar.
+
+## Fase 9
 
 Sin empezar. El orden del plan es el orden de trabajo: primero la plata,
 después los datos, después la experiencia.

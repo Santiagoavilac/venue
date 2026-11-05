@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'dart:math' as math;
+
 import 'package:apple_maps_flutter/apple_maps_flutter.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,7 +32,9 @@ class MapaScreen extends ConsumerStatefulWidget {
 }
 
 class _MapaScreenState extends ConsumerState<MapaScreen> {
-  static const _peek = 0.34;
+  /// La hoja tapaba un tercio de la pantalla siempre. Con 18 % queda mapa de
+  /// verdad para arrastrar, que es lo que se vino a hacer acá.
+  static const _peek = 0.18;
   static const _medio = 0.6;
   static const _lleno = 0.93;
 
@@ -47,13 +52,22 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
   String? _claveMapa;
   final _filtros = <FiltroMapa>{};
   int _elegido = 0;
-  double _extension = _peek;
+
+  /// El zoom con el que se dibujó el calor. Se actualiza al soltar la cámara
+  /// (onCameraIdle) y no mientras se mueve: recalcular los círculos por cuadro
+  /// es trabajo tirado, y el usuario los ve bien al soltar.
+  double _zoom = 0;
+  /// Lo que ocupa la hoja. Es un notifier y no un campo con setState: al
+  /// arrastrarla, cada cuadro reconstruía la pantalla entera -y con ella se
+  /// volvían a filtrar los eventos, a regenerar los pines y a recalcular el
+  /// encuadre- para mover dos botones.
+  final _extension = ValueNotifier<double>(_peek);
   bool _moviendoPorTarjeta = false;
 
   @override
   void initState() {
     super.initState();
-    _hoja.addListener(() => setState(() => _extension = _hoja.size));
+    _hoja.addListener(() => _extension.value = _hoja.size);
   }
 
   @override
@@ -64,6 +78,7 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
 
   @override
   void dispose() {
+    _extension.dispose();
     _hoja.dispose();
     _tarjetas.dispose();
     _busqueda.dispose();
@@ -112,6 +127,12 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
     final ahora = DateTime.now();
     final lugares = ref.watch(lugaresProvider).value ?? const <Lugar>[];
     final eventos = ref.watch(eventosProvider).value ?? const <Evento>[];
+    // El mapa es sólo iOS: apple_maps_flutter no tiene lado Android. Fuera de
+    // iOS queda la lista, que hace lo mismo con menos. Cuando haya Android, lo
+    // que cambia es el plugin detrás de esta pantalla: `pinesPara`,
+    // `encuadre`, `filtrarEventos` y `circulosDeCalor` no saben de qué mapa se
+    // trata -son funciones puras sobre lugares, eventos y zoom-, así que
+    // reemplazar AppleMap por GoogleMap no toca nada de eso.
     if (defaultTargetPlatform != TargetPlatform.iOS) {
       final visibles = lugares.where((l) => l.nombre.toLowerCase().contains(_busqueda.text.toLowerCase())).toList();
       return Scaffold(body: SafeArea(child: ListView(
@@ -139,7 +160,7 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
     unawaited(_prepararIconos(pines, ahora));
     final c = encuadre(pines);
     final arriba = MediaQuery.paddingOf(context).top;
-    final oscurecer = ((_extension - _medio) / (_lleno - _medio)).clamp(0.0, 1.0);
+    double oscuridad(double ext) => ((ext - _medio) / (_lleno - _medio)).clamp(0.0, 1.0);
 
     final calor = ref.watch(calorProvider).value ?? const <String, double>{};
     final iconosDe = [
@@ -149,6 +170,9 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
     final clave = [
       for (var i = 0; i < pines.length; i++) '${pines[i].lugar.id}:${iconosDe[i] != null}:${i == _elegido}',
       for (final e in calor.entries) '${e.key}=${e.value}',
+      // el calor se redibuja cuando cambia el zoom, no cuando cambia la
+      // selección: así cambiar de tarjeta no regenera los bitmaps
+      'z:${_zoom.toStringAsFixed(1)}',
     ].join('|');
     if (clave != _claveMapa || _mapaArmado == null) {
       _claveMapa = clave;
@@ -168,7 +192,16 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
         initialCameraPosition: CameraPosition(target: LatLng(c.lat - 0.004, c.lng), zoom: c.zoom),
         onMapCreated: (m) => _mapa = m,
         annotations: anotaciones,
-        circles: circulosDeCalor(lugares, calor),
+        circles: circulosDeCalor(lugares, calor, zoom: _zoom == 0 ? c.zoom : _zoom),
+        // Sin esto el mapa no se deja arrastrar: la vista nativa sólo recibe
+        // los gestos que Flutter no reclama, y encima tiene al detector global
+        // de la app y a la hoja compitiendo por el mismo toque. Con el
+        // reconocedor impaciente, la vista del mapa gana y pasa lo obvio.
+        gestureRecognizers: {Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new)},
+        onCameraIdle: () async {
+          final z = await _mapa?.getZoomLevel();
+          if (z != null && mounted && (z - _zoom).abs() > 0.3) setState(() => _zoom = z);
+        },
         myLocationEnabled: true,
         compassEnabled: false,
         pitchGesturesEnabled: false,
@@ -182,8 +215,13 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
       body: Stack(children: [
         // el mismo widget mientras no cambien los datos: el mapa no se toca
         Positioned.fill(child: _mapaArmado!),
-        // al subir la hoja el mapa se apaga
-        IgnorePointer(child: Container(color: Aftr.fondo.withValues(alpha: 0.7 * oscurecer))),
+        // al subir la hoja el mapa se apaga. Sólo este velo se repinta al
+        // arrastrar, no la pantalla.
+        IgnorePointer(child: ValueListenableBuilder<double>(
+          valueListenable: _extension,
+          builder: (_, ext, _) => Container(
+            color: Aftr.fondo.withValues(alpha: 0.7 * oscuridad(ext))),
+        )),
         // búsqueda y filtros
         Positioned(
           top: arriba + 8,
@@ -241,16 +279,19 @@ class _MapaScreenState extends ConsumerState<MapaScreen> {
           ]),
         ),
         // centrar: sube y baja con la hoja
-        Positioned(
-          right: 16,
-          bottom: MediaQuery.sizeOf(context).height * _extension.clamp(_peek, _medio) + 12,
-          child: Opacity(
-            opacity: 1 - oscurecer,
-            child: Presionable(
-              onTap: () => _centrar(pines),
-              child: const _Vidrio(
-                radio: 14,
-                child: SizedBox(width: 46, height: 46, child: Icon(Icons.near_me_rounded, color: Aftr.texto, size: 20)),
+        ValueListenableBuilder<double>(
+          valueListenable: _extension,
+          builder: (context, ext, _) => Positioned(
+            right: 16,
+            bottom: MediaQuery.sizeOf(context).height * ext.clamp(_peek, _medio) + 12,
+            child: Opacity(
+              opacity: 1 - oscuridad(ext),
+              child: Presionable(
+                onTap: () => _centrar(pines),
+                child: const _Vidrio(
+                  radio: 14,
+                  child: SizedBox(width: 46, height: 46, child: Icon(Icons.near_me_rounded, color: Aftr.texto, size: 20)),
+                ),
               ),
             ),
           ),
@@ -443,18 +484,40 @@ class _TarjetaPin extends StatelessWidget {
   }
 }
 
+/// Cuántos metros mide un píxel de pantalla, a este zoom y a esta latitud.
+///
+/// Es la fórmula del mosaico web de siempre: la Tierra entera en 256 px al
+/// zoom 0, y la mitad de metros por píxel en cada zoom.
+double metrosPorPixel(double zoom, double lat) =>
+    156543.03392 * math.cos(lat * math.pi / 180) / math.pow(2, zoom);
+
+/// El radio del círculo de calor, en metros, para que mida siempre lo mismo en
+/// pantalla.
+double radioDeCalor(double zoom, double lat) =>
+    _pixelesDeCalor * metrosPorPixel(zoom, lat);
+
+/// Lo que el círculo mide en pantalla: 46 px de radio, poco más que el pin.
+const _pixelesDeCalor = 46.0;
+
 /// Calor de ventas como círculos nativos del mapa: van pegados a la dirección
-/// del boliche y se mueven con el mapa (no se dibujan encima). Tres anillos
-/// que se desvanecen hacia afuera, de ámbar a rojo según la intensidad.
-Set<Circle> circulosDeCalor(List<Lugar> lugares, Map<String, double> calor) {
+/// del boliche y se mueven con el mapa (no se dibujan encima).
+///
+/// El radio era `160 + 380 × intensidad` metros, así que el que más vendió
+/// dibujaba 540 m SIEMPRE: una mancha enorme a zoom de ciudad e invisible a
+/// zoom de calle, y nunca del tamaño que se quería. Ahora el radio sale del
+/// zoom -ocupa lo mismo en pantalla, que es donde se mira- y la intensidad
+/// queda en el color y en la opacidad, que es lo que debía comunicar. Dos
+/// anillos y no tres: el tercero no se distinguía.
+Set<Circle> circulosDeCalor(List<Lugar> lugares, Map<String, double> calor,
+    {required double zoom}) {
   const ambar = Color(0xFFFFB020), rojo = Color(0xFFFF3B30);
   final circulos = <Circle>{};
   for (final l in lugares) {
     final i = calor[l.id];
     if (i == null || i <= 0 || l.lat == null || l.lng == null) continue;
     final color = Color.lerp(ambar, rojo, i)!;
-    final radio = 160 + 380 * i; // metros
-    for (final (k, factor, alfa) in [(0, 1.0, .10), (1, .64, .16), (2, .34, .26)]) {
+    final radio = radioDeCalor(zoom, l.lat!);
+    for (final (k, factor, alfa) in [(0, 1.0, .07 + .10 * i), (1, .55, .12 + .18 * i)]) {
       circulos.add(Circle(
         circleId: CircleId('calor-${l.id}-$k'),
         center: LatLng(l.lat!, l.lng!),
