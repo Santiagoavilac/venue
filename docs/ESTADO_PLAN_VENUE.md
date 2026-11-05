@@ -78,8 +78,10 @@ trabajo. Última actualización: 2026-11-05.
 
 - [~] **Mesas** — la fuga cerrada, la app leyendo `mesas_detalle` y el total en
       plata condicionado a `eventos.comision_mesas` (`veDineroDeMesas`, con
-      prueba en `test/mesas_dinero_test.dart`). Falta el plano (tamaño de lo
-      que se toca y contraste) y el tutorial, que sale con la Fase 4
+      prueba en `test/mesas_dinero_test.dart`) y el plano: lo que se toca mide
+      44 como mínimo aunque la mesa se dibuje más chica, y cada estado lleva su
+      ícono además del color, en las mesas y en la leyenda
+      (`test/plano_test.dart`). Falta el tutorial, que sale con la Fase 4
 - [ ] **Eventos / Gestión** — una sola lista con eje temporal, "Crear evento"
       arriba, datos reales en Gestionar evento, arreglar el campo `_cut` que se
       manda sin dibujarse (`gestion_screen.dart:1511,1619`)

@@ -7,6 +7,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/venue_theme.dart';
 import '../data/mesas.dart';
 
+/// El estado de una mesa, además dibujado: en la puerta hay gente que no
+/// distingue el verde del naranja, y el plano es todo color.
+IconData? iconoDeMesa(Mesa m) => switch (m.estado) {
+      'reservada' => Icons.schedule_rounded,
+      'pagada' => Icons.check_circle_rounded,
+      'ocupada' => Icons.person_rounded,
+      _ => null,
+    };
+
+/// Lo que se toca nunca mide menos de esto. El informe pide 44 y el token
+/// `tocable` son 48; acá van 44 a propósito, porque en un plano denso una
+/// zona de 48 le empieza a robar el toque a la mesa de al lado.
+const _minTocable = 44.0;
+
 Color colorDeMesa(Mesa m, Color marca) => switch (m.estado) {
       'reservada' => VenueColors.aviso,
       'pagada' => VenueColors.ok,
@@ -251,9 +265,15 @@ class _MesaEnPlanoState extends State<_MesaEnPlano> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(m.etiqueta,
-                style: TextStyle(
-                    color: VenueColors.texto, fontWeight: FontWeight.w800, fontSize: 15, height: 1.1)),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              if (estado != null) ...[
+                Icon(iconoDeMesa(m), size: 11, color: estado),
+                const SizedBox(width: 3),
+              ],
+              Text(m.etiqueta,
+                  style: TextStyle(
+                      color: VenueColors.texto, fontWeight: FontWeight.w800, fontSize: 15, height: 1.1)),
+            ]),
             if (nombre.isNotEmpty)
               Text(nombre,
                   maxLines: 1,
@@ -266,9 +286,15 @@ class _MesaEnPlanoState extends State<_MesaEnPlano> {
       ),
     );
 
+    // La mesa dibujada puede quedar en 30 px en un teléfono. El dibujo no
+    // cambia: lo que crece es la zona que recibe el toque, centrada sobre la
+    // mesa, y la posición se corre lo mismo que creció para que la mesa siga
+    // cayendo en su lugar del plano.
+    final cajaW = w < _minTocable ? _minTocable : w;
+    final cajaH = h < _minTocable ? _minTocable : h;
     return Positioned(
-      left: widget.ancho * widget.posicion.dx / 100,
-      top: widget.alto * widget.posicion.dy / 100,
+      left: widget.ancho * widget.posicion.dx / 100 - (cajaW - w) / 2,
+      top: widget.alto * widget.posicion.dy / 100 - (cajaH - h) / 2,
       child: Transform.translate(
         offset: _d,
         child: Semantics(
@@ -302,7 +328,12 @@ class _MesaEnPlanoState extends State<_MesaEnPlano> {
                       _arrastrando = false;
                     })
                 : null,
-            child: Stack(clipBehavior: Clip.none, children: [
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(
+              width: cajaW,
+              height: cajaH,
+              child: Center(
+                child: Stack(clipBehavior: Clip.none, children: [
               RepaintBoundary(child: cuerpo),
               if (team != null)
                 Positioned(
@@ -317,7 +348,9 @@ class _MesaEnPlanoState extends State<_MesaEnPlano> {
                     ),
                   ),
                 ),
-            ]),
+                ]),
+              ),
+            ),
           ),
         ),
       ),
@@ -331,20 +364,24 @@ class LeyendaPlano extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final marca = Theme.of(context).colorScheme.primary;
-    Widget item(String t, Color c) => Row(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                  color: c.withValues(alpha: .5), borderRadius: BorderRadius.circular(3))),
+    Widget item(String t, Color c, IconData? icono) => Row(mainAxisSize: MainAxisSize.min, children: [
+          icono == null
+              ? Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                      color: c.withValues(alpha: .5), borderRadius: BorderRadius.circular(3)))
+              : Icon(icono, size: 13, color: c),
           const SizedBox(width: 5),
           Text(t, style: TextStyle(fontSize: 12.5, color: VenueColors.textoSuave)),
         ]);
+    // los mismos íconos que llevan las mesas en el plano: la leyenda no
+    // explica colores, explica lo que se ve dibujado
     return Wrap(spacing: 14, runSpacing: 4, children: [
-      item('Libre', VenueColors.textoSuave),
-      item('Reservada', VenueColors.aviso),
-      item('Pagada', VenueColors.ok),
-      item('Ocupada', marca),
+      item('Libre', VenueColors.textoSuave, null),
+      item('Reservada', VenueColors.aviso, Icons.schedule_rounded),
+      item('Pagada', VenueColors.ok, Icons.check_circle_rounded),
+      item('Ocupada', marca, Icons.person_rounded),
     ]);
   }
 }
