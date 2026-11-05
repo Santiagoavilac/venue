@@ -24,9 +24,10 @@ class Ingreso {
   final SupabaseClient _sb;
   final String googleIosClientId;
   final String googleWebClientId;
-  // google_sign_in 7 inicializa el SDK una sola vez por proceso.
-  static final String _googleNonce = _nonce();
-  static Future<void>? _googleInicializacion;
+  /// El nonce que quedó activo en el SDK de Google. Es por intento -eso es lo
+  /// que ata el token a esta sesión y no a otra- y se guarda sólo porque, si el
+  /// SDK se niega a reinicializarse, hay que firmar con el que ya tenía.
+  static String? _googleNonceActivo;
 
   static String _nonce([int largo = 32]) {
     const c = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
@@ -61,11 +62,25 @@ class Ingreso {
       throw const AuthException('El ingreso con Google todavía no está configurado.');
     }
     final g = GoogleSignIn.instance;
-    await (_googleInicializacion ??= g.initialize(
-      clientId: googleIosClientId,
-      serverClientId: googleWebClientId,
-      nonce: sha256.convert(utf8.encode(_googleNonce)).toString(),
-    ));
+    // Un nonce por intento, como el de Apple. Antes era uno fijo por proceso:
+    // todos los ingresos de una corrida compartían el mismo, así que el nonce
+    // no distinguía un intento de otro.
+    final crudo = _nonce();
+    var usado = crudo;
+    try {
+      await g.initialize(
+        clientId: googleIosClientId,
+        serverClientId: googleWebClientId,
+        nonce: sha256.convert(utf8.encode(crudo)).toString(),
+      );
+    } on Exception {
+      // Si el SDK no acepta reinicializarse, se firma con el que ya tiene
+      // puesto: mejor eso que no poder entrar. En el primer intento no hay
+      // ninguno, y ahí el error sí es un error.
+      if (_googleNonceActivo == null) rethrow;
+      usado = _googleNonceActivo!;
+    }
+    _googleNonceActivo = usado;
     final GoogleSignInAccount cuenta;
     try {
       cuenta = await g.authenticate();
@@ -75,7 +90,7 @@ class Ingreso {
     }
     final token = cuenta.authentication.idToken;
     if (token == null) throw const AuthException('Google no devolvió el token.');
-    await _sb.auth.signInWithIdToken(provider: OAuthProvider.google, idToken: token, nonce: _googleNonce);
+    await _sb.auth.signInWithIdToken(provider: OAuthProvider.google, idToken: token, nonce: usado);
   }
 
   /// El nombre que dio el proveedor, para proponerlo en el onboarding.
@@ -87,7 +102,7 @@ class Ingreso {
 
   Future<void> salir() async {
     try {
-      if (_googleInicializacion != null) await GoogleSignIn.instance.signOut();
+      if (_googleNonceActivo != null) await GoogleSignIn.instance.signOut();
     } catch (_) {}
     await _sb.auth.signOut();
   }

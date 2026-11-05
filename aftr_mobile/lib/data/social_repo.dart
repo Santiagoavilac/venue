@@ -119,16 +119,20 @@ class SocialRepo {
     final path = '$uid/${nuevaOperacion()}.${tipo.ext}';
     await sb.storage.from(bucket).uploadBinary(path, bytes,
         fileOptions: FileOptions(contentType: tipo.mime, cacheControl: '0'));
-    if (historia) {
-      try {
-        final r = await sb.functions.invoke('historias-media', body: {'path': path});
-        if (r.status < 200 || r.status >= 300) {
-          throw const FormatException('No se pudo verificar el archivo.');
-        }
-      } catch (_) {
-        await borrar(bucket, path);
-        rethrow;
+    // El servidor mira los bytes, no el nombre ni el content-type que declaró
+    // el cliente: storage acepta cualquier contenido con que digas image/jpeg.
+    // Si no es lo que dice ser, el archivo se borra del bucket.
+    try {
+      final r = historia
+          ? await sb.functions.invoke('historias-media', body: {'path': path})
+          : await sb.functions.invoke('historias-media',
+              body: {'accion': 'revisar', 'bucket': bucket, 'path': path});
+      if (r.status < 200 || r.status >= 300) {
+        throw const FormatException('No se pudo verificar el archivo.');
       }
+    } catch (_) {
+      await borrar(bucket, path);
+      rethrow;
     }
     return path;
   }

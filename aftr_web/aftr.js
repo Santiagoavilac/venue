@@ -49,7 +49,7 @@ async function rpc(fn, p = {}) {
 
 // imagen con fundido; sin imagen, degradé del color del boliche
 function img(url, color, extra = "") {
-  return `<div class="img ${extra}" style="--c:${esc(color || "#26262a")}">${url ? `<img src="${esc(url)}" alt="" loading="lazy" onload="this.classList.add('cargada')">` : ""}</div>`;
+  return `<div class="img ${extra}" style="--c:${esc(color || "#26262a")}">${url ? `<img src="${esc(url)}" alt="" loading="lazy">` : ""}</div>`;
 }
 const ICO = {
   chev: `<svg class="chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>`,
@@ -98,6 +98,22 @@ function cerrarHoja() {
   const cb = alCerrarHoja; alCerrarHoja = null; cb?.();
 }
 $("#hoja-fondo").addEventListener("click", cerrarHoja);
+// Las imagenes aparecen con una transicion cuando terminan de cargar. Antes
+// cada <img> traia su propio onload escrito en el HTML; con la CSP eso no se
+// ejecuta, asi que se marca desde aca.
+const marcarCargada = (img) => img.classList.add("cargada");
+document.addEventListener("load", (e) => {
+  if (e.target instanceof HTMLImageElement) marcarCargada(e.target);
+}, true);
+// Y las que ya estaban en cache nunca disparan load: se repasan despues de
+// pintar, que es cuando aparecen en el arbol.
+new MutationObserver((cambios) => {
+  for (const c of cambios) for (const n of c.addedNodes) {
+    if (!(n instanceof HTMLElement)) continue;
+    const imgs = n instanceof HTMLImageElement ? [n] : [...n.querySelectorAll("img")];
+    for (const img of imgs) if (img.complete && img.naturalWidth) marcarCargada(img);
+  }
+}).observe(document.body, { childList: true, subtree: true });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#hoja").hidden) cerrarHoja(); });
 const listo = (titulo, texto, accion, fn) => `<div class="listo">${check}<h2 class="aparecer" style="--o:6">${esc(titulo)}</h2><p class="aparecer" style="--o:7">${esc(texto)}</p>
   <button class="boton" data-listo>${esc(accion)}</button><button class="enlace" data-cerrar>Listo</button></div>`;
@@ -339,7 +355,10 @@ async function pintar() {
     if (r.nombre === "mi-mesa") return pintarMiMesa(r.id);
     return await pintarDescubrir();
   } catch (e) {
-    vista.innerHTML = `<div class="vacio"><img src="img/marca.svg" alt=""><p>${esc(mensaje(e))}</p><button class="pildora" onclick="location.reload()">Reintentar</button></div>`;
+    // sin handlers en línea: la CSP no deja ejecutar nada escrito en el HTML,
+    // que es lo que hace que un XSS acá no sirva para nada
+    vista.innerHTML = `<div class="vacio"><img src="img/marca.svg" alt=""><p>${esc(mensaje(e))}</p><button class="pildora" data-recargar>Reintentar</button></div>`;
+    $("[data-recargar]", vista)?.addEventListener("click", () => location.reload());
   }
 }
 window.addEventListener("hashchange", pintar);
@@ -396,7 +415,7 @@ async function pintarDescubrir() {
     } else {
       const d = lista[0];
       html += `<a class="destacado img presionable aparecer" style="--o:1;--c:#26262a" href="#/evento/${d.id}">
-        ${d.flyer ? `<img src="${esc(d.flyer)}" alt="" onload="this.classList.add('cargada')">` : ""}<div class="degrade"></div>
+        ${d.flyer ? `<img src="${esc(d.flyer)}" alt="">` : ""}<div class="degrade"></div>
         <div class="info"><div style="display:flex;align-items:center"><span class="suave">${esc(d.club?.nombre)}</span></div>
         <h2 class="titular">${esc(d.nombre)}</h2><div>${esc(linea(d))}</div>
         ${precioDesde(d) ? `<span class="precio-destacado">${esc(precioDesde(d))}</span>` : ""}</div></a>`;
@@ -845,12 +864,16 @@ async function pintarAccesos() {
   }
   if (!E.accesos) vista.innerHTML = `<div class="pagina"><h1 class="titular">Accesos</h1><div class="esq" style="height:200px;border-radius:24px"></div></div>`;
   await cargarPerfil();
-  if (!E.perfil) { vista.innerHTML = `<div class="pagina"><h1 class="titular">Accesos</h1><button class="boton" onclick="abrirBienvenida()">Completar perfil</button></div>`; return; }
+  if (!E.perfil) {
+    vista.innerHTML = `<div class="pagina"><h1 class="titular">Accesos</h1><button class="boton" data-perfil>Completar perfil</button></div>`;
+    $("[data-perfil]", vista)?.addEventListener("click", abrirBienvenida);
+    return;
+  }
   await cargarAccesos();
   if (ruta().nombre !== "accesos") return;
   const prox = proximos(E.accesos), pas = pasados(E.accesos);
   if (!prox.find((a) => a.id === abierta)) abierta = null;
-  vista.innerHTML = `<div class="pagina"><a class="texto-accion" href="#/mis-mesas">Mis mesas y pedidos</a><button class="texto-accion" style="margin-left:16px" onclick="socialAftr().mineResale().catch(e=>avisar(mensaje(e)))">Reventa y mis operaciones ↗</button><h1 class="titular">Accesos ${abierta ? `<button class="pildora densa" data-cerrar-t>Cerrar</button>` : ""}</h1>
+  vista.innerHTML = `<div class="pagina"><a class="texto-accion" href="#/mis-mesas">Mis mesas y pedidos</a><button class="texto-accion" style="margin-left:16px" data-reventa>Reventa y mis operaciones ↗</button><h1 class="titular">Accesos ${abierta ? `<button class="pildora densa" data-cerrar-t>Cerrar</button>` : ""}</h1>
     ${(E.accesos?.revisar || []).map((p) => avisoPagoTarde({
       monto: Number(p.monto || 0).toFixed(2), tarde: p.nota === "PAGADO_FUERA_DE_PLAZO",
       resuelta: p.resuelta === true, evento: p.evento?.nombre || null,
@@ -863,6 +886,9 @@ async function pintarAccesos() {
       <span class="tenue" style="font-size:13px">${{ usada: "Usada", anulada: "Anulada", bloqueada: "En reventa", reemplazada: "Reemplazada", valida: "Sin usar", pendiente: "Pendiente" }[a.estado]}</span></div>`).join("")}` : ""}</div>`;
   apilar(prox);
   $("[data-cerrar-t]")?.addEventListener("click", () => { abierta = null; pintarAccesos(); });
+  // el boton de reventa aparece en la cabecera y dentro de la tarjeta abierta
+  $$("[data-reventa]", vista).forEach((b) =>
+    b.addEventListener("click", () => socialAftr().mineResale().catch((e) => avisar(mensaje(e)))));
 }
 function tarjetaWallet(a, i) {
   const pend = a.estado === "pendiente";
@@ -875,7 +901,7 @@ function tarjetaWallet(a, i) {
     </div></div>`;
 }
 function abiertaHtml(a) {
-  if(a.estado==="bloqueada")return `<div class="tw-abierta"><b class="fuerte">Entrada en reventa</b><p>El QR está bloqueado para ingreso y transferencias.</p><button class="boton" onclick="socialAftr().mineResale()">Ver mis operaciones</button></div>`;
+  if(a.estado==="bloqueada")return `<div class="tw-abierta"><b class="fuerte">Entrada en reventa</b><p>El QR está bloqueado para ingreso y transferencias.</p><button class="boton" data-reventa>Ver mis operaciones</button></div>`;
   const club = a.evento.club || {};
   if (a.qr && a.estado === "valida") {
     const q = qrcode(0, "M"); q.addData(a.qr); q.make();
@@ -969,7 +995,7 @@ async function pintarCuenta() {
   vista.innerHTML = `<div class="pagina"><h1 class="titular">Cuenta</h1>
     <div class="perfil aparecer"><button class="avatar" data-foto aria-label="Cambiar foto de perfil">${fotoPerfilHtml(p)}</button><div><b class="fuerte" style="font-size:24px">${esc(p?.nombre || "")}</b>
       ${p ? `<div class="suave">@${esc(p.usuario)}</div>` : ""}</div></div>
-    ${!p ? `<button class="boton" style="margin-top:20px" onclick="abrirBienvenida()">Completar perfil</button>` : ""}
+    ${!p ? `<button class="boton" style="margin-top:20px" data-perfil>Completar perfil</button>` : ""}
     ${g.eventos?.length ? `<h3 class="fuerte" style="font-size:22px;margin:30px 4px 14px">Guardados</h3><div class="carrusel" style="padding:0 4px">${g.eventos.map(tarjeta).join("")}</div>` : ""}
     ${g.lugares?.length ? `<h3 class="fuerte" style="font-size:22px;margin:30px 4px 6px">Siguiendo</h3>${g.lugares.map((l, i) => filaLugar(l, i).replace('class="fila ', 'style="padding:8px 4px" class="fila ')).join("")}` : ""}
     <h3 class="fuerte" style="font-size:22px;margin:30px 4px 6px">Ajustes</h3>
@@ -980,6 +1006,7 @@ async function pintarCuenta() {
     <button class="opcion mal" data-borrar>${ICO.borrar}Eliminar cuenta</button>
     <img src="img/marca.svg" style="height:26px;margin:30px auto 8px;opacity:.35" alt=""><p class="tenue" style="text-align:center;font-size:12px;margin:0">AFTR · Nightlife &amp; Events</p></div>`;
   $$("[data-foto], [data-foto-editar]").forEach(b => b.onclick = () => editarFotoWeb());
+  $("[data-perfil]")?.addEventListener("click", abrirBienvenida);
   $("[data-guia]").onclick = () => abrirGuiaAftr();
   $("[data-salir]").onclick = async () => { await sb.auth.signOut(); };
   $("[data-borrar]").onclick = () => {

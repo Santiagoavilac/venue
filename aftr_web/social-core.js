@@ -121,10 +121,13 @@
       const extension=({'image/jpeg':'jpg','image/png':'png','image/webp':'webp','video/mp4':'mp4','video/quicktime':'mov'})[file.type];
       const path=`${uid()}/${crypto.randomUUID()}.${extension}`;
       const {error}=await sb.storage.from(bucket).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;
-      if(validar){
-        try {const {data,error:e}=await sb.functions.invoke('historias-media',{body:{path}});if(e)throw new Error(e.context ? 'No se pudo validar el archivo. Revisá que el video no supere 30 segundos.' : e.message);if(data?.error)throw new Error(data.error);}
-        catch(e){await sb.storage.from(bucket).remove([path]);throw e;}
-      }
+      // El servidor mira los bytes, no el content-type que declaró el cliente:
+      // storage acepta cualquier contenido con que digas image/jpeg. Para las
+      // historias valida y registra; para los comprobantes sólo valida, y
+      // borra el objeto si no es una imagen de verdad.
+      const cuerpo=validar?{path}:{accion:'revisar',bucket,path};
+      try {const {data,error:e}=await sb.functions.invoke('historias-media',{body:cuerpo});if(e)throw new Error(e.context ? 'No se pudo validar el archivo. Revisá que el video no supere 30 segundos.' : e.message);if(data?.error)throw new Error(data.error);}
+      catch(e){await sb.storage.from(bucket).remove([path]);throw e;}
       return path;
     }
     // La foto de perfil del autor de una historia. Viene como URL (logo del

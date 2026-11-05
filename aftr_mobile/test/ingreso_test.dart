@@ -56,12 +56,15 @@ void main() {
       await servidor.close(force: true);
     });
 
-    // Una nueva instancia del repositorio no debe reinicializar el SDK nativo.
+    // Un nonce por intento: antes era uno fijo por proceso, así que todos los
+    // ingresos de una corrida compartían el mismo y el nonce no distinguía un
+    // intento de otro. Por eso ahora el SDK se inicializa en cada uno.
     for (var i = 0; i < 2; i++) {
       await expectLater(Ingreso(sb, googleIosClientId: 'ios-cliente-de-prueba', googleWebClientId: 'web-cliente-de-prueba').conGoogle(), throwsA(isA<AuthException>()));
     }
-    expect(google.inicializaciones, 1);
+    expect(google.inicializaciones, 2);
     expect(peticiones, hasLength(2));
+    expect(peticiones[0]['nonce'], isNot(peticiones[1]['nonce']));
     for (final cuerpo in peticiones) {
       expect(cuerpo['provider'], 'google');
       final nonce = cuerpo['nonce'] as String;

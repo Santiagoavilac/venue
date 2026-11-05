@@ -51,7 +51,30 @@ partirla rompería las apps publicadas, que llaman `aftr_reventa('mercado')` sin
 sesión. El agujero que el plan señalaba (un `p_accion` nuevo puesto arriba abre
 todo) queda cerrado igual, y sin depender del orden.
 
-## Fases 4 a 9
+## Fase 4 · El borde: funciones, archivos y la web
+
+| # | Qué | Estado |
+|---|-----|--------|
+| 4.1 | `historias-media` con su propio secreto, comparación en tiempo constante y límite por IP | ok |
+| 4.2 | Los bytes se validan, no el nombre (`aftr-p2p` y `aftr-perfiles`) | ok |
+| 4.3 | CORS acotado, CSP, cabeceras y SRI en los tres CDN | ok |
+| 4.4 | Nonce por intento en Google | ok |
+
+**Fase 4 cerrada**, con dos cosas dichas de frente:
+
+- `crear-usuario` sigue con `CORS *`. No se toca porque no sé desde qué dominio
+  la llama la web de Venue, y acotarla a ciegas la dejaría sin poder crear
+  cuentas. Hay que confirmar el dominio y agregarlo a la misma lista.
+- La CSP deja `style-src 'unsafe-inline'`: los templates de la web arman
+  estilos en línea en casi cien lugares y sacarlos es otro trabajo. Lo que sí
+  quedó cerrado es `script-src` sin `'unsafe-inline'`, que es lo que hace que un
+  XSS no pueda ejecutar nada; por eso en los templates ya no hay ni un
+  `onclick=` ni un `onload=`.
+- Los tres scripts de CDN quedaron con SRI y versión fija en vez de bajados a
+  `vendor/`: con el hash, un CDN comprometido no puede inyectar nada, y la
+  página no carga un megabyte más del repo.
+
+## Fases 5 a 9
 
 Sin empezar. El orden del plan es el orden de trabajo: primero la plata,
 después los datos, después la experiencia.
@@ -137,6 +160,13 @@ después los datos, después la experiencia.
   revende, no contra el precio original de siempre.
 - El mismo flujo probado además contra la base real en una transacción que
   vuelve atrás, con dos cuentas.
+- `curl` con `Origin: https://malicioso.example` contra las dos Edge Functions:
+  no vuelve `Access-Control-Allow-Origin`; con el dominio propio, sí. `revisar`
+  sin sesión contesta "Iniciá sesión"; `firmar` sin sesión sigue andando, que es
+  para lo que existe.
+- 32 pruebas de la Edge Function del banco (una nueva de CORS) y 7 del
+  validador de medios (dos nuevas: un HTML, un .exe, un PDF y un GIF no pasan
+  como comprobante, y un video no sirve de foto de perfil).
 - Edge Function `baneco` desplegada: era obligatorio, porque ahora una orden
   puede tener más de un QR y el `maybeSingle()` anterior habría fallado.
 

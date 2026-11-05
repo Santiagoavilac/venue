@@ -103,6 +103,10 @@ async function editarFotoWeb() {
         ruta = `${uid}/${crypto.randomUUID()}.jpg`;
         const {error} = await sb.storage.from('aftr-perfiles').upload(ruta,blob,{contentType:'image/jpeg',cacheControl:'3600'});
         if (error) throw error;
+        // Los bytes los mira el servidor: la foto se le muestra ahora a
+        // cualquier visitante sin cuenta, y storage no revisa el contenido.
+        const {data:rev,error:er} = await sb.functions.invoke('historias-media',{body:{accion:'revisar',bucket:'aftr-perfiles',path:ruta}});
+        if (er || rev?.error) throw new Error(rev?.error || 'Elegí una foto JPG, PNG o WebP.');
       }
       await rpc('aftr_cambiar_foto',{p_archivo:ruta}); confirmado = true;
       if (perfil.foto_archivo?.startsWith(`${uid}/`)) await sb.storage.from('aftr-perfiles').remove([perfil.foto_archivo]).catch(()=>{});

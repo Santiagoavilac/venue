@@ -72,6 +72,14 @@ class FotoPerfilRepo {
           ),
         );
     try {
+      // Antes de dejarla en el perfil, el servidor mira los bytes: la foto se
+      // le muestra ahora a cualquier visitante sin cuenta, y storage acepta
+      // cualquier contenido con que el cliente declare image/jpeg.
+      final r = await sb.functions.invoke('historias-media',
+          body: {'accion': 'revisar', 'bucket': bucketPerfil, 'path': ruta});
+      if (r.status < 200 || r.status >= 300) {
+        throw const FormatException('Elegí una foto JPG, PNG o WebP.');
+      }
       await sb.rpc('aftr_cambiar_foto', params: {'p_archivo': ruta});
     } catch (_) {
       try {

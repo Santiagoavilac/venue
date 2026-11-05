@@ -61,6 +61,8 @@ EXCEPCIONES = {
     'baneco_reservar_destino': 'solo service_role: la llama la Edge Function del banco',
     'baneco_reservar_qr': 'solo service_role: la llama la Edge Function del banco',
     'baneco_liberar_sin_qr': 'solo service_role: la llama la Edge Function del banco',
+    'aftr_limite_externo': 'solo service_role: recibe el actor de afuera, porque la '
+                           'Edge Function no tiene sesion sino una IP',
 }
 
 # Señales de que la función comprueba quién llama.

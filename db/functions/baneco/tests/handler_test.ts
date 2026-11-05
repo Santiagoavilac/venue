@@ -167,3 +167,15 @@ Deno.test("una consulta individual fallida no bloquea un día ya conciliado", as
   igual(s.tablas.finalizacion[0].p_dia_ok, "2026-10-29");
   igual(s.tablas.finalizacion[0].p_errores, 1);
 });
+Deno.test("CORS: sólo los dominios propios, y sin Origin no se autoriza a nadie", async () => {
+  const s = escenario();
+  const con = async (origin?: string) => {
+    const r = await s.handler(new Request("https://local/baneco", {
+      method: "OPTIONS", headers: origin ? { Origin: origin } : {},
+    }));
+    return r.headers.get("access-control-allow-origin");
+  };
+  igual(await con("https://aftrvenue.com"), "https://aftrvenue.com");
+  igual(await con("https://malicioso.example"), null);
+  igual(await con(), null);
+});

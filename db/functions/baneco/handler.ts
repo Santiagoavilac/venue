@@ -1,11 +1,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Banco, type Datos, type Entorno, ErrorBanco } from "./bank.ts";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
+/* CORS: era `*`, o sea que cualquier página podía llamar a la función del cobro
+   con la sesión de quien la estuviera mirando. Ahora sólo los dominios propios.
+   El webhook del banco y la app nativa no mandan Origin: ahí no hay nada que
+   autorizar en el navegador, y el permiso real lo da el token de la petición. */
+const PROPIOS = [
+  "https://aftrvenue.com", "https://www.aftrvenue.com",
+  "http://localhost:5173", "http://localhost:8000", "http://127.0.0.1:5173",
+];
+const BASE_CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-cron, x-baneco-token",
 };
+function cors(req: Request, extra?: string) {
+  const permitidos = [...PROPIOS, ...(extra ?? "").split(",").map((o) => o.trim()).filter(Boolean)];
+  const origen = req.headers.get("origin");
+  return origen && permitidos.includes(origen)
+    ? { ...BASE_CORS, "Access-Control-Allow-Origin": origen, Vary: "Origin" }
+    : BASE_CORS;
+}
 const publico = (q: Datos | null, imagen = true) => q && ({
   estado: q.estado, qrId: q.qr_id, ...(imagen ? { imagen: q.qr_imagen } : {}), monto: q.monto, moneda: q.moneda, vence: q.vence,
   // limite es cuando deja de cobrarse (diez minutos); nota, por qué quedó en
@@ -199,6 +213,7 @@ export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, 
     return { responseCode: 0, message: "" };
   }
   return async (req: Request): Promise<Response> => {
+    const CORS = cors(req, env("ORIGENES_PERMITIDOS"));
     const json = (d: unknown, status = 200) => new Response(JSON.stringify(d), { status, headers: { ...CORS, "Content-Type": "application/json" } });
     if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
     if (req.method !== "POST") return json({ error: "Método no permitido." }, 405);

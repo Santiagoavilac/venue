@@ -1,15 +1,72 @@
 import { validarMedio } from './media.ts';
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-const respuesta = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+
+/* CORS: antes era `*`, o sea que cualquier página podía llamar a esta función
+   con la sesión de quien la estuviera mirando. Ahora sólo los dominios propios,
+   y localhost para desarrollo. Se pueden agregar por la variable
+   ORIGENES_PERMITIDOS sin tocar el código. */
+const propios = [
+  'https://aftrvenue.com', 'https://www.aftrvenue.com',
+  'http://localhost:5173', 'http://localhost:8000', 'http://127.0.0.1:5173',
+];
+const permitidos = () => [
+  ...propios,
+  ...(Deno.env.get('ORIGENES_PERMITIDOS') ?? '').split(',').map(o => o.trim()).filter(Boolean),
+];
+function cabeceras(req: Request) {
+  const origen = req.headers.get('origin');
+  // Sin Origin es una app nativa o un curl: no hay nada que autorizar en el
+  // navegador, y la autorización real la hace el token de la petición.
+  const permitido = origen && permitidos().includes(origen) ? origen : null;
+  return {
+    ...(permitido ? { 'Access-Control-Allow-Origin': permitido, Vary: 'Origin' } : {}),
+    'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-social-cron',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
+
+/* Comparación en tiempo constante: antes el token del cron se comparaba con
+   `!==`, que corta en el primer byte distinto y deja medir cuántos aciertan. */
+async function secretoIgual(a: string | null, b: string | undefined) {
+  if (!a || !b || b.length < 32) return false;
+  const hash = async (s: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
+  const [x, y] = await Promise.all([hash(a), hash(b)]);
+  let diferencia = 0;
+  for (let i = 0; i < x.length; i++) diferencia |= x[i] ^ y[i];
+  return diferencia === 0;
+}
+
 Deno.serve(async req => {
+  const cors = cabeceras(req);
+  const respuesta = (data: unknown, status = 200) =>
+    new Response(JSON.stringify(data), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   if (req.method !== 'POST') return respuesta({ error: 'Método no permitido.' }, 405);
   try {
     const url = Deno.env.get('SUPABASE_URL')!, key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const body = await req.json();
+    /* Quién llama, para los frenos: la IP que informa el proxy. El freno vive
+       en la base (aftr_limite_externo) para que sea el mismo contador que el
+       del resto de AFTR y no uno nuevo en memoria, que se pierde en cada
+       arranque en frío. */
+    const quienEs = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim();
+    const frenar = async (accion: string, max: number, ventana: number) => {
+      const r = await fetch(`${url}/rest/v1/rpc/aftr_limite_externo`, {
+        method: 'POST',
+        headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_accion: accion, p_actor: quienEs, p_max: max, p_ventana_seg: ventana }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (r.status === 400 || r.status === 409 || r.status === 429) {
+        const d = await r.json().catch(() => ({}));
+        throw new Response(JSON.stringify({ error: d?.message ?? 'Estás yendo muy rápido. Esperá un momento.' }),
+          { status: 429, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+    };
     if (body.accion === 'limpiar' || body.accion === 'verificar_limpieza') {
-      const token = Deno.env.get('BANECO_CRON_TOKEN');
-      if (!token || token.length < 32 || req.headers.get('x-social-cron') !== token) return respuesta({ error: 'No autorizado.' }, 401);
+      // Su propio secreto: usaba el del banco, y dos puertas con la misma
+      // llave es una llave que no se puede rotar sin cerrar las dos.
+      const token = Deno.env.get('SOCIAL_CRON_TOKEN') ?? Deno.env.get('BANECO_CRON_TOKEN');
+      if (!await secretoIgual(req.headers.get('x-social-cron'), token)) return respuesta({ error: 'No autorizado.' }, 401);
       const headers = { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
       const candidatos = await fetch(`${url}/rest/v1/rpc/aftr_social_limpieza`, { method: 'POST', headers, body: '{}', signal: AbortSignal.timeout(10000) });
       if (!candidatos.ok) throw new Error('No se pudo consultar la limpieza.');
@@ -35,6 +92,7 @@ Deno.serve(async req => {
       const pedidas = [...new Set(claves.filter((c: unknown) => typeof c === 'string' && uuid.test(c)))];
       if (!pedidas.length) return respuesta({ urls: {} });
       if (pedidas.length > 60) return respuesta({ error: 'Demasiados archivos de una vez.' }, 400);
+      await frenar('firmar_media', 120, 60);
       const quien = req.headers.get('authorization') ?? `Bearer ${Deno.env.get('SUPABASE_ANON_KEY') ?? ''}`;
       const anon = Deno.env.get('SUPABASE_ANON_KEY') ?? key;
       const rutas = await fetch(`${url}/rest/v1/rpc/aftr_media_rutas`, {
@@ -73,6 +131,50 @@ Deno.serve(async req => {
 
     const bearer = req.headers.get('authorization');
     if (!bearer) return respuesta({ error: 'Iniciá sesión.' }, 401);
+    // Cada validación descarga el archivo entero: hasta 30 MB por llamada.
+    await frenar('validar_media', 30, 60);
+    const userResponse0 = () => fetch(`${url}/auth/v1/user`, { headers: { apikey: key, Authorization: bearer }, signal: AbortSignal.timeout(10000) });
+
+    /* Los comprobantes de pago (aftr-p2p) y las fotos de perfil
+       (aftr-perfiles) se suben derecho a storage, y storage acepta cualquier
+       contenido con que el cliente declare image/jpeg. Hasta ahora nadie miraba
+       los bytes: un "comprobante" podía ser un HTML o un ejecutable, y la foto
+       de perfil se le muestra ahora a cualquier visitante sin cuenta.
+       Acá pasan por el mismo validador de magic bytes que las historias, y si
+       no son una imagen de verdad el objeto se borra. */
+    if (body.accion === 'revisar') {
+      const bucket = body.bucket === 'aftr-perfiles' ? 'aftr-perfiles' : body.bucket === 'aftr-p2p' ? 'aftr-p2p' : null;
+      const ruta = typeof body.path === 'string' ? body.path : '';
+      if (!bucket) return respuesta({ error: 'Bucket no válido.' }, 400);
+      const u = await userResponse0();
+      if (!u.ok) return respuesta({ error: 'Tu sesión venció.' }, 401);
+      const quien = (await u.json()).id as string;
+      if (!ruta.startsWith(`${quien}/`) || ruta.includes('..')) {
+        return respuesta({ error: 'El archivo no pertenece a tu cuenta.' }, 403);
+      }
+      const cabecerasServicio = { apikey: key, Authorization: `Bearer ${key}` };
+      const borrar = () => fetch(`${url}/storage/v1/object/${bucket}`, {
+        method: 'DELETE', headers: { ...cabecerasServicio, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefixes: [ruta] }), signal: AbortSignal.timeout(10000),
+      }).catch(() => {});
+      const archivo = await fetch(`${url}/storage/v1/object/authenticated/${bucket}/${ruta}`,
+        { headers: cabecerasServicio, signal: AbortSignal.timeout(20000) });
+      if (!archivo.ok) return respuesta({ error: 'Primero subí el archivo.' }, 400);
+      const crudo = new Uint8Array(await archivo.arrayBuffer());
+      // 8 MB: es lo que la app y la web dejan subir para estos dos
+      if (crudo.byteLength > 8 * 1024 * 1024) {
+        await borrar();
+        return respuesta({ error: 'El archivo supera 8 MB.' }, 400);
+      }
+      try {
+        const v = validarMedio(crudo);
+        if (v.tipo !== 'imagen') throw new Error('Tiene que ser una imagen, no un video.');
+        return respuesta({ path: ruta, bucket, ...v, valido: true });
+      } catch (e) {
+        await borrar();
+        return respuesta({ error: e instanceof Error ? e.message : 'El archivo no es una imagen válida.' }, 400);
+      }
+    }
     const userResponse = await fetch(`${url}/auth/v1/user`, { headers: { apikey: key, Authorization: bearer }, signal: AbortSignal.timeout(10000) });
     if (!userResponse.ok) return respuesta({ error: 'Tu sesión venció.' }, 401);
     const user = await userResponse.json();
@@ -132,6 +234,7 @@ Deno.serve(async req => {
     }
     return respuesta({ path, ruta: donde, ...validacion, size: total, valido: true });
   } catch (error) {
+    if (error instanceof Response) return error;
     return respuesta({ error: error instanceof Error ? error.message : 'No se pudo verificar el archivo.' }, 400);
   }
 });

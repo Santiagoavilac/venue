@@ -8,3 +8,17 @@ Deno.test('no admite archivos superiores a 30MB',()=>rechaza(new Uint8Array(30*1
 Deno.test('verifica duración MP4 en servidor',()=>{if(validarMedio(video(30)).duracion_ms!==30000)throw new Error('Duración incorrecta');rechaza(video(31));});
 Deno.test('rechaza cajas MP4 truncadas y pista inexistente',()=>{rechaza(video(10).slice(0,-1));rechaza(caja('ftyp',new TextEncoder().encode('isom0000')));});
 Deno.test('imágenes siempre tienen cinco segundos',()=>{const b=new Uint8Array([255,216,255,1,2,3,4,5,6,7,8,9,10,255,217]);if(validarMedio(b).duracion_ms!==5000)throw new Error('Duración incorrecta');});
+// Los comprobantes de pago y las fotos de perfil pasan ahora por el mismo
+// validador: storage acepta cualquier contenido con que el cliente declare
+// image/jpeg, así que el "comprobante" podía ser un HTML o un ejecutable.
+Deno.test('un comprobante que no es imagen no pasa', () => {
+  rechaza(new TextEncoder().encode('<!doctype html><script>alert(1)</script>'));
+  rechaza(new Uint8Array([0x4d, 0x5a, 0x90, 0x00, 0x03, 0, 0, 0, 0, 0, 0, 0, 0]));  // .exe
+  rechaza(new TextEncoder().encode('%PDF-1.7 trailer'));
+  rechaza(new TextEncoder().encode('GIF89a' + '\x00'.repeat(40)));
+});
+Deno.test('un video no sirve como comprobante ni como foto de perfil', () => {
+  // La función 'revisar' exige tipo imagen; acá se comprueba que el validador
+  // distingue, que es de lo que depende ese chequeo.
+  if (validarMedio(video(10)).tipo !== 'video') throw new Error('No distingue el video.');
+});
