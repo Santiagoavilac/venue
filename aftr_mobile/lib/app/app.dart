@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/routing/router.dart';
+import '../core/widgets/teclado.dart';
 import '../core/theme/aftr_theme.dart';
 import '../features/splash/splash.dart';
 import '../features/pulse/marco_aftr.dart';
@@ -30,9 +31,10 @@ class _AftrAppState extends ConsumerState<AftrApp> {
       routerConfig: ref.watch(routerProvider),
       // el arranque va encima de todo y se desvanece cuando termina; la app
       // ya está cargando debajo
-      builder: (context, hijo) => GestureDetector(
+      builder: (context, hijo) => VigilanteDelTeclado(
+        child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        onTap: esconderTeclado,
         child: Stack(children: [
         MarcoAftr(iniciado: !_splash, child: hijo ?? const SizedBox.shrink()),
         if (!_quitado)
@@ -50,7 +52,7 @@ class _AftrAppState extends ConsumerState<AftrApp> {
               ),
             ),
           ),
-      ])),
+      ]))),
     );
   }
 }

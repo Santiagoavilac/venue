@@ -43,6 +43,8 @@ class _VigilanteDelTecladoState extends State<VigilanteDelTeclado>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     FocusManager.instance.addListener(_revisar);
+    // por si la app arranca con el teclado de la pantalla anterior arriba
+    _revisar();
   }
 
   @override
