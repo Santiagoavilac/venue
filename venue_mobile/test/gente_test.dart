@@ -18,7 +18,7 @@ void main() {
       'id': 't', 'nombre': 'Team Norte', 'clubs': ['aurora'],
       'invite_code': 'ab12cd34ab12cd34ab12cd34ab12cd34',
     });
-    expect(t.link, 'https://venue-web-amber.vercel.app/?invite=ab12cd34ab12cd34ab12cd34ab12cd34');
+    expect(t.link, 'https://www.venuebol.com/?invite=ab12cd34ab12cd34ab12cd34ab12cd34');
     final m = mensajeDeInvitacion(t, 'Aurora Club');
     expect(m, contains(t.link));
     expect(m, contains('Team Norte'));

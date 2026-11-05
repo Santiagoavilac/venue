@@ -6,7 +6,7 @@ function socialVenue() {
     club:()=>club,identity:()=>['admin','propietario'].includes(me?.rol)?'club':'rrpp',
     events:async()=>{const {data,error}=await sb.rpc('aftr_eventos');if(error)throw error;return(data||[]).filter(e=>e.club?.id===club||e.club_id===club);},
     canModerate:h=>h.can_retirar===true,
-    storyCTA:h=>window.open(`https://aftr-web.vercel.app/#/evento/${encodeURIComponent(h.evento_id)}?historia=${encodeURIComponent(h.id)}`,'_blank','noopener')
+    storyCTA:h=>window.open(`https://www.aftrvenue.com/#/evento/${encodeURIComponent(h.evento_id)}?historia=${encodeURIComponent(h.id)}`,'_blank','noopener')
   });
 }
 const socialMenu=document.createElement('div');socialMenu.className='venue-social-menu';socialMenu.hidden=true;

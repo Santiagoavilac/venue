@@ -11,7 +11,7 @@
    muestra lo que las RPC devuelven para quien está mirando.
    =================================================================== */
 (() => {
-  const AFTR_URL = "https://aftr-web.vercel.app/";
+  const AFTR_URL = "https://www.aftrvenue.com/";
   const FLECHA = '<svg viewBox="0 0 24 24" class="ic mas-chev"><path d="M9 6l6 6-6 6"/></svg>';
   const volverA = () => location.origin + location.pathname;
 

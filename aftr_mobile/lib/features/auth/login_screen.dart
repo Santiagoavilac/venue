@@ -1,11 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/networking/supabase.dart';
 import '../../core/theme/aftr_theme.dart';
+import '../cuenta/cuenta_screen.dart' show aftrPrivacidad, aftrTerminos;
 import '../../core/widgets/logo.dart';
 import '../../core/widgets/movimiento.dart';
 import '../../core/widgets/piezas.dart';
@@ -130,10 +134,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
               ),
               const SizedBox(height: 18),
               Center(
-                child: Text(
-                  'Al continuar aceptás los términos y la política de privacidad de AFTR.',
+                child: Text.rich(
+                  TextSpan(
+                    style: Aftr.cuerpo(12, c: Aftr.texto3),
+                    children: [
+                      const TextSpan(text: 'Al continuar aceptás los '),
+                      TextSpan(
+                        text: 'términos',
+                        style: const TextStyle(decoration: TextDecoration.underline),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () => launchUrl(Uri.parse(aftrTerminos),
+                              mode: LaunchMode.externalApplication),
+                      ),
+                      const TextSpan(text: ' y la '),
+                      TextSpan(
+                        text: 'política de privacidad',
+                        style: const TextStyle(decoration: TextDecoration.underline),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () => launchUrl(Uri.parse(aftrPrivacidad),
+                              mode: LaunchMode.externalApplication),
+                      ),
+                      const TextSpan(text: ' de AFTR.'),
+                    ],
+                  ),
                   textAlign: TextAlign.center,
-                  style: Aftr.cuerpo(12, c: Aftr.texto3),
                 ),
               ),
               SizedBox(height: abajo > 0 ? 8 : 20),

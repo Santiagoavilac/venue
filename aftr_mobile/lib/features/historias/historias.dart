@@ -106,6 +106,8 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
   Duration _imagen = Duration.zero;
   DateTime _ultimo = DateTime.now();
   DateTime? _firmada;
+  /// URL firmada por historia, para no volver a pedirla al avanzar.
+  final Map<String, String> _firmadas = {};
   Timer? _reloj;
   DatosSocial get _h => widget.grupos[_grupo][_indice];
   bool get _detenida => _pausa || _fondo || _menu || !_lista;
@@ -152,19 +154,54 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
     _lista = false; _error = null; _url = null; _imagen = Duration.zero;
     if (mounted) setState(() {});
     try {
-      final url = await ref.read(socialRepoProvider).firmar('aftr-historias', '${_h['storage_path']}');
+      // la firma de la siguiente ya puede estar pedida: abrir sin esperarla
+      final url = _firmadas[_h['id']] ??
+          await ref.read(socialRepoProvider).firmar('aftr-historias', '${_h['storage_path']}');
       if (!mounted || version != _generacion) return;
+      _firmadas[_h['id'] as String] = url;
       _firmada = DateTime.now();
       if (_esVideo) {
         final video = VideoPlayerController.networkUrl(Uri.parse(url));
         await video.initialize();
         if (!mounted || version != _generacion) { video.dispose(); return; }
         _video = video; _lista = true; _sincronizar();
+      } else {
+        // la foto entra ya descargada: nada de ver media imagen o un salto
+        await precacheImage(NetworkImage(url), context);
+        if (!mounted || version != _generacion) return;
       }
       setState(() => _url = url);
+      _precargarSiguiente();
     } catch (e) {
       if (mounted && version == _generacion) setState(() => _error = mensajeDeError(e));
     }
+  }
+
+  /// Deja lista la que sigue mientras se mira la actual, como Instagram: al
+  /// tocar para avanzar ya está firmada y descargada.
+  Future<void> _precargarSiguiente() async {
+    final h = _despuesDe(_grupo, _indice);
+    if (h == null || _firmadas.containsKey(h['id'])) return;
+    try {
+      final url = await ref
+          .read(socialRepoProvider)
+          .firmar('aftr-historias', '${h['storage_path']}');
+      if (!mounted) return;
+      _firmadas[h['id'] as String] = url;
+      if (h['tipo'] != 'video') await precacheImage(NetworkImage(url), context);
+    } catch (_) {
+      // si falla, la siguiente se pide igual cuando toque: no molestamos acá
+    }
+  }
+
+  /// La historia que viene después de una posición, saltando de autor si hace
+  /// falta. Devuelve null en la última.
+  DatosSocial? _despuesDe(int grupo, int indice) {
+    if (indice + 1 < widget.grupos[grupo].length) {
+      return widget.grupos[grupo][indice + 1];
+    }
+    if (grupo + 1 < widget.grupos.length) return widget.grupos[grupo + 1][0];
+    return null;
   }
   void _siguiente({bool autor = false}) {
     if (!autor && _indice + 1 < widget.grupos[_grupo].length) { _indice++; }
@@ -187,15 +224,29 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
           onTap: () => Navigator.pop(ctx, 'retirar')),
         ListTile(leading: const Icon(Icons.flag_outlined), title: const Text('Reportar historia'),
           onTap: () => Navigator.pop(ctx, 'reportar')),
+        // bloquear es silencioso: el otro no se entera y se puede deshacer
+        // desde Cuenta → Ajustes → Cuentas bloqueadas
+        if (!propia) ListTile(leading: const Icon(Icons.block_outlined), title: const Text('Bloquear a esta persona'),
+          subtitle: const Text('No vas a ver más sus historias'),
+          onTap: () => Navigator.pop(ctx, 'bloquear')),
       ])));
     if (!mounted) return;
     if (accion != null) {
       try {
         if (!await asegurarCuenta(context, ref) || !mounted) return;
-        await ref.read(socialRepoProvider).historias(accion, {'id': _h['id'],
-          if (accion == 'reportar') 'motivo': 'Contenido inapropiado reportado desde el visor'});
+        await ref.read(socialRepoProvider).historias(accion, {
+          if (accion == 'bloquear') 'usuario': _h['autor_id'] else 'id': _h['id'],
+          if (accion == 'reportar') 'motivo': 'Contenido inapropiado reportado desde el visor',
+        });
         ref.invalidate(historiasProvider);
-        if (mounted) { avisar(context, accion == 'retirar' ? 'Historia eliminada.' : 'Reporte enviado.'); _siguiente(); }
+        if (mounted) {
+          avisar(context, switch (accion) {
+            'retirar' => 'Historia eliminada.',
+            'bloquear' => 'Listo, no vas a ver más sus historias.',
+            _ => 'Reporte enviado.',
+          });
+          _siguiente();
+        }
       } catch (e) { if (mounted) avisar(context, mensajeDeError(e)); }
     }
     _menu = false; _sincronizar();

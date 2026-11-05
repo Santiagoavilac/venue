@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/networking/supabase.dart';
 import '../../core/theme/aftr_theme.dart';
@@ -179,6 +180,11 @@ class CuentaScreen extends ConsumerWidget {
             () => context.go('/accesos'),
           ),
           _Opcion(
+            Icons.block_outlined,
+            'Cuentas bloqueadas',
+            () => context.push('/bloqueados'),
+          ),
+          _Opcion(
             Icons.logout_rounded,
             'Cerrar sesión',
             () => ref.read(ingresoProvider).salir(),
@@ -189,6 +195,13 @@ class CuentaScreen extends ConsumerWidget {
             () => _eliminar(context, ref),
             peligro: true,
           ),
+          // Apple pide que soporte, normas y privacidad se alcancen desde
+          // adentro de la app, no solo desde la ficha de la App Store.
+          const TituloSeccion('Ayuda y legales'),
+          _Opcion(Icons.mail_outline_rounded, 'Soporte', () => _abrir(aftrSoporte)),
+          _Opcion(Icons.verified_user_outlined, 'Normas de comunidad', () => _abrir(aftrNormas)),
+          _Opcion(Icons.lock_outline_rounded, 'Política de privacidad', () => _abrir(aftrPrivacidad)),
+          _Opcion(Icons.description_outlined, 'Términos de uso', () => _abrir(aftrTerminos)),
           const SizedBox(height: 30),
           const Center(child: MarcaAftr(alto: 26, color: Aftr.texto3)),
           const SizedBox(height: 8),
@@ -235,4 +248,16 @@ class _Opcion extends StatelessWidget {
       ),
     ),
   );
+}
+
+
+/// Páginas públicas y contacto. Viven en la web de AFTR para que Apple y
+/// cualquier persona puedan leerlas sin instalar la app.
+const aftrPrivacidad = 'https://www.aftrvenue.com/privacidad';
+const aftrTerminos = 'https://www.aftrvenue.com/terminos';
+const aftrNormas = 'https://www.aftrvenue.com/normas';
+const aftrSoporte = 'mailto:soporte.aftrvenue@aftrvenue.com';
+
+Future<void> _abrir(String url) async {
+  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 }

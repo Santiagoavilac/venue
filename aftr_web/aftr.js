@@ -639,7 +639,7 @@ async function pintarLugar(id) {
   const fotos = (l.fotos || []).length ? l.fotos : [l.eventos?.[0]?.flyer || l.logo];
   const render = () => {
     vista.innerHTML = `<div class="redondos" id="redondos"><button class="redondo" data-atras>${ICO.atras}</button><div class="titulo-mini">${esc(l.nombre)}</div><button class="redondo" data-comp>${ICO.comp}</button></div>
-      <div class="portada"><div class="fotos-lugar" id="fotos">${fotos.map((f) => img(f, l.color)).join("")}</div>
+      <div class="portada"><div class="fotos-lugar${fotos.length > 1 ? "" : " una"}" id="fotos">${fotos.map((f) => img(f, l.color)).join("")}</div>
       ${fotos.length > 1 ? `<div class="puntos">${fotos.map((_, i) => `<i class="${i ? "" : "si"}"></i>`).join("")}</div>` : ""}</div>
       <div class="det" style="margin-top:0;padding-top:20px"><div style="display:flex;gap:12px;align-items:flex-start">
         <div style="flex:1"><h1 class="titular aparecer" style="margin:0">${esc(l.nombre)}</h1>${l.subtitulo ? `<p style="margin:6px 0 0">${esc(l.subtitulo)}</p>` : ""}</div>

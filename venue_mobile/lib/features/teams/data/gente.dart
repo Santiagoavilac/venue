@@ -67,7 +67,7 @@ class TeamInfo {
 
   /// Link de registro con la invitación ya cargada. Va a la web: la mayoría
   /// no tiene la app instalada y `venue://` les abría una pantalla negra.
-  String get link => 'https://venue-web-amber.vercel.app/?invite=$invitacion';
+  String get link => 'https://www.venuebol.com/?invite=$invitacion';
 
   factory TeamInfo.desde(Map<String, dynamic> j) => TeamInfo(
         id: j['id'] as String,

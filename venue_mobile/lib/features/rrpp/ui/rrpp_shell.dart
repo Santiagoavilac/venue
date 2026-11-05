@@ -22,7 +22,7 @@ import '../../vip_tables/ui/mesas_screen.dart';
 import '../data/rrpp.dart';
 import 'gestion_solicitudes.dart';
 
-const _aftr = 'https://aftr-web.vercel.app/';
+const _aftr = 'https://www.aftrvenue.com/';
 
 String _miles(num v) {
   final s = v.round().abs().toString();

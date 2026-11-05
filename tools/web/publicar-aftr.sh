@@ -20,4 +20,4 @@ t = re.search(r'eyJ[\w-]+\.([\w-]+)\.', open(sys.argv[1]).read()).group(1)
 rol = json.loads(base64.urlsafe_b64decode(t + '=' * (-len(t) % 4)))['role']
 sys.exit(0 if rol == 'anon' else f'config.js no tiene la clave anon (tiene {rol}): no se publica.')
 PY
-cd "$D" && vercel deploy --prod --yes --scope santiago-avilas-projects --project prj_SblH4E0U4aByE1IQzznmhKrapfsY "$@"
+cd "$D" && vercel deploy --prod --yes --scope venue6 --project prj_SblH4E0U4aByE1IQzznmhKrapfsY "$@"

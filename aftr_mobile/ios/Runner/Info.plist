@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Elegí una foto para tu perfil de AFTR.</string>
+	<string>Para elegir tu foto de perfil, publicar una historia y adjuntar el comprobante cuando comprás una entrada en reventa.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

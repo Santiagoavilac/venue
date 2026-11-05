@@ -10,6 +10,7 @@ import '../../features/cuenta/cuenta_screen.dart';
 import '../../features/pulse/pulse_screen.dart';
 import '../../features/pulse/mesas_screen.dart';
 import '../../features/reventa/reventa.dart';
+import '../../features/cuenta/bloqueados_screen.dart';
 import '../../features/descubrir/descubrir_screen.dart';
 import '../../features/evento/evento_screen.dart';
 import '../../features/lugar/lugar_screen.dart';
@@ -43,6 +44,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     routes: [
       GoRoute(path: '/pulse', builder: (_, _) => const PulseScreen()),
+      GoRoute(path: '/bloqueados', builder: (_, _) => const BloqueadosScreen()),
       GoRoute(path: '/mis-mesas', builder: (_, _) => const MisMesasScreen()),
       GoRoute(path: '/reventa', builder: (_, st) => ReventaScreen(eventoId: st.uri.queryParameters['evento'])),
       GoRoute(path: '/reventa/orden/:id', builder: (_, st) => OrdenReventaScreen(id: st.pathParameters['id']!)),

@@ -13,7 +13,7 @@ import '../../teams/data/gente.dart';
 import '../data/rrpp.dart';
 
 /// Web pública donde se abren los enlaces de invitación.
-const webVenue = 'https://venue-web-amber.vercel.app/';
+const webVenue = 'https://www.venuebol.com/';
 
 /// Solicitudes para sumarse al boliche activo. El admin aprueba (con o sin
 /// team), invita con el enlace del boliche y decide si aparece en
