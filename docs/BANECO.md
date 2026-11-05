@@ -1,5 +1,8 @@
 # Banco Económico: operación de VENUE / AFTR
 
+Referencia técnica de la API y de la integración: [API_BANECO.md](API_BANECO.md).
+Este documento es la bitácora de la puesta en producción.
+
 ## Estado de esta entrega
 
 Al 04/11/2026 la integración está operativa en producción. Lo verificado en esta sesión, contra el proyecto `cxksjarupexptfksnptg`:
