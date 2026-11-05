@@ -10,6 +10,7 @@ import '../../clubs/data/clubs.dart';
 import '../data/eventos.dart';
 import 'gestion_screen.dart';
 import '../../../core/widgets/insignia.dart';
+import 'hero_evento.dart';
 
 /// Eventos abiertos del boliche. Tocar uno lo deja como evento de trabajo
 /// para el resto de la app (escáner, listas…).
@@ -63,33 +64,10 @@ class EventosScreen extends ConsumerWidget {
               if (rol?.vende ?? false) ...[
                 const TituloBloque('Accesos rápidos'),
                 GrillaAcciones(children: [
-                  AccionRapida(
-                    icono: Icons.person_add_alt_1_outlined,
-                    titulo: 'Anotar invitados',
-                    detalle: 'Listas y entradas',
-                    alTocar: () => ir('Accesos'),
-                  ),
-                  AccionRapida(
-                    icono: Icons.table_bar_outlined,
-                    titulo: 'Mesas',
-                    detalle: 'Vender y reservar',
-                    color: VenueColors.info,
-                    alTocar: () => ir('Mesas'),
-                  ),
-                  AccionRapida(
-                    icono: Icons.payments_outlined,
-                    titulo: 'Pagos',
-                    detalle: 'Lo que cobraste',
-                    color: VenueColors.ok,
-                    alTocar: () => ir('Pagos'),
-                  ),
-                  AccionRapida(
-                    icono: Icons.bar_chart_rounded,
-                    titulo: 'Mis números',
-                    detalle: 'Ventas y comisión',
-                    color: VenueColors.aviso,
-                    alTocar: () => ir('Stats'),
-                  ),
+                  AccionRapida(icono: Icons.person_add_alt_1_outlined, titulo: 'Anotar invitados', detalle: 'Listas y entradas', alTocar: () => ir('Accesos')),
+                  AccionRapida(icono: Icons.table_bar_outlined, titulo: 'Mesas', detalle: 'Vender y reservar', alTocar: () => ir('Mesas')),
+                  AccionRapida(icono: Icons.payments_outlined, titulo: 'Pagos', detalle: 'Lo que cobraste', alTocar: () => ir('Pagos')),
+                  AccionRapida(icono: Icons.bar_chart_rounded, titulo: 'Mis números', detalle: 'Ventas y comisión', alTocar: () => ir('Stats')),
                 ]),
               ],
               if (otros.isNotEmpty) const TituloBloque('Otros eventos'),

@@ -445,14 +445,12 @@ class AccionRapida extends StatelessWidget {
     required this.icono,
     required this.titulo,
     this.detalle,
-    this.color,
     required this.alTocar,
   });
 
   final IconData icono;
   final String titulo;
   final String? detalle;
-  final Color? color;
   final VoidCallback? alTocar;
 
   @override

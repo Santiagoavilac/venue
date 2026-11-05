@@ -166,76 +166,24 @@ class ReporteScreen extends ConsumerWidget {
               const TituloBloque('Acciones'),
               GrillaAcciones(children: [
                 if (esAdmin)
-                  AccionRapida(
-                    icono: Icons.copy_rounded,
-                    titulo: 'Copiar cierre',
-                    detalle: 'Para WhatsApp',
-                    alTocar: () async {
+                  AccionRapida(icono: Icons.copy_rounded, titulo: 'Copiar cierre', detalle: 'Para WhatsApp', alTocar: () async {
                       await Clipboard.setData(ClipboardData(
                           text: textoCierre(ev.nombre, club.nombre, ev.fechaCorta, c)));
                       if (context.mounted) avisar(context, 'Cierre copiado — pegalo en WhatsApp');
-                    },
-                  ),
+                    }),
                 if (rol == Rol.rrpp)
-                  AccionRapida(
-                    icono: Icons.receipt_long_outlined,
-                    titulo: 'A quién le vendí',
-                    detalle: 'Nombre por nombre',
-                    alTocar: () => abrirPersona(context, perfil.id, perfil.nombre, eventoId: ev.id),
-                  ),
+                  AccionRapida(icono: Icons.receipt_long_outlined, titulo: 'A quién le vendí', detalle: 'Nombre por nombre', alTocar: () => abrirPersona(context, perfil.id, perfil.nombre, eventoId: ev.id)),
                 if (puedeExcel)
-                  AccionRapida(
-                    icono: Icons.description_outlined,
-                    titulo: 'Excel',
-                    detalle: perfil.contabilidadTotal ? 'Contabilidad' : 'De mi team',
-                    color: VenueColors.ok,
-                    alTocar: () => exportarContabilidad(context, ref),
-                  ),
+                  AccionRapida(icono: Icons.description_outlined, titulo: 'Excel', detalle: perfil.contabilidadTotal ? 'Contabilidad' : 'De mi team', alTocar: () => exportarContabilidad(context, ref)),
                 if (esAdmin && club.usaRelacionadores) ...[
-                  AccionRapida(
-                    icono: Icons.handshake_outlined,
-                    titulo: 'Comisiones',
-                    detalle: 'Por team',
-                    color: VenueColors.info,
-                    alTocar: () => hojaComisiones(context),
-                  ),
-                  AccionRapida(
-                    icono: Icons.card_giftcard_outlined,
-                    titulo: 'Bonos',
-                    detalle: 'Premios extra',
-                    color: VenueColors.aviso,
-                    alTocar: () => hojaBonos(context),
-                  ),
-                  AccionRapida(
-                    icono: Icons.leaderboard_outlined,
-                    titulo: 'Histórico',
-                    detalle: 'Y ranking',
-                    color: const Color(0xFF7A5AF8),
-                    alTocar: () => hojaHistorico(context),
-                  ),
-                  AccionRapida(
-                    icono: Icons.phone_outlined,
-                    titulo: 'Teléfonos',
-                    detalle: 'Del equipo',
-                    color: const Color(0xFF0BA5EC),
-                    alTocar: () => hojaTelefonos(context),
-                  ),
-                  AccionRapida(
-                    icono: Icons.filter_alt_outlined,
-                    titulo: 'Filtro',
-                    detalle: 'Reporte de puerta',
-                    color: VenueColors.neutro,
-                    alTocar: () => hojaReporteFiltro(context),
-                  ),
+                  AccionRapida(icono: Icons.handshake_outlined, titulo: 'Comisiones', detalle: 'Por team', alTocar: () => hojaComisiones(context)),
+                  AccionRapida(icono: Icons.card_giftcard_outlined, titulo: 'Bonos', detalle: 'Premios extra', alTocar: () => hojaBonos(context)),
+                  AccionRapida(icono: Icons.leaderboard_outlined, titulo: 'Histórico', detalle: 'Y ranking', alTocar: () => hojaHistorico(context)),
+                  AccionRapida(icono: Icons.phone_outlined, titulo: 'Teléfonos', detalle: 'Del equipo', alTocar: () => hojaTelefonos(context)),
+                  AccionRapida(icono: Icons.filter_alt_outlined, titulo: 'Filtro', detalle: 'Reporte de puerta', alTocar: () => hojaReporteFiltro(context)),
                 ],
                 if (!esAdmin)
-                  AccionRapida(
-                    icono: Icons.history_rounded,
-                    titulo: 'Eventos pasados',
-                    detalle: 'Lo que hiciste antes',
-                    color: VenueColors.info,
-                    alTocar: () => hojaEventosPasados(context, perfil.id, perfil.nombre),
-                  ),
+                  AccionRapida(icono: Icons.history_rounded, titulo: 'Eventos pasados', detalle: 'Lo que hiciste antes', alTocar: () => hojaEventosPasados(context, perfil.id, perfil.nombre)),
               ]),
               if (esAdmin) ...[
                 if (!ancho) ...[const SizedBox(height: 12), const _AjustesCierre()],

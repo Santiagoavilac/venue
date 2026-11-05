@@ -27,12 +27,15 @@ trabajo. Última actualización: 2026-11-05.
       a mano los de Inicio, el relacionador, Listas, POS, Barra AFTR, reventa e
       historias. Quedan a propósito las ruleditas chicas de botones y recuadros.
       Prueba: `test/esqueleto_test.dart`
-- [ ] Sacar `HeroEvento` de `gestion_screen.dart` a `core/widgets/`
-- [~] Borrar lo muerto: ya salieron `Indicador`, `GrillaIndicadores`, `FichaDato`
+- [x] `HeroEvento` sale de `gestion_screen.dart` (3410 → 3142 líneas) a
+      `features/events/ui/hero_evento.dart`, junto con `NumerosEvento`.
+      **No fue a `core/widgets/`**: lee `numerosEventoProvider`, y core no puede
+      depender de los providers de una feature
+- [x] Borrar lo muerto: ya salieron `Indicador`, `GrillaIndicadores`, `FichaDato`
       y `Kpi` con sus parámetros ignorados (`horizontal`, `color` de ficha).
       **`MarcaClub` no está muerto**: el de `patron.dart` lo usan `inicio_shell`
       (tres veces) y el de `selector_club_screen` es otro, con otra firma.
-      Falta el `color` ignorado de `AccionRapida`
+      El `color` ignorado de `AccionRapida` también salió, con sus 17 argumentos
 
 ## Fase 1 · Privacidad en el servidor
 
