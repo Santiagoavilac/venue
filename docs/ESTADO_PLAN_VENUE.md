@@ -149,8 +149,24 @@ Nada de esto se puede cerrar sin un proyecto real delante:
    cerró con `20261105090000`: `mesas_detalle` tenía INSERT/UPDATE/DELETE para
    `authenticated` y, como corre con los permisos de su dueño, cualquiera con
    sesión podía escribir en `mesas` sin pasar por RLS.
-2. **Probar la privacidad con `curl`**, como pide el plan: la interfaz ya
-   ocultaba los datos y salían igual por el endpoint REST.
+2. ~~Probar la privacidad con `curl`~~ **Hecho** (05/11/2026), con las cuentas
+   de demo del boliche Aurora y una mesa de prueba vendida por `rrpp.aurora`:
+   - `mesas`: un relacionador recibe 403 en `precio`, `cliente`, `vendido_por`,
+     `metodo_pago`, `comprobante_url` y en `select=*`; el plano sale igual.
+   - `mesas_detalle`: el admin, el jefe del team, el portero y quien la vendió
+     ven los 700 Bs; otro relacionador del mismo boliche recibe la fila con
+     `precio` y `cliente` en null.
+   - Escribir por la vista: `PATCH` y `DELETE` dan 403.
+   - `bonos`: sólo el dueño, su jefe y el admin. Otro relacionador, cero filas.
+   - `team_reparto`: el admin y los del team; el portero, cero filas.
+   - Comisión de jefe por boliche: con el mismo usuario puesto en los dos
+     boliches, `rol_en_club` devuelve `jefe` en uno y `rrpp` en el otro, que es
+     lo que ahora mira `rrpp_eventos`.
+
+   **Pendiente de revisar, no es un error del plan**: el portero ve los `bonos`
+   de los relacionadores. Sale de `impl.ve_registro`, que le da todo para poder
+   trabajar en la puerta; para listas y entradas está bien, para la plata de
+   otro habría que decidir si corresponde.
 3. **Mirar las pantallas en un teléfono.** Todo lo de acá está verificado con
    `flutter analyze`, 140 pruebas y las de base sobre PostgreSQL descartable,
    pero el contraste y los tamaños reales se ven mirando.
