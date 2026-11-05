@@ -107,10 +107,18 @@ trabajo. Última actualización: 2026-11-05.
 
 ## Fase 4 · Tutoriales
 
-- [ ] Guía por pantalla, con su clave en `SharedPreferences`
-- [ ] Cubrir Mesas, Accesos, Pagos y Gestión de evento
+- [x] `GuiaDePantalla`: se envuelve una pantalla y su guía sale la primera vez
+      que se entra, con su propia clave (`venue.tutorial.v1.<guia>.<uid>`). La
+      del inicio conserva la clave vieja para no repetírsela a quien ya la vio.
+      Dos arreglos que hacían falta para esto: un paso sin objetivo dejaba la
+      pantalla negra (se dibujaba el velo y no la tarjeta) y además se quedaba
+      con el agujero del paso anterior
+- [~] Mesas ya tiene la suya (el plano, qué significa cada ícono, acomodar el
+      plano si es admin, y mirar de qué evento son las mesas). Faltan Accesos,
+      Pagos y Gestión de evento
 - [ ] Tutorial en `RrppShell` (hoy los relacionadores no tienen ninguno)
-- [ ] Que use los colores del tema (`tutorial.dart:119,172`)
+- [x] Los colores salen de `Oscuro`, no de hexadecimales sueltos (quedó hecho
+      al unificar la paleta)
 
 ## Fuera del plan, ya hecho
 

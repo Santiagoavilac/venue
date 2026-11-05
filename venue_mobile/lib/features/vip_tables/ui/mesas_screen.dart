@@ -21,6 +21,7 @@ import '../data/mesas.dart';
 import 'mesa_hojas.dart';
 import 'plano.dart';
 import '../../events/ui/cambiar_evento.dart';
+import '../../dashboard/ui/tutorial.dart';
 
 /// Mesas del evento sobre el plano del local.
 ///
@@ -177,7 +178,42 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
     final esPortero = rol == Rol.portero;
     final repo = ref.read(mesasRepositoryProvider);
 
-    return Column(children: [
+    return GuiaDePantalla(
+      guia: 'mesas',
+      pasos: () => [
+        PasoTutorial(
+          icono: Icons.table_bar_outlined,
+          titulo: 'El plano del boliche',
+          texto: esPortero
+              ? 'Cada cuadrado es una mesa de esta noche. Tocala para ver de quién es y qué combo tiene.'
+              : 'Cada cuadrado es una mesa de esta noche. Tocá una libre para venderla; tocá una vendida para ver quién la tiene.',
+          objetivo: () => null,
+        ),
+        PasoTutorial(
+          icono: Icons.check_circle_rounded,
+          titulo: 'Qué significa cada una',
+          texto: 'El reloj es reservada y todavía no pagó, el tilde es pagada y '
+              'la persona es ocupada. El ícono va además del color, para que se '
+              'entienda en la puerta y con poca luz.',
+          objetivo: () => null,
+        ),
+        if (esAdmin)
+          PasoTutorial(
+            icono: Icons.open_with_rounded,
+            titulo: 'Acomodar el plano',
+            texto: 'Con "Editar plano" podés arrastrar las mesas hasta que queden '
+                'como en el local, agregar pisos y copiar el plano de otro evento.',
+            objetivo: () => null,
+          ),
+        PasoTutorial(
+          icono: Icons.calendar_today_outlined,
+          titulo: 'Ojo con el evento',
+          texto: 'Arriba dice de qué evento son estas mesas. Si no es el que '
+              'estás trabajando, tocá ahí y cambialo antes de vender.',
+          objetivo: () => null,
+        ),
+      ],
+      child: Column(children: [
       const DeQueEvento(),
       Expanded(
         child: VistaAsync(
@@ -554,7 +590,8 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
       },
         ),
       ),
-    ]);
+    ]),
+    );
   }
 }
 

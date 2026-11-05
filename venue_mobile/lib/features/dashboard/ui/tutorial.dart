@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/venue_theme.dart';
+import '../../authentication/data/sesion.dart';
 
 /// La burbuja flota sobre el velo, así que es oscura también en modo claro.
 const _burbuja = Oscuro.tarjeta;
@@ -11,20 +12,29 @@ const _burbuja = Oscuro.tarjeta;
 /// apunta a cada botón de la barra, con qué es y "Siguiente". Sale una vez
 /// por persona en este teléfono; se puede volver a ver desde el perfil.
 
-String _clave(String uid) => 'venue.tutorial.v1.$uid';
+/// Cada guía se recuerda aparte: la del inicio, la de Mesas, la de Pagos. Si
+/// fueran una sola clave, agregar una guía nueva obligaría a repetirle a todo
+/// el mundo las que ya vio.
+///
+/// 'inicio' conserva la clave vieja, sin el nombre, para que a quien ya hizo
+/// el recorrido de la barra no se le vuelva a aparecer.
+String _clave(String uid, String guia) =>
+    guia == 'inicio' ? 'venue.tutorial.v1.$uid' : 'venue.tutorial.v1.$guia.$uid';
 
-Future<bool> tutorialVisto(String uid) async {
+Future<bool> tutorialVisto(String uid, [String guia = 'inicio']) async {
   try {
-    return (await SharedPreferences.getInstance()).getBool(_clave(uid)) ?? false;
+    return (await SharedPreferences.getInstance()).getBool(_clave(uid, guia)) ??
+        false;
   } catch (_) {
     // si no se puede leer, mejor no molestar
     return true;
   }
 }
 
-Future<void> marcarTutorialVisto(String uid) async {
+Future<void> marcarTutorialVisto(String uid, [String guia = 'inicio']) async {
   try {
-    await (await SharedPreferences.getInstance()).setBool(_clave(uid), true);
+    await (await SharedPreferences.getInstance())
+        .setBool(_clave(uid, guia), true);
   } catch (_) {
     // vale igual para esta sesión
   }
@@ -100,7 +110,12 @@ class _TutorialGuiadoState extends State<TutorialGuiado> {
     final caja = context.findRenderObject() as RenderBox?;
     final r = widget.pasos[n].objetivo();
     if (caja == null || r == null) {
-      setState(() => _n = n);
+      // un paso que no apunta a nada no puede quedarse con el agujero del
+      // anterior: se ilumina lo que no corresponde
+      setState(() {
+        _n = n;
+        _rect = null;
+      });
       return;
     }
     final o = caja.globalToLocal(r.topLeft);
@@ -211,7 +226,17 @@ class _TutorialGuiadoState extends State<TutorialGuiado> {
             child: CustomPaint(painter: _Velo(r)),
           ),
         ),
-        if (r != null) ...[
+        if (r == null)
+          // un paso que no apunta a nada igual tiene que verse: antes se
+          // dibujaba el velo y la tarjeta no, así que la pantalla quedaba
+          // negra y sin salida
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: margen),
+              child: tarjeta,
+            ),
+          )
+        else ...[
           piquito,
           Positioned(
             left: margen,
@@ -269,4 +294,71 @@ class _Pico extends CustomPainter {
 
   @override
   bool shouldRepaint(_Pico old) => old.hacia != hacia;
+}
+
+/// La guía de una pantalla, la primera vez que se entra.
+///
+/// El tutorial de la app explicaba los cuatro botones de la barra y nada más:
+/// quien abría Mesas por primera vez se encontraba un plano con cuadraditos y
+/// ninguna pista de que se tocan para vender, ni de qué significan los
+/// colores. Y los relacionadores con cuenta propia, que entran por otro
+/// camino, no veían ningún tutorial.
+///
+/// Se envuelve el contenido de la pantalla y listo. Cada guía se recuerda por
+/// su nombre, así que agregar una no le repite las otras a nadie.
+class GuiaDePantalla extends ConsumerStatefulWidget {
+  const GuiaDePantalla({
+    super.key,
+    required this.guia,
+    required this.pasos,
+    required this.child,
+  });
+
+  /// Nombre con el que se recuerda: 'mesas', 'pagos', 'accesos'…
+  final String guia;
+
+  /// Los pasos. Un paso puede no apuntar a nada: la tarjeta queda centrada.
+  final List<PasoTutorial> Function() pasos;
+
+  final Widget child;
+
+  @override
+  ConsumerState<GuiaDePantalla> createState() => _GuiaDePantallaState();
+}
+
+class _GuiaDePantallaState extends ConsumerState<GuiaDePantalla> {
+  bool _mostrando = false;
+  bool _consultado = false;
+
+  Future<void> _verSiCorresponde(String uid) async {
+    if (_consultado) return;
+    _consultado = true;
+    if (await tutorialVisto(uid, widget.guia)) return;
+    if (mounted) setState(() => _mostrando = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = ref.watch(usuarioIdProvider);
+    if (uid != null && !_consultado) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _verSiCorresponde(uid));
+    }
+    if (!_mostrando) return widget.child;
+    final pasos = widget.pasos();
+    if (pasos.isEmpty) return widget.child;
+    return Stack(
+      children: [
+        widget.child,
+        Positioned.fill(
+          child: TutorialGuiado(
+            pasos: pasos,
+            alTerminar: () async {
+              if (uid != null) await marcarTutorialVisto(uid, widget.guia);
+              if (mounted) setState(() => _mostrando = false);
+            },
+          ),
+        ),
+      ],
+    );
+  }
 }

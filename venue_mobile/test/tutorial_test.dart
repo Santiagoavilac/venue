@@ -44,4 +44,56 @@ void main() {
     await t.tap(find.text('Listo'));
     expect(termino, isTrue);
   });
+
+  testWidgets('un paso que no apunta a nada no se queda con el agujero del anterior', (t) async {
+    final abajo = GlobalKey();
+    Rect? de(GlobalKey k) {
+      final b = k.currentContext!.findRenderObject() as RenderBox;
+      return b.localToGlobal(Offset.zero) & b.size;
+    }
+
+    await t.pumpWidget(
+      MaterialApp(
+        home: Stack(
+          children: [
+            Scaffold(bottomNavigationBar: SizedBox(key: abajo, height: 70)),
+            Positioned.fill(
+              child: TutorialGuiado(
+                pasos: [
+                  PasoTutorial(
+                    icono: Icons.event,
+                    titulo: 'La barra',
+                    texto: 'uno',
+                    objetivo: () => de(abajo),
+                  ),
+                  PasoTutorial(
+                    icono: Icons.table_bar_outlined,
+                    titulo: 'El plano',
+                    texto: 'dos',
+                    objetivo: () => null,
+                  ),
+                ],
+                alTerminar: () {},
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    expect(find.text('La barra'), findsOneWidget);
+    await t.tap(find.text('Siguiente'));
+    await t.pumpAndSettle();
+    expect(find.text('El plano'), findsOneWidget);
+    // si el agujero quedara pegado, la burbuja seguiría acomodada contra la
+    // barra de abajo en vez de quedar centrada
+    final caja = t.getRect(find.text('dos'));
+    expect(caja.center.dy, lessThan(600));
+  });
+
+  test('cada guía se recuerda con su propia clave', () async {
+    // la del inicio conserva la clave vieja, sin nombre, para no repetirle el
+    // recorrido de la barra a quien ya lo hizo
+    expect(await tutorialVisto('sin-prefs-uid', 'mesas'), isA<bool>());
+  });
 }
