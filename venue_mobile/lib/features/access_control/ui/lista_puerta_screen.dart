@@ -155,6 +155,59 @@ class _ListaPuertaScreenState extends ConsumerState<ListaPuertaScreen> {
     });
   }
 
+  /// Inhabilitar el QR de un invitado, o devolvérselo. Pide el motivo cuando
+  /// se inhabilita: el caso típico es "entró otra persona con este QR", y eso
+  /// hay que poder leerlo después.
+  Future<void> _anularQr(PersonaPuerta p) async {
+    if (p.id == null) return;
+    String? motivo;
+    if (!p.qrAnulado) {
+      final c = TextEditingController();
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: Text('Inhabilitar el QR de ${p.nombre}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'El QR deja de entrar, acá y en el escáner. Se puede volver a '
+                'habilitar.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: c,
+                maxLength: 120,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Por qué',
+                  hintText: 'Entró otra persona con este QR',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Volver')),
+            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Inhabilitar')),
+          ],
+        ),
+      );
+      motivo = c.text.trim();
+      Future<void>.delayed(const Duration(seconds: 1), c.dispose);
+      if (ok != true) return;
+    }
+    await _hacer(() async {
+      final quedo = await ref
+          .read(puertaRepositoryProvider)
+          .anularQrLista(p.id!, anular: !p.qrAnulado, motivo: motivo);
+      if (mounted) {
+        avisar(context,
+            quedo ? 'QR inhabilitado' : 'QR habilitado otra vez');
+      }
+    });
+  }
+
   Future<void> _filtro(PersonaPuerta p, String eventoId) => _hacer(() async {
     final r = await ref
         .read(puertaRepositoryProvider)
@@ -248,6 +301,7 @@ class _ListaPuertaScreenState extends ConsumerState<ListaPuertaScreen> {
                       alMarcar: () => _marcar(p, ev.id),
                       alDesmarcar: () => _desmarcar(p, ev.id),
                       alFiltrar: () => _filtro(p, ev.id),
+                      alAnularQr: p.esEntrada ? null : () => _anularQr(p),
                     );
                   },
                 ),
@@ -264,6 +318,7 @@ class _Fila extends StatelessWidget {
     required this.alMarcar,
     required this.alDesmarcar,
     required this.alFiltrar,
+    this.alAnularQr,
   });
 
   final PersonaPuerta persona;
@@ -271,6 +326,10 @@ class _Fila extends StatelessWidget {
   final VoidCallback alMarcar;
   final VoidCallback alDesmarcar;
   final VoidCallback alFiltrar;
+
+  /// Inhabilitar o devolver el QR. Sólo para invitados de lista: la entrada
+  /// pagada se anula por otro camino, el del vendedor.
+  final VoidCallback? alAnularQr;
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +390,14 @@ class _Fila extends StatelessWidget {
                             Insignia.texto('de la casa', color: VenueColors.cortesia),
                           if (p.filtrada)
                             const Insignia.texto('no pasó filtro', tono: Tono.mal),
-                          if (p.anulada)
+                          if (p.qrAnulado)
+                            Insignia.texto(
+                              p.qrAnuladoMotivo == null
+                                  ? 'QR inhabilitado'
+                                  : 'QR inhabilitado · ${p.qrAnuladoMotivo}',
+                              tono: Tono.mal,
+                            )
+                          else if (p.anulada)
                             const Insignia.texto('anulada', tono: Tono.mal),
                         ],
                       ),
@@ -339,6 +405,17 @@ class _Fila extends StatelessWidget {
                 ],
               ),
             ),
+            if (alAnularQr != null)
+              IconButton(
+                tooltip: p.qrAnulado
+                    ? 'Volver a habilitar el QR'
+                    : 'Inhabilitar el QR de esta persona',
+                onPressed: alAnularQr,
+                icon: Icon(
+                  p.qrAnulado ? Icons.lock_rounded : Icons.lock_open_outlined,
+                  color: p.qrAnulado ? VenueColors.mal : VenueColors.textoSuave,
+                ),
+              ),
             if (!p.sinTope)
               IconButton(
                 tooltip: 'No pasó el control del boliche',

@@ -13,6 +13,7 @@ import '../../events/data/eventos.dart';
 import '../data/puerta_repository.dart';
 import '../data/qr.dart';
 import '../data/resultado.dart';
+import 'lista_puerta_screen.dart';
 import 'veredicto_card.dart';
 
 class _Registro {
@@ -323,6 +324,27 @@ class _EscanerScreenState extends ConsumerState<EscanerScreen> {
             ),
           ),
         const SizedBox(height: 14),
+        // El buscador por nombre existía en otra pestaña, y el guardia que
+        // escanea no lo tenía a mano: cuando alguien llega sin QR o con el QR
+        // de otro, cambiar de pestaña con cola en la puerta no pasa.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              useSafeArea: true,
+              showDragHandle: true,
+              backgroundColor: VenueColors.superficie,
+              builder: (_) => FractionallySizedBox(
+                heightFactor: .92,
+                child: ListaPuertaScreen(),
+              ),
+            ),
+            icon: const Icon(Icons.person_search_rounded, size: 20),
+            label: const Text('Buscar por nombre'),
+          ),
+        ),
         Row(
           children: [
             Expanded(

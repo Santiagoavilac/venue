@@ -88,7 +88,23 @@ lo que se desincroniza después. Son dos de las 98 que ya comprueban adentro, y
 `tests/rpc_con_guarda.py` las ve igual. El portero y el jefe quedan afuera:
 probado con los dos contra la base real.
 
-## Fases 6 a 9
+## Fase 6 · Listas y puerta (Venue)
+
+| # | Qué | Estado |
+|---|-----|--------|
+| 6.1 | Los cupos, sólo de quien corresponde | ok (ya lo estaba; probado) |
+| 6.2 | Inhabilitar el QR de un invitado | ok `20261106180000` |
+| 6.3 | Buscador dentro del escáner | ok |
+
+**6.1 no necesitaba arreglo, y eso se probó en vez de suponerlo.** Con la sesión
+de un relacionador de burtown, contra la base real: `jefe_fijar_cupos` contesta
+"Solo para jefes de team"; un `insert` directo en `cupo_rrpp` con el rol
+`authenticated` choca contra la política de RLS; y un `update` de
+`lista_tipos.cupo_por_rrpp` no toca ninguna fila -el cupo queda en 10-. El admin
+sí fija el cupo general de la lista y el de cada persona, que es lo que el plan
+pedía para los boliches sin jefes, y ya estaba en la pantalla de gestión.
+
+## Fases 7 a 9
 
 Sin empezar. El orden del plan es el orden de trabajo: primero la plata,
 después los datos, después la experiencia.
@@ -188,6 +204,13 @@ después los datos, después la experiencia.
   un segundo intento de resolverla avisa que ya se resolvió. El portero y el
   jefe reciben "Solo el administrador del boliche ve los cobros a resolver".
 - `venue_mobile`: 153 pruebas, cinco nuevas del panel de incidencias.
+- El ciclo del QR de invitado, contra la base real en una transacción que
+  vuelve atrás: el relacionador recibe "No autorizado"; el portero lo
+  inhabilita con motivo; la puerta contesta `anulada` **sin consumir el
+  ingreso** (`ingreso_at` sigue vacío, que era la trampa: si se consumía, la
+  persona quedaba marcada como que entró); el buscador lo muestra con el
+  motivo; y al volver a habilitarlo la puerta dice `valida` otra vez.
+- `venue_mobile`: 156 pruebas, tres nuevas del QR inhabilitado.
 - Edge Function `baneco` desplegada: era obligatorio, porque ahora una orden
   puede tener más de un QR y el `maybeSingle()` anterior habría fallado.
 

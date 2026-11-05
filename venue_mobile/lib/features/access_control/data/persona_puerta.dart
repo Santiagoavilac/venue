@@ -12,6 +12,8 @@ class PersonaPuerta {
     this.sinTope = false,
     this.ingresoAt,
     this.filtroAt,
+    this.qrAnulado = false,
+    this.qrAnuladoMotivo,
   });
 
   /// true = entrada o manilla con QR; false = invitado de lista.
@@ -32,9 +34,17 @@ class PersonaPuerta {
   final DateTime? ingresoAt;
   final DateTime? filtroAt;
 
+  /// El QR del invitado quedó inhabilitado: alguien entró con él, o se anotó
+  /// por error. Lo puede poner y sacar el admin, el jefe o el portero.
+  final bool qrAnulado;
+  final String? qrAnuladoMotivo;
+
   bool get ingreso => ingresoAt != null;
   bool get filtrada => filtroAt != null;
-  bool get anulada => estado == 'anulada';
+
+  /// No deja entrar: la entrada la anuló el vendedor, o el QR del invitado se
+  /// inhabilitó en la puerta.
+  bool get anulada => estado == 'anulada' || qrAnulado;
 
   factory PersonaPuerta.desde(Map<String, dynamic> j) {
     DateTime? f(String k) => DateTime.tryParse(j[k] as String? ?? '')?.toLocal();
@@ -49,6 +59,8 @@ class PersonaPuerta {
       sinTope: j['sin_tope'] == true,
       ingresoAt: f('ingreso_at'),
       filtroAt: f('filtro_at'),
+      qrAnulado: j['qr_anulado'] == true,
+      qrAnuladoMotivo: j['qr_anulado_motivo'] as String?,
     );
   }
 

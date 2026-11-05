@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:venue_mobile/core/widgets/avisos.dart';
 import 'package:venue_mobile/features/access_control/data/persona_puerta.dart';
+import 'package:venue_mobile/features/access_control/data/resultado.dart';
 
 PersonaPuerta p(String nombre,
         {String? ingreso, String? filtro, bool casa = false, bool entrada = false}) =>
@@ -14,6 +15,7 @@ PersonaPuerta p(String nombre,
     });
 
 void main() {
+  _qrInhabilitado();
   test('fila de entrada y de lista desde el servidor', () {
     final e = PersonaPuerta.desde({
       'tipo': 'entrada', 'nombre': 'Ana', 'code': 'ABC', 'lista': 'Mesa B2',
@@ -63,5 +65,59 @@ void main() {
 
   test('hora corta', () {
     expect(horaCorta(DateTime(2026, 1, 1, 2, 5)), '02:05');
+  });
+}
+
+// ── El QR de un invitado se puede inhabilitar ────────────────────────
+// La columna registros.qr_anulado existía desde db/13 y nadie la escribía: no
+// había forma de frenar a quien entra con el QR de otro.
+void _qrInhabilitado() {
+  test('el QR de invitado inhabilitado no deja pasar y dice por qué', () {
+    final r = ResultadoEscaneo.desdeServidor(
+      {
+        'resultado': 'anulada',
+        'cliente': 'Ana',
+        'lista': true,
+        'lista_nombre': 'Invitados',
+        'motivo': 'Entró otra persona con este QR',
+        'rrpp': 'Juan',
+      },
+      codigo: 'ZZTEST1',
+      esLista: true,
+      ahora: DateTime(2026, 11, 5),
+    );
+    expect(r.veredicto.dejaPasar, isFalse);
+    expect(r.tipo, 'QR inhabilitado');
+    expect(r.detalle, contains('Entró otra persona'));
+  });
+
+  test('la entrada anulada por el vendedor sigue diciendo lo suyo', () {
+    final r = ResultadoEscaneo.desdeServidor(
+      {'resultado': 'anulada', 'cliente': 'Ana'},
+      codigo: 'ABC123',
+      esLista: false,
+      ahora: DateTime(2026, 11, 5),
+    );
+    expect(r.veredicto.dejaPasar, isFalse);
+    expect(r.tipo, 'Entrada anulada');
+    expect(r.detalle, contains('vendedor'));
+  });
+
+  test('una fila de puerta con el QR inhabilitado se lee como anulada', () {
+    final p = PersonaPuerta.desde({
+      'id': 'uno',
+      'tipo': 'lista',
+      'nombre': 'Ana',
+      'lista': 'Invitados',
+      'qr_anulado': true,
+      'qr_anulado_motivo': 'lo usó otro',
+    });
+    expect(p.qrAnulado, isTrue);
+    expect(p.anulada, isTrue);
+    expect(p.qrAnuladoMotivo, 'lo usó otro');
+    // y sin la bandera, nada cambia
+    final otra = PersonaPuerta.desde({'id': 'dos', 'tipo': 'lista', 'nombre': 'Beto'});
+    expect(otra.qrAnulado, isFalse);
+    expect(otra.anulada, isFalse);
   });
 }

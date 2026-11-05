@@ -127,6 +127,21 @@ class PuertaRepository {
     return r['resultado'] == 'ok';
   }
 
+  /// Inhabilita (o vuelve a habilitar) el QR de un invitado. La columna
+  /// existía desde db/13 y nadie la escribía: no había forma de frenar a quien
+  /// entra con el QR de otro, salvo no escanearlo, y en la puerta con cola eso
+  /// no pasa. Lo pueden hacer el admin, el jefe de su team y el portero.
+  Future<bool> anularQrLista(String registroId,
+      {bool anular = true, String? motivo}) async {
+    final r = Map<String, dynamic>.from(
+        await _sb.rpc('anular_qr_lista', params: {
+          'p_registro': registroId,
+          'p_anular': anular,
+          'p_motivo': motivo,
+        }) as Map);
+    return r['qr_anulado'] == true;
+  }
+
   Future<void> desmarcarLista(String registroId) =>
       _sb.rpc('descheckin_registro', params: {'p_registro': registroId});
 

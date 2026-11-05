@@ -205,12 +205,21 @@ class ResultadoEscaneo {
           hora: DateTime.tryParse(r['used_at'] as String? ?? '')?.toLocal(),
         );
       case 'anulada':
+        // Dos cosas distintas con el mismo nombre: la entrada que anuló el
+        // vendedor, y el QR de invitado que alguien inhabilitó en la puerta.
+        final deLista = r['lista'] == true;
         return ResultadoEscaneo(
           veredicto: Veredicto.noValido,
           codigo: cod,
           nombre: nombre,
-          tipo: 'Entrada anulada',
-          detalle: 'El vendedor anuló esta entrada.',
+          tipo: deLista ? 'QR inhabilitado' : 'Entrada anulada',
+          quien: quien.isEmpty ? null : quien,
+          detalle: deLista
+              ? [
+                  'El boliche inhabilitó este QR.',
+                  if ((r['motivo'] as String? ?? '').trim().isNotEmpty) '${r['motivo']}',
+                ].join(' ')
+              : 'El vendedor anuló esta entrada.',
         );
       case 'fuera_hora':
         return ResultadoEscaneo(
