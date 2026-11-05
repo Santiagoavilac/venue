@@ -26,14 +26,21 @@ Leyenda: `ok` hecho y verificado · `—` sin empezar.
 |---|-----|--------|
 | 2.1 | El feed anónimo deja de devolver uid y rutas | ok `20261106120000` |
 | 2.2 | Clave opaca (`media_key`, `foto_key`) y firma en lote | ok `20261106120000` |
-| 2.3 | `aftr_buscar_usuario` escapa, exige 3 letras y tiene límite | — |
-| 2.4 | Límites de uso en una pieza sola | — |
+| 2.3 | `aftr_buscar_usuario` escapa, exige 3 letras y tiene límite | ok `20261106130000` |
+| 2.4 | Límites de uso en una pieza sola | ok `20261106130000` |
 | 2.5 | Topes en `aftr_historias`, `aftr_eventos` y `aftr_calor` | — |
 
 ## Fases 3 a 9
 
 Sin empezar. El orden del plan es el orden de trabajo: primero la plata,
 después los datos, después la experiencia.
+
+## Anotado para las fases que siguen
+
+- El límite de `aftr_reventa` (iniciar orden) va en la Fase 3, que reescribe ese
+  despachador entero: ponerlo ahora obligaría a tocarlo dos veces.
+- El límite por IP de subida de medios va en la Fase 4.1, con el resto de lo de
+  la Edge Function.
 
 ## Lo que falta cerrar cuando caigan las apps viejas
 
@@ -91,6 +98,11 @@ después los datos, después la experiencia.
 - `venue_mobile`: `flutter analyze` sin advertencias -quedaban seis locales sin
   usar en el perfil del relacionador y la miniatura del comprobante sin pintar,
   de la reestructuración de la UI- y 148 pruebas en verde.
+- `aftr_buscar_usuario('%%')` y `('___')` devuelven vacío; con dos letras,
+  vacío; a la búsqueda 30 del minuto corta con el mensaje. Con veinte intentos
+  de compra anotados, `aftr_comprar` corta con su mensaje. La limpieza borra lo
+  de hace dos días y deja lo de hoy. Todo contra la base real, en transacciones
+  que vuelven atrás.
 - Edge Function `baneco` desplegada: era obligatorio, porque ahora una orden
   puede tener más de un QR y el `maybeSingle()` anterior habría fallado.
 
