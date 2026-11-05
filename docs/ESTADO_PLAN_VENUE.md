@@ -94,7 +94,10 @@ trabajo. Última actualización: 2026-11-05.
       un número", que se me había escapado) es `TarjetaCifra`, los títulos son
       `TituloBloque`, las tarjetas son `Tarjeta` y los tamaños salen de `Tipo`.
       Ya tenía `DeQueEvento` y las insignias de estado
-- [ ] **Accesos** — unificar `_Dato` con `TarjetaCifra`
+- [x] **Accesos** — `_Dato` ya es `TarjetaCifra`; además se fue `ResumenView`
+      entera, que no la usaba nadie desde que los números viven en el inicio, y
+      el refresco en vivo pasó a invalidar `numerosEventoProvider`, que es lo
+      que de verdad se está mirando
 - [ ] **Reporte** — tokens y gráficos con `fl_chart`
 - [ ] **Shell del relacionador** — `_Cifra`, `_Vacio` y `_Estado` a los compartidos
 

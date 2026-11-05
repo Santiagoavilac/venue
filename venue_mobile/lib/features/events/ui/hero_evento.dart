@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/venue_theme.dart';
 import '../../../core/widgets/patron.dart';
-import '../../../core/widgets/tarjeta_cifra.dart';
-import '../data/eventos.dart';
 import '../data/gestion.dart';
 
 /// Tarjeta grande del evento de trabajo: la foto con el estado, el nombre y

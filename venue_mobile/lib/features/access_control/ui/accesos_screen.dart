@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/networking/supabase.dart';
 import '../../../core/sync/tiempo_real.dart';
-import '../../../core/theme/venue_theme.dart';
-import '../../../core/widgets/estado_vista.dart';
-import '../../../core/widgets/tarjeta_cifra.dart';
 import '../../events/data/eventos.dart';
 import '../../guestlists/data/listas.dart';
 import '../../clubs/data/clubs.dart';
@@ -14,6 +10,7 @@ import '../../tickets/data/entradas.dart';
 import '../../tickets/ui/entradas_screen.dart';
 import 'escaner_screen.dart';
 import '../../events/ui/cambiar_evento.dart';
+import '../../events/data/gestion.dart';
 
 /// Accesos para quien vende: Listas, Entradas y —para quien valida en la
 /// puerta— Escáner. El resumen de números está en la tarjeta del evento.
@@ -36,7 +33,8 @@ class AccesosScreen extends ConsumerWidget {
           ref.invalidate(entradasProvider);
           ref.invalidate(misEntradasProvider);
         }
-        ref.invalidate(resumenProvider);
+        // los números del evento, que son los que se ven en el inicio
+        ref.invalidate(numerosEventoProvider(ev.id));
       });
     }
     return DefaultTabController(
@@ -63,71 +61,6 @@ class AccesosScreen extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-final resumenProvider = FutureProvider.autoDispose<Map<String, int>>((
-  ref,
-) async {
-  final ev = ref.watch(eventoActivoProvider);
-  if (ev == null) return const {};
-  final r = Map<String, dynamic>.from(
-    await ref
-            .watch(supabaseProvider)
-            .rpc('resumen_evento', params: {'p_evento': ev.id})
-        as Map,
-  );
-  return r.map((k, v) => MapEntry(k, (v as num?)?.toInt() ?? 0));
-});
-
-/// Quién puede entrar y quién ya entró, en números.
-class ResumenView extends ConsumerWidget {
-  const ResumenView({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final r = ref.watch(resumenProvider);
-    return RefreshIndicator(
-      onRefresh: () => ref.refresh(resumenProvider.future),
-      child: VistaAsync(
-        valor: r,
-        reintentar: () => ref.invalidate(resumenProvider),
-        datos: (d) {
-          int n(String k) => d[k] ?? 0;
-          final adentro = n('ingresaron') + n('qr_usados');
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              TarjetaCifra(etiqueta: 'Adentro ahora', valor: '$adentro', detalle: 'Invitados de lista y entradas con QR que ya ingresaron', color: VenueColors.ok),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TarjetaCifra(etiqueta: 'Anotados en listas', valor: '${n('anotados')}', detalle: '${n('ingresaron')} ingresaron'),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TarjetaCifra(etiqueta: 'Entradas con QR', valor: '${n('qr_total')}', detalle: '${n('qr_usados')} ingresaron'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TarjetaCifra(etiqueta: 'Prepagadas', valor: '${n('entradas')}', detalle: 'vendidas'),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TarjetaCifra(etiqueta: 'Mesas', valor: '${n('mesas')}', detalle: 'vendidas o reservadas'),
-                  ),
-                ],
-              ),
-            ],
-          );
-        },
       ),
     );
   }
