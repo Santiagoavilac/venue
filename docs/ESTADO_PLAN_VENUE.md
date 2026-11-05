@@ -167,6 +167,11 @@ Nada de esto se puede cerrar sin un proyecto real delante:
    de los relacionadores. Sale de `impl.ve_registro`, que le da todo para poder
    trabajar en la puerta; para listas y entradas está bien, para la plata de
    otro habría que decidir si corresponde.
+
+   La prueba se hizo en el boliche de demo Aurora, que después se borró a
+   pedido. Para repetirla hay cuentas de prueba en Burtown: `prueba.admin`,
+   `prueba.jefe`, `prueba.rrpp` y `prueba.portero`, todas con la clave de
+   siempre y el correo `usuario@plataforma.local`.
 3. **Mirar las pantallas en un teléfono.** Todo lo de acá está verificado con
    `flutter analyze`, 140 pruebas y las de base sobre PostgreSQL descartable,
    pero el contraste y los tamaños reales se ven mirando.
