@@ -28,7 +28,9 @@ Leyenda: `ok` hecho y verificado · `—` sin empezar.
 | 2.2 | Clave opaca (`media_key`, `foto_key`) y firma en lote | ok `20261106120000` |
 | 2.3 | `aftr_buscar_usuario` escapa, exige 3 letras y tiene límite | ok `20261106130000` |
 | 2.4 | Límites de uso en una pieza sola | ok `20261106130000` |
-| 2.5 | Topes en `aftr_historias`, `aftr_eventos` y `aftr_calor` | — |
+| 2.5 | Topes en `aftr_historias`, `aftr_eventos` y `aftr_calor` | ok `20261106140000` |
+
+**Fase 2 cerrada**, menos lo que quedó anotado abajo para su propia fase.
 
 ## Fases 3 a 9
 
@@ -103,6 +105,9 @@ después los datos, después la experiencia.
   de compra anotados, `aftr_comprar` corta con su mensaje. La limpieza borra lo
   de hace dos días y deja lo de hoy. Todo contra la base real, en transacciones
   que vuelven atrás.
+- `aftr_eventos` con el rango `1900-01-01 → 2100-01-01` devuelve sólo los días
+  que la app muestra; `aftr_historias` con un `p_datos` de 20 KB contesta "Datos
+  no válidos"; `aftr_calor` sale de la caché y coincide con el cálculo en vivo.
 - Edge Function `baneco` desplegada: era obligatorio, porque ahora una orden
   puede tener más de un QR y el `maybeSingle()` anterior habría fallado.
 
