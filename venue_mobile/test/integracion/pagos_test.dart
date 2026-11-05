@@ -80,7 +80,7 @@ void main() {
     final uid = rrpp.auth.currentUser!.id;
     final vendidas = await repo.misVendidas(ev, uid);
     expect(vendidas, greaterThanOrEqualTo(3));
-    final comision = await repo.miComision(ev, uid);
+    final comision = await repo.miComision(ev);
     final r = rendicion(vendidas: vendidas, precio: 100, comision: comision, yaRendido: 135);
     expect(r.recaudado, vendidas * 100);
     expect(r.aRendir, vendidas * 100 - vendidas * comision - 135);

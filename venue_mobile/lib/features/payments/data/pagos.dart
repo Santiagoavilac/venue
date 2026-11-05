@@ -175,30 +175,16 @@ class PagosRepository {
     return r.count;
   }
 
-  /// Datos del evento y de la persona para calcular la comisión.
-  Future<num> miComision(String eventoId, String usuarioId) async {
-    // la cuenta la hace la base (db/33: configuración del boliche y reparto
-    // del jefe); sin esa migración, la de siempre acá
-    try {
-      final r = await _sb.rpc('mi_comision', params: {'p_evento': eventoId});
-      final v = (r as Map?)?['por_manilla'] as num?;
-      if (v != null) return v;
-    } on PostgrestException catch (e) {
-      if (e.code != 'PGRST202' && e.code != '42883') rethrow;
-    }
-    final e = await _sb
-        .from('eventos')
-        .select('precio_manilla, pct_boliche, pct_rrpp, cut_rrpp')
-        .eq('id', eventoId)
-        .single();
-    final p = await _sb.from('profiles').select('cut_rel').eq('id', usuarioId).single();
-    return comisionPorManilla(
-      cutPersona: p['cut_rel'] as num?,
-      cutEvento: e['cut_rrpp'] as num?,
-      precio: e['precio_manilla'] as num? ?? 0,
-      pctBoliche: e['pct_boliche'] as num? ?? 0,
-      pctRrpp: e['pct_rrpp'] as num? ?? 0,
-    );
+  /// Lo que gana la persona por manilla en ese evento.
+  ///
+  /// La cuenta la hace la base (db/33: configuración del boliche y reparto del
+  /// jefe). Antes, si la RPC no estaba, se rehacía acá pidiendo
+  /// `eventos.pct_boliche` y `profiles.cut_rel`: eso le mostraba al
+  /// relacionador cuánto se queda el boliche de cada manilla, que no es asunto
+  /// suyo y encima salía con un curl. La cuenta vive en un solo lado.
+  Future<num> miComision(String eventoId) async {
+    final r = await _sb.rpc('mi_comision', params: {'p_evento': eventoId});
+    return (r as Map?)?['por_manilla'] as num? ?? 0;
   }
 
   // ── QRs de cobro del boliche (admin) ──
@@ -234,7 +220,7 @@ final miRendicionProvider = FutureProvider.autoDispose<
   if (ev == null || uid == null || !(rol == Rol.rrpp || rol == Rol.jefe)) return null;
   final repo = ref.watch(pagosRepositoryProvider);
   final vendidas = await repo.misVendidas(ev.id, uid);
-  final comision = await repo.miComision(ev.id, uid);
+  final comision = await repo.miComision(ev.id);
   final pagos = await ref.watch(pagosProvider.future);
   final ya = pagos.where((p) => p.rrppId == uid).fold<num>(0, (a, p) => a + p.monto);
   final r = rendicion(
