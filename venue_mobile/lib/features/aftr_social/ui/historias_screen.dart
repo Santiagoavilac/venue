@@ -678,10 +678,17 @@ class _VistaHistoriaState extends ConsumerState<_VistaHistoria> {
 
   Future<void> _cargar() async {
     try {
-      final path = widget.historia['storage_path'] as String;
-      final url = await ref
-          .read(socialAftrProvider)
-          .medio('aftr-historias', path);
+      final repo = ref.read(socialAftrProvider);
+      // Por clave opaca: la ruta del archivo ya no viaja en el feed. Queda la
+      // ruta como respaldo para las historias publicadas antes de la clave.
+      final clave = widget.historia['media_key'] as String?;
+      final url = clave != null
+          ? await repo.medioPorClave(clave)
+          : await repo.medio(
+              'aftr-historias',
+              widget.historia['storage_path'] as String,
+            );
+      if (url == null) throw Exception('No pudimos abrir esta historia.');
       VideoPlayerController? video;
       if (widget.historia['tipo'] == 'video') {
         video = VideoPlayerController.networkUrl(Uri.parse(url));

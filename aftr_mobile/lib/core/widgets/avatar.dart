@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/firmas.dart';
 import '../../data/foto_perfil.dart';
 import '../theme/aftr_theme.dart';
 
@@ -50,6 +51,7 @@ class AvatarRemoto extends ConsumerWidget {
     this.nombre,
     this.foto,
     this.archivo,
+    this.clave,
     this.radio = 18,
   });
   final String? nombre;
@@ -57,15 +59,24 @@ class AvatarRemoto extends ConsumerWidget {
   /// URL directa (el logo de un boliche, o una foto antigua con URL pública).
   final String? foto;
 
-  /// Ruta en el bucket de perfiles, que se firma para poder verla.
+  /// Ruta en el bucket de perfiles, que se firma para poder verla. Es el
+  /// camino viejo: sólo sirve con sesión y expone de quién es el archivo.
   final String? archivo;
+
+  /// Clave opaca de la foto. Es el camino nuevo: lo firma el servidor, en
+  /// lote, y funciona también sin cuenta.
+  final String? clave;
   final double radio;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     var url = foto;
-    if ((url == null || url.isEmpty) && archivo != null && archivo!.isNotEmpty) {
-      url = ref.watch(fotoFirmadaProvider(archivo!)).value;
+    if (url == null || url.isEmpty) {
+      if (clave != null && clave!.isNotEmpty) {
+        url = ref.watch(mediaFirmadaProvider(clave!)).value;
+      } else if (archivo != null && archivo!.isNotEmpty) {
+        url = ref.watch(fotoFirmadaProvider(archivo!)).value;
+      }
     }
     return AvatarAftr(nombre: nombre, foto: url, radio: radio);
   }

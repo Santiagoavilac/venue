@@ -14,13 +14,16 @@ import '../../core/widgets/avatar.dart';
 import '../../core/widgets/piezas.dart';
 import '../../data/aftr_repo.dart';
 import '../../data/modelos.dart';
+import '../../data/firmas.dart';
 import '../../data/social_repo.dart';
 import '../auth/asegurar_cuenta.dart';
 
 List<List<DatosSocial>> agruparHistorias(List<DatosSocial> historias) {
   final grupos = <String, List<DatosSocial>>{};
   for (final h in historias) {
-    final key = '${h['identidad']}:${h['identidad'] == 'club' ? h['club_id'] : h['autor_id']}';
+    // `grupo` lo arma el servidor y no dice quién es el autor: antes se
+    // agrupaba por autor_id, que ahora no viaja sin sesión.
+    final key = '${h['grupo'] ?? '${h['identidad']}:${h['club_id'] ?? h['autor_id']}'}';
     (grupos[key] ??= []).add(h);
   }
   return grupos.values.toList();
@@ -52,7 +55,7 @@ class HistoriasFila extends ConsumerWidget {
           }
           final h = grupos[i - 1].first;
           return _CirculoHistoria(nombre: '${h['nombre'] ?? h['autor'] ?? 'AFTR'}',
-            foto: h['foto'] as String?, archivo: h['foto_archivo'] as String?,
+            foto: h['foto'] as String?, clave: h['foto_key'] as String?,
             onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
               MaterialPageRoute(builder: (_) => HistoriasVisor(
                 grupos: grupos, grupoInicial: i - 1,
@@ -65,14 +68,18 @@ class HistoriasFila extends ConsumerWidget {
 
 class _CirculoHistoria extends StatelessWidget {
   const _CirculoHistoria({required this.nombre, required this.onTap,
-    this.agregar = false, this.foto, this.archivo});
+    this.agregar = false, this.foto, this.archivo, this.clave});
   final String nombre;
   final VoidCallback onTap;
   final bool agregar;
   /// Foto del autor: URL directa (logo del boliche) o ruta por firmar.
   final String? foto;
   final String? archivo;
-  bool get _conFoto => (foto ?? '').isNotEmpty || (archivo ?? '').isNotEmpty;
+
+  /// Clave opaca de la foto del autor, que firma el servidor.
+  final String? clave;
+  bool get _conFoto =>
+    (foto ?? '').isNotEmpty || (archivo ?? '').isNotEmpty || (clave ?? '').isNotEmpty;
   @override
   Widget build(BuildContext context) => Semantics(
     button: true, label: agregar ? 'Publicar una historia' : 'Historias de $nombre',
@@ -92,7 +99,7 @@ class _CirculoHistoria extends StatelessWidget {
               ? (agregar ? const Icon(Icons.add_rounded, color: Aftr.texto) :
                   Text(nombre.isEmpty ? 'A' : nombre.substring(0, 1).toUpperCase(), style: Aftr.titular(28)))
               : Stack(alignment: Alignment.bottomRight, children: [
-                  AvatarRemoto(nombre: nombre, foto: foto, archivo: archivo, radio: 27),
+                  AvatarRemoto(nombre: nombre, foto: foto, archivo: archivo, clave: clave, radio: 27),
                   if (agregar) Container(
                     decoration: BoxDecoration(color: Aftr.acento, shape: BoxShape.circle,
                       border: Border.all(color: Aftr.fondo, width: 2)),
@@ -127,9 +134,9 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
   bool _saliendo = false;
   Duration _imagen = Duration.zero;
   DateTime _ultimo = DateTime.now();
-  DateTime? _firmada;
-  /// URL firmada por historia, para no volver a pedirla al avanzar.
-  final Map<String, String> _firmadas = {};
+  /// Las que ya se dejaron descargadas, para no precargarlas dos veces. Las
+  /// URL no se guardan acá: las guarda Firmas, que sabe cuándo vencen.
+  final Set<String> _precargadas = {};
   Timer? _reloj;
   DatosSocial get _h => widget.grupos[_grupo][_indice];
   bool get _detenida => _pausa || _fondo || _menu || !_lista;
@@ -162,7 +169,12 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _fondo = state != AppLifecycleState.resumed; _sincronizar();
-    if (!_fondo && _firmada != null && DateTime.now().difference(_firmada!).inSeconds > 45) {
+    // Al volver de segundo plano la firma pudo vencerse. No se mide el tiempo
+    // a mano: se pregunta a Firmas, que guarda cada URL hasta el 80 % de su
+    // plazo y vuelve a firmar sola.
+    final clave = _h['media_key'] as String?;
+    if (!_fondo && _url != null && clave != null &&
+        ref.read(firmasProvider).enCache(clave) == null) {
       _cargar();
     }
   }
@@ -177,11 +189,14 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
     if (mounted) setState(() {});
     try {
       // la firma de la siguiente ya puede estar pedida: abrir sin esperarla
-      final url = _firmadas[_h['id']] ??
-          await ref.read(socialRepoProvider).firmar('aftr-historias', '${_h['storage_path']}');
-      if (!mounted || version != _generacion) return;
-      _firmadas[_h['id'] as String] = url;
-      _firmada = DateTime.now();
+      final url = await _firmar(_h);
+      if (!mounted || version != _generacion || url == null) {
+        if (url == null && mounted && version == _generacion) {
+          setState(() => _error = 'No pudimos abrir esta historia.');
+        }
+        return;
+      }
+      _precargadas.add(_h['id'] as String);
       if (_esVideo) {
         final video = VideoPlayerController.networkUrl(Uri.parse(url));
         await video.initialize();
@@ -203,17 +218,28 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
   /// tocar para avanzar ya está firmada y descargada.
   Future<void> _precargarSiguiente() async {
     final h = _despuesDe(_grupo, _indice);
-    if (h == null || _firmadas.containsKey(h['id'])) return;
+    if (h == null || _precargadas.contains(h['id'])) return;
     try {
-      final url = await ref
-          .read(socialRepoProvider)
-          .firmar('aftr-historias', '${h['storage_path']}');
-      if (!mounted) return;
-      _firmadas[h['id'] as String] = url;
+      final url = await _firmar(h);
+      if (!mounted || url == null) return;
+      _precargadas.add(h['id'] as String);
       if (h['tipo'] != 'video') await precacheImage(NetworkImage(url), context);
     } catch (_) {
       // si falla, la siguiente se pide igual cuando toque: no molestamos acá
     }
+  }
+
+  /// La URL del archivo de una historia. Por clave opaca cuando el servidor la
+  /// manda -lo normal-, y por la ruta vieja mientras queden historias
+  /// publicadas antes de la clave.
+  Future<String?> _firmar(DatosSocial h) async {
+    final clave = h['media_key'] as String?;
+    if (clave != null && clave.isNotEmpty) {
+      return ref.read(firmasProvider).url(clave);
+    }
+    final ruta = h['storage_path'] as String?;
+    if (ruta == null || ruta.isEmpty) return null;
+    return ref.read(socialRepoProvider).firmar('aftr-historias', ruta);
   }
 
   /// La historia que viene después de una posición, saltando de autor si hace
@@ -361,7 +387,7 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
           const SizedBox(height: 8),
           Row(children: [
             AvatarRemoto(nombre: '${_h['nombre'] ?? _h['autor'] ?? 'AFTR'}',
-              foto: _h['foto'] as String?, archivo: _h['foto_archivo'] as String?, radio: 16),
+              foto: _h['foto'] as String?, clave: _h['foto_key'] as String?, radio: 16),
             const SizedBox(width: 10),
             Expanded(child: Text('${_h['nombre'] ?? _h['autor'] ?? 'AFTR'}', style: Aftr.fuerte(16))),
             IconButton(onPressed: _opciones, icon: const Icon(Icons.more_horiz)),

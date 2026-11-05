@@ -1060,12 +1060,8 @@ class _Perfil extends ConsumerWidget {
     final perfil = ref.watch(perfilProvider).value;
     final user = ref.watch(supabaseProvider).auth.currentUser;
     final correo = (user?.email ?? '').endsWith('@plataforma.local') ? null : user?.email;
-    final boliches = ref.watch(misBolichesProvider).value ?? const <BolicheMio>[];
-    final sols = ref.watch(misSolicitudesProvider).value ?? const <SolicitudMia>[];
-    final club = ref.watch(clubActivoProvider);
-    final rol = ref.watch(rolProvider).value;
-    final todos = ref.watch(rrppEventosProvider).value ?? const <EventoRrpp>[];
-    final repo = ref.read(rrppRepositoryProvider);
+    // Lo de trabajar -boliches, eventos, herramientas- se fue a Inicio y a
+    // Boliches: acá quedó la cuenta y nada más.
     final flecha = const Icon(Icons.chevron_right_rounded);
 
     return RefreshIndicator(

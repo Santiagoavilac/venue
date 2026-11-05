@@ -20,10 +20,30 @@ Leyenda: `ok` hecho y verificado · `—` sin empezar.
 
 **Fase 1 cerrada.**
 
-## Fases 2 a 9
+## Fase 2 · Cerrar los datos
+
+| # | Qué | Estado |
+|---|-----|--------|
+| 2.1 | El feed anónimo deja de devolver uid y rutas | ok `20261106120000` |
+| 2.2 | Clave opaca (`media_key`, `foto_key`) y firma en lote | ok `20261106120000` |
+| 2.3 | `aftr_buscar_usuario` escapa, exige 3 letras y tiene límite | — |
+| 2.4 | Límites de uso en una pieza sola | — |
+| 2.5 | Topes en `aftr_historias`, `aftr_eventos` y `aftr_calor` | — |
+
+## Fases 3 a 9
 
 Sin empezar. El orden del plan es el orden de trabajo: primero la plata,
 después los datos, después la experiencia.
+
+## Lo que falta cerrar cuando caigan las apps viejas
+
+- `impl.social_historia_json` todavía manda `storage_path` y `foto_archivo` a
+  quien tiene sesión, porque las versiones publicadas firman el archivo por su
+  cuenta con esa ruta. Al visitante anónimo -por donde se enumeraban los uid- ya
+  no se las manda. Se saca del todo cuando esas versiones caigan.
+- Las políticas `social_archivo_leer` y `aftr_foto_leer` de storage siguen
+  abiertas a los clientes por lo mismo. Sin la ruta no se pueden usar, así que
+  no filtran nada por sí solas.
 
 ## Verificado a mano
 
@@ -53,6 +73,24 @@ después los datos, después la experiencia.
   aparecieron diez, todas con control real (seis sólo `service_role`, dos que
   delegan en la compra, y `venue_avanzar_pedido`/`venue_pedidos_mesa` que usan
   `impl.aftr_bar_staff`, que faltaba en la lista de señales).
+- `curl` sin sesión contra `aftr_historias`: ya no vuelven `autor_id`,
+  `storage_path` ni `foto_archivo`; vuelven `media_key`, `foto_key` y `grupo`
+  (un md5 del uid, estable y que no dice quién es). Los únicos uuid del feed son
+  los de la historia, el evento y las dos claves.
+- `curl` sin sesión a `historias-media` con `accion: firmar`: devuelve las dos
+  URL firmadas, de los dos buckets, en una sola llamada. Es la primera vez que
+  un visitante sin cuenta puede ver una historia y una foto de perfil: la
+  política de lectura de storage llama a `es_platform_admin()`, que `anon` no
+  puede ejecutar.
+- Publicar con el archivo ya movido a `h/<uuid>`: la historia guarda la ruta
+  opaca, el cliente sigue mandando la ruta que subió, y esa ruta vieja ya no se
+  puede reusar. Probado contra la base real en una transacción que vuelve atrás.
+- `aftr_mobile`: 25 pruebas (cinco nuevas del agrupador de firmas: una sola
+  llamada por tanda, caché por clave, los fallos no se cachean, la firma se da
+  por vencida al 80 % del plazo y un error de red no deja a nadie esperando).
+- `venue_mobile`: `flutter analyze` sin advertencias -quedaban seis locales sin
+  usar en el perfil del relacionador y la miniatura del comprobante sin pintar,
+  de la reestructuración de la UI- y 148 pruebas en verde.
 - Edge Function `baneco` desplegada: era obligatorio, porque ahora una orden
   puede tener más de un QR y el `maybeSingle()` anterior habría fallado.
 

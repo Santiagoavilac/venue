@@ -50,6 +50,19 @@ class SocialAftr {
   Future<String> medio(String bucket, String path) =>
       sb.storage.from(bucket).createSignedUrl(path, 300);
 
+  /// La URL de un archivo por su clave opaca: la firma el servidor, que es el
+  /// único que conoce la ruta. Se usa para las historias, donde la ruta dejó de
+  /// viajar al cliente porque tenía adentro el uid del autor.
+  Future<String?> medioPorClave(String clave) async {
+    final r = await sb.functions.invoke(
+      'historias-media',
+      body: {'accion': 'firmar', 'claves': [clave]},
+    );
+    final datos = Map<String, dynamic>.from(r.data as Map);
+    return (Map<String, dynamic>.from(datos['urls'] as Map? ?? {}))[clave]
+        as String?;
+  }
+
   Future<String> subir(Uint8List bytes, String tipo) async {
     if (bytes.isEmpty || bytes.length > 30 * 1024 * 1024) {
       throw Exception('El archivo debe pesar como máximo 30 MB.');

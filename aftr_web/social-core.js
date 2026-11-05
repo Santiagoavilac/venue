@@ -19,7 +19,9 @@
   function agrupar(historias, ahora = Date.now()) {
     const grupos = new Map();
     for (const h of historias.filter(h => Date.parse(h.vence_at)>ahora).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at))) {
-      const k = h.identidad==='club' ? `club:${h.club_id}` : `${h.identidad}:${h.autor_id}`;
+      // `grupo` lo arma el servidor y no dice quién es el autor: sin sesión
+      // autor_id ya no viaja, justamente para que no se puedan enumerar.
+      const k = h.grupo || (h.identidad==='club' ? `club:${h.club_id}` : `${h.identidad}:${h.autor_id}`);
       if (!grupos.has(k)) grupos.set(k,[]); grupos.get(k).push(h);
     }
     return [...grupos.values()];
@@ -76,6 +78,35 @@
       if(!path)return null;
       const {data,error}=await sb.storage.from(bucket).createSignedUrl(path,ttl);if(error)throw error;return data.signedUrl;
     }
+    /* Las claves opacas se cambian por URL firmadas en el servidor, todas
+       juntas. Antes se firmaba de a una contra storage -una llamada por
+       historia y otra por foto de perfil-, y el visitante sin cuenta no podía
+       firmar nada: la política de lectura llama a es_platform_admin(), que anon
+       no puede ejecutar, así que las historias no se veían sin entrar.
+       La URL se guarda hasta el 80 % de su plazo, para volver a firmar antes de
+       que se venza; sólo se guardan los éxitos, porque antes una firma fallida
+       quedaba cacheada para siempre y ni después de loguearte reintentaba. */
+    const firmadas = new Map();
+    let juntando = null, pendientes = new Set();
+    function firmar(clave) {
+      if(!clave)return Promise.resolve(null);
+      const guardada = firmadas.get(clave);
+      if(guardada && guardada.hasta > Date.now())return Promise.resolve(guardada.url);
+      firmadas.delete(clave);
+      pendientes.add(clave);
+      juntando ||= new Promise(listo => setTimeout(async () => {
+        const claves = [...pendientes].slice(0,60);
+        pendientes = new Set([...pendientes].slice(60));
+        juntando = null;
+        try {
+          const {data} = await sb.functions.invoke('historias-media',{body:{accion:'firmar',claves}});
+          const plazo = Number(data?.vence_en || 600)*800;
+          for(const [k,url] of Object.entries(data?.urls || {})) firmadas.set(k,{url,hasta:Date.now()+plazo});
+        } catch { /* sin firma: se reintenta la próxima vez que se pida */ }
+        listo();
+      },40));
+      return juntando.then(() => firmadas.get(clave)?.url ?? null);
+    }
     async function upload(file,bucket,validar=false) {
       if(!file)throw new Error('Elegí un archivo.');
       if(file.size>(validar?30:8)*1024*1024)throw new Error(`El archivo supera ${validar?30:8} MB.`);
@@ -96,6 +127,7 @@
     const fotosDeAutor=new Map();
     function fotoDeAutor(h) {
       if(h?.foto)return Promise.resolve(h.foto);
+      if(h?.foto_key)return firmar(h.foto_key);
       const ruta=h?.foto_archivo;if(!ruta)return Promise.resolve(null);
       if(!fotosDeAutor.has(ruta))fotosDeAutor.set(ruta,sign('aftr-perfiles',ruta,3600).catch(()=>null));
       return fotosDeAutor.get(ruta);
@@ -162,7 +194,9 @@
         stage.addEventListener('pointerup',e=>{if(e.target.closest('button'))return;held=false;const dx=e.clientX-startX,dy=e.clientY-startY;if(Math.abs(dy)>90&&dy>0){close();return;}if(Math.abs(dx)>65){dx<0?next():prev();return;}if(performance.now()-pressAt<220){e.clientX<stage.getBoundingClientRect().left+stage.clientWidth*.35?prev():next();return;}video?.play().catch(()=>{});});
         stage.addEventListener('pointercancel',()=>{held=false;video?.play().catch(()=>{});});
         try {
-          const url=await sign('aftr-historias',current.storage_path);if(disposed||version!==loadVersion)return;
+          const url=current.media_key ? await firmar(current.media_key) : await sign('aftr-historias',current.storage_path);
+          if(disposed||version!==loadVersion)return;
+          if(!url)throw new Error('No pudimos abrir esta historia.');
           if(current.tipo==='video'){
             video=document.createElement('video');video.src=url;video.playsInline=true;video.muted=true;video.preload='auto';
             video.addEventListener('waiting',()=>buffering=true);video.addEventListener('playing',()=>{buffering=false;last=performance.now();});

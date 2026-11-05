@@ -425,9 +425,18 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
               // Para los boliches que no venden por AFTR: el cliente le paga
               // al relacionador por fuera y le manda la captura. Queda pegada
               // a la entrada, así el jefe rinde con la prueba en la mano.
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
+              Row(children: [
+                // la miniatura de lo que se adjuntó: antes de generar veinte
+                // entradas conviene ver que la captura es la que se eligió
+                if (_comprobante != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(Redondeo.chico),
+                    child: Image.memory(_comprobante!, width: 38, height: 38, fit: BoxFit.cover),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Flexible(
+                  child: TextButton.icon(
                   onPressed: _subiendo ? null : _elegirComprobante,
                   icon: _subiendo
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
@@ -440,8 +449,9 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                           : 'Adjuntar comprobante del pago'),
                   style: TextButton.styleFrom(
                       foregroundColor: faltaComprobante ? VenueColors.aviso : null),
+                  ),
                 ),
-              ),
+              ]),
               if (veOtras) ...[
                 const SizedBox(height: 10),
                 SegmentedButton<_Alcance>(
