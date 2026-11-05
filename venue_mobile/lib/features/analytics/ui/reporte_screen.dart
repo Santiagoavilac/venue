@@ -16,6 +16,7 @@ import '../../teams/ui/team_detalle_screen.dart';
 import '../data/reporte.dart';
 import 'reporte_hojas.dart';
 import '../../../core/widgets/insignia.dart';
+import '../../../core/theme/tokens.dart';
 
 /// Reporte del evento. Admin: cierre completo. Jefe: su team. Relacionador:
 /// lo suyo. Los datos que llegan ya vienen recortados por RLS a lo que cada
@@ -197,7 +198,7 @@ class ReporteScreen extends ConsumerWidget {
                     tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                     iconColor: VenueColors.textoSuave,
                     collapsedIconColor: VenueColors.textoSuave,
-                    title: const Text('Ver desglose por comisiones',
+                    title: Text('Ver desglose por comisiones',
                         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                     childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                     children: [
@@ -232,9 +233,9 @@ Future<void> _elegirEvento(BuildContext context, WidgetRef ref, List<Evento> lis
         shrinkWrap: true,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 4, bottom: 8),
-            child: Text('Evento', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text('Evento', style: Tipo.bloque.copyWith(fontWeight: FontWeight.w600)),
           ),
           for (final x in lista)
             ListTile(
@@ -283,8 +284,8 @@ class _Composicion extends StatelessWidget {
                     ],
             )),
             Column(mainAxisSize: MainAxisSize.min, children: [
-              Text(_bs(total), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              Text('facturado', style: TextStyle(fontSize: 11.5, color: VenueColors.textoTenue)),
+              Text(_bs(total), style: Tipo.fila.copyWith(fontWeight: FontWeight.w700)),
+              Text('facturado', style: Tipo.apoyo.copyWith(fontSize: 12, color: VenueColors.textoTenue)),
             ]),
           ]),
         ),
@@ -319,9 +320,9 @@ class _Leyenda extends StatelessWidget {
                 parte == null ? nombre : '$nombre · ${(parte! * 100).round()}%',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 13, color: VenueColors.textoSuave)),
+                style: Tipo.apoyo),
           ),
-          Text(valor, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+          Text(valor, style: Tipo.apoyo.copyWith(fontWeight: FontWeight.w600, color: VenueColors.texto)),
         ]),
       );
 }
@@ -359,7 +360,7 @@ class _TopTeams extends StatelessWidget {
       );
     }
     const medallas = [Color(0xFFF5B400), Color(0xFF98A2B3), Color(0xFFCD7F32)];
-    final cab = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: VenueColors.textoTenue);
+    final cab = Tipo.apoyo.copyWith(color: VenueColors.textoTenue);
     const cifra = TextStyle(fontWeight: FontWeight.w600, fontFeatures: [FontFeature.tabularFigures()]);
     return Tarjeta(
       padding: EdgeInsets.zero,
@@ -393,10 +394,10 @@ class _TopTeams extends StatelessWidget {
                   Text(teams[i].esMio ? '${teams[i].team} (mi team)' : teams[i].team,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+                      style: Tipo.cuerpo.copyWith(fontWeight: FontWeight.w500)),
                   if (teams[i].mesas > 0)
                     Text('${teams[i].mesas} mesas',
-                        style: TextStyle(fontSize: 12, color: VenueColors.textoTenue)),
+                        style: Tipo.apoyo.copyWith(fontSize: 12, color: VenueColors.textoTenue)),
                 ]),
               ),
               SizedBox(width: 62, child: Text('${teams[i].entraron}', textAlign: TextAlign.right, style: cifra)),
@@ -428,7 +429,7 @@ class _TablaTop extends StatelessWidget {
       );
     }
     const medallas = [Color(0xFFF5B400), Color(0xFF98A2B3), Color(0xFFCD7F32)];
-    TextStyle cab = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: VenueColors.textoTenue);
+    TextStyle cab = Tipo.apoyo.copyWith(color: VenueColors.textoTenue);
     return Tarjeta(
       padding: EdgeInsets.zero,
       child: Column(children: [
@@ -462,7 +463,7 @@ class _TablaTop extends StatelessWidget {
                     Text(filas[i].nombre,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+                        style: Tipo.cuerpo.copyWith(fontWeight: FontWeight.w500)),
                     Text(
                       [
                         equipo[filas[i].id]?.team ?? '',
@@ -470,7 +471,7 @@ class _TablaTop extends StatelessWidget {
                       ].where((x) => x.isNotEmpty).join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: VenueColors.textoTenue),
+                      style: Tipo.apoyo.copyWith(fontSize: 12, color: VenueColors.textoTenue),
                     ),
                   ]),
                 ),
@@ -534,7 +535,7 @@ class _PorTeamState extends State<_PorTeam> {
     }
     final cifra = TextStyle(
         fontWeight: FontWeight.w600, fontFeatures: const [FontFeature.tabularFigures()]);
-    final suave = TextStyle(fontSize: 12.5, color: VenueColors.textoSuave);
+    final suave = Tipo.apoyo;
 
     return Column(children: [
       for (final g in orden) ...[
@@ -561,7 +562,7 @@ class _PorTeamState extends State<_PorTeam> {
                             Text(nombre,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                                style: Tipo.fila.copyWith(fontWeight: FontWeight.w700)),
                             Text('${l.length} ${l.length == 1 ? 'relacionador' : 'relacionadores'}',
                                 style: suave),
                           ]),
@@ -604,7 +605,7 @@ class _PorTeamState extends State<_PorTeam> {
                               Text(l[k].nombre,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+                                  style: Tipo.cuerpo.copyWith(fontWeight: FontWeight.w500)),
                               Text(
                                 [
                                   'lista ${l[k].ingresaron}/${l[k].anotados}',
@@ -613,14 +614,14 @@ class _PorTeamState extends State<_PorTeam> {
                                 ].join(' · '),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, color: VenueColors.textoTenue),
+                                style: Tipo.apoyo.copyWith(fontSize: 12, color: VenueColors.textoTenue),
                               ),
                             ]),
                           ),
                           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                             Text(_bs(vendido(l[k])), style: cifra),
                             Text('a pagar ${_bs(l[k].aPagar)}',
-                                style: TextStyle(fontSize: 12, color: VenueColors.textoTenue)),
+                                style: Tipo.apoyo.copyWith(fontSize: 12, color: VenueColors.textoTenue)),
                           ]),
                         ]),
                       ),
@@ -653,7 +654,7 @@ class _MiniDato extends StatelessWidget {
           Text(etiqueta,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: color)),
+              style: Tipo.apoyo.copyWith(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(valor,
@@ -861,9 +862,9 @@ class _Sub extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(k, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500)),
+              Text(k, style: Tipo.cuerpo.copyWith(fontWeight: FontWeight.w500)),
               const SizedBox(height: 2),
-              Text(d, style: TextStyle(fontSize: 12.5, color: VenueColors.textoTenue)),
+              Text(d, style: Tipo.apoyo.copyWith(color: VenueColors.textoTenue)),
             ],
           ),
         ),
@@ -922,20 +923,17 @@ class _AjustesCierreState extends ConsumerState<_AjustesCierre> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Row(
+          Row(
             children: [
-              IconoRecuadro(Icons.settings_outlined, lado: 42),
-              SizedBox(width: 14),
-              Text(
-                'Ajustes del cierre',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
+              const IconoRecuadro(Icons.settings_outlined, lado: 42),
+              const SizedBox(width: 14),
+              Text('Ajustes del cierre', style: Tipo.bloque),
             ],
           ),
           const SizedBox(height: 18),
           Text(
             'Manillas de externos (no se reparten)',
-            style: TextStyle(fontSize: 14, color: VenueColors.textoSuave),
+            style: Tipo.apoyo.copyWith(fontSize: 14),
           ),
           const SizedBox(height: 8),
           TextField(

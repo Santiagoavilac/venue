@@ -98,7 +98,11 @@ trabajo. Última actualización: 2026-11-05.
       entera, que no la usaba nadie desde que los números viven en el inicio, y
       el refresco en vivo pasó a invalidar `numerosEventoProvider`, que es lo
       que de verdad se está mirando
-- [ ] **Reporte** — tokens y gráficos con `fl_chart`
+- [x] **Reporte** — ya tenía su gráfico con `fl_chart` (la dona de composición).
+      21 de los 32 tamaños de letra sueltos pasan a los roles de `Tipo`, con un
+      redondeo de medio punto a un punto. Los 11 que quedan son a propósito:
+      los que cambian según el ancho (`angosto ? 14.5 : 17`) y la cifra grande
+      del cierre, que es su propio rol
 - [ ] **Shell del relacionador** — `_Cifra`, `_Vacio` y `_Estado` a los compartidos
 
 ## Fase 4 · Tutoriales
