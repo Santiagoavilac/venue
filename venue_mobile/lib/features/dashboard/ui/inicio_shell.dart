@@ -62,20 +62,22 @@ class _Seccion {
 List<_Seccion> _seccionesPara(Rol rol) {
   final l = _secciones(rol);
   if (rol != Rol.admin) return l;
-  // el admin tiene a un toque lo de la noche; Accesos, Reporte y Usuarios
-  // quedan detrás de "Más"
+  // el admin tiene a un toque lo de la noche; Reporte y Usuarios quedan
+  // detrás de "Más". Accesos sube a la barra porque es desde donde se
+  // trabaja la puerta, y el escáner pasó a ser una pestaña suya: tenerlo
+  // además como sección aparte duplicaba la misma pantalla.
   const orden = [
     'Eventos',
-    'Escáner',
+    'Accesos',
     'Mesas',
     'Pagos',
-    'Accesos',
     'Reporte',
     'Usuarios',
   ];
   int pos(_Seccion s) =>
       orden.contains(s.titulo) ? orden.indexOf(s.titulo) : orden.length;
-  return [...l]..sort((a, b) => pos(a).compareTo(pos(b)));
+  return [...l.where((s) => s.titulo != 'Escáner')]
+    ..sort((a, b) => pos(a).compareTo(pos(b)));
 }
 
 List<_Seccion> _secciones(Rol rol) => [
@@ -380,7 +382,12 @@ class _InicioShellState extends ConsumerState<InicioShell>
         // otra pantalla pidió ir a una sección (accesos rápidos del inicio)
         ref.listen(seccionPedidaProvider, (_, t) {
           if (t == null) return;
-          final k = secciones.indexWhere((x) => x.titulo == t);
+          var k = secciones.indexWhere((x) => x.titulo == t);
+          // el escáner dejó de ser sección propia para el admin: es una
+          // pestaña de Accesos, así que los atajos a "Escáner" abren Accesos
+          if (k < 0 && t == 'Escáner') {
+            k = secciones.indexWhere((x) => x.titulo == 'Accesos');
+          }
           if (k >= 0) setState(() => _i = k);
           ref.read(seccionPedidaProvider.notifier).atendida();
         });

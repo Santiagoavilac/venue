@@ -432,7 +432,42 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                 final marcadas =
                     lista.where((e) => _marcadas.contains(e.id)).toList();
 
-                return ListView(
+                // Las entradas marcadas se mandan desde una barra fija arriba:
+                // con la lista larga, si viajaba con el scroll había que
+                // buscarla para enviar la tanda recién generada.
+                final barra = marcadas.isEmpty
+                    ? null
+                    : Material(
+                        color: VenueColors.superficie,
+                        child: SafeArea(
+                          bottom: false,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                            child: Row(children: [
+                              Expanded(
+                                  child: Text('${marcadas.length} marcadas',
+                                      style: const TextStyle(fontWeight: FontWeight.w700))),
+                              TextButton(
+                                  onPressed: () => setState(_marcadas.clear),
+                                  child: const Text('Limpiar')),
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                    minimumSize: const Size(0, 44),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14)),
+                                onPressed: () async {
+                                  await compartirTanda(context, [
+                                    for (final e in marcadas) _ticket(e, ev, fases, casa)
+                                  ]);
+                                  if (mounted) setState(_marcadas.clear);
+                                },
+                                icon: const Icon(Icons.send_rounded, size: 18),
+                                label: const Text('Enviar'),
+                              ),
+                            ]),
+                          ),
+                        ),
+                      );
+                final contenido = ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   children: [
                     Text(
@@ -487,31 +522,6 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                         onChanged: (v) => setState(() => _vendedor = v),
                       ),
                     ],
-                    if (marcadas.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Row(children: [
-                          Expanded(
-                              child: Text('${marcadas.length} marcadas',
-                                  style: const TextStyle(fontWeight: FontWeight.w700))),
-                          TextButton(
-                              onPressed: () => setState(_marcadas.clear),
-                              child: const Text('Limpiar')),
-                          FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                                minimumSize: const Size(0, 44),
-                                padding: const EdgeInsets.symmetric(horizontal: 14)),
-                            onPressed: () async {
-                              await compartirTanda(context, [
-                                for (final e in marcadas) _ticket(e, ev, fases, casa)
-                              ]);
-                              if (mounted) setState(_marcadas.clear);
-                            },
-                            icon: const Icon(Icons.send_rounded, size: 18),
-                            label: const Text('Enviar'),
-                          ),
-                        ]),
-                      ),
                     const SizedBox(height: 8),
                     for (final e in lista)
                       _FilaEntrada(
@@ -533,6 +543,8 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                       ),
                   ],
                 );
+                if (barra == null) return contenido;
+                return Column(children: [barra, Expanded(child: contenido)]);
               },
             ),
           ),

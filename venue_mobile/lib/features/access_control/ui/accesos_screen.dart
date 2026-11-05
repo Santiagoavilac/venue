@@ -1,29 +1,29 @@
-import '../../../core/widgets/opcion_texto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/networking/supabase.dart';
 import '../../../core/sync/tiempo_real.dart';
 import '../../../core/theme/venue_theme.dart';
-import '../../../core/widgets/avisos.dart';
 import '../../../core/widgets/estado_vista.dart';
-import '../../authentication/data/sesion.dart';
 import '../../events/data/eventos.dart';
 import '../../guestlists/data/listas.dart';
+import '../../clubs/data/clubs.dart';
 import '../../guestlists/ui/listas_screen.dart';
 import '../../tickets/data/entradas.dart';
 import '../../tickets/ui/entradas_screen.dart';
+import 'escaner_screen.dart';
 
-/// Accesos para quien vende: Listas, Entradas y —solo la cuenta principal—
-/// Historial. El resumen de números está en la tarjeta del evento. Es la misma sección de la web, con las mismas
-/// pestañas.
+/// Accesos para quien vende: Listas, Entradas y —para quien valida en la
+/// puerta— Escáner. El resumen de números está en la tarjeta del evento.
+///
+/// El escáner vive acá, junto a las listas y las entradas que valida, en vez
+/// de ser una sección aparte. El Historial se sacó: nadie lo usaba.
 class AccesosScreen extends ConsumerWidget {
   const AccesosScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final conHistorial =
-        ref.watch(perfilProvider).value?.adminPrincipal ?? false;
+    final conEscaner = ref.watch(rolProvider).value?.validaIngresos ?? false;
     final ev = ref.watch(eventoActivoProvider);
     if (ev != null) {
       // lo que cambia otro (un ingreso en puerta, una venta) refresca solo
@@ -38,16 +38,16 @@ class AccesosScreen extends ConsumerWidget {
       });
     }
     return DefaultTabController(
-      length: conHistorial ? 3 : 2,
+      length: conEscaner ? 3 : 2,
       child: Column(
         children: [
           TabBar(
-            isScrollable: conHistorial,
-            tabAlignment: conHistorial ? TabAlignment.start : null,
+            isScrollable: conEscaner,
+            tabAlignment: conEscaner ? TabAlignment.start : null,
             tabs: [
               const Tab(text: 'Listas'),
               const Tab(text: 'Entradas'),
-              if (conHistorial) const Tab(text: 'Historial'),
+              if (conEscaner) const Tab(text: 'Escáner'),
             ],
           ),
           Expanded(
@@ -55,7 +55,7 @@ class AccesosScreen extends ConsumerWidget {
               children: [
                 const ListasScreen(),
                 const EntradasScreen(),
-                if (conHistorial) const HistorialView(),
+                if (conEscaner) const EscanerScreen(),
               ],
             ),
           ),
@@ -198,6 +198,8 @@ class Ingreso {
 }
 
 /// Une invitados y entradas que ya ingresaron, del más reciente al más viejo.
+/// La pestaña Historial se sacó de Accesos porque no se usaba; esto queda
+/// porque lo cubre una prueba y sirve para rearmar la vista si hace falta.
 List<Ingreso> armarHistorial(
   List<Invitado> invitados,
   List<Entrada> entradas,
@@ -219,84 +221,3 @@ List<Ingreso> armarHistorial(
   return l;
 }
 
-class HistorialView extends ConsumerStatefulWidget {
-  const HistorialView({super.key});
-
-  @override
-  ConsumerState<HistorialView> createState() => _HistorialViewState();
-}
-
-class _HistorialViewState extends ConsumerState<HistorialView> {
-  String? _cat;
-
-  @override
-  Widget build(BuildContext context) {
-    final invitados = ref.watch(invitadosProvider);
-    final entradas = ref.watch(entradasProvider);
-    final listas = ref.watch(listasProvider).value ?? const <ListaTipo>[];
-    return VistaAsync(
-      valor: invitados,
-      reintentar: () => ref.invalidate(invitadosProvider),
-      datos: (inv) {
-        final todos = armarHistorial(inv, entradas.value ?? const [], {
-          for (final l in listas) l.id: l.nombre,
-        });
-        final porCat = <String, int>{};
-        for (final i in todos) {
-          porCat[i.categoria] = (porCat[i.categoria] ?? 0) + 1;
-        }
-        final filas = _cat == null
-            ? todos
-            : todos.where((i) => i.categoria == _cat).toList();
-        if (todos.isEmpty) {
-          return const MensajeVista(
-            icono: Icons.history_rounded,
-            titulo: 'Todavía no ingresó nadie',
-          );
-        }
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                OpcionTexto(
-                  label: Text('Todos (${todos.length})'),
-                  selected: _cat == null,
-                  onSelected: (_) => setState(() => _cat = null),
-                ),
-                for (final c in porCat.entries)
-                  OpcionTexto(
-                    label: Text('${c.key} (${c.value})'),
-                    selected: _cat == c.key,
-                    onSelected: (_) => setState(() => _cat = c.key),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            for (final i in filas)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  i.nombre,
-                  style: const TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  [i.categoria, if (i.quien.isNotEmpty) i.quien].join(' · '),
-                ),
-                trailing: Text(
-                  horaCorta(i.cuando),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}

@@ -1,8 +1,9 @@
 import '../../../core/widgets/opcion_texto.dart';
 import '../../clubs/ui/operacion_sheet.dart';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/media/imagenes.dart';
@@ -299,6 +300,9 @@ class GestionEventosScreen extends ConsumerWidget {
                         recargar();
                       case 'horarios':
                         await _hoja(context, _Horarios(evento: e));
+                        recargar();
+                      case 'aftr':
+                        await _hoja(context, _Aftr(evento: e));
                         recargar();
                       case 'arte':
                         final b = await elegirImagen(lado: 1400);
@@ -1231,6 +1235,22 @@ class _EventoDetalleState extends ConsumerState<_EventoDetalle> {
                         'Imagen del evento',
                         conImagen ? 'Tocá para cambiarla' : 'Sin imagen',
                         'arte',
+                      ),
+                      Divider(
+                        height: 1,
+                        indent: 68,
+                        color: VenueColors.lineaSuave,
+                      ),
+                      fila(
+                        Icons.phone_iphone_rounded,
+                        marca,
+                        'AFTR',
+                        e['aftr_publico'] == false
+                            ? 'Apagado: no aparece en AFTR'
+                            : e['publicado'] == true
+                            ? 'Visible: la gente puede comprar'
+                            : 'Falta publicar el evento',
+                        'aftr',
                       ),
                     ],
                   ),
@@ -3290,6 +3310,137 @@ class _AvisosState extends ConsumerState<_Avisos> {
                 ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// AFTR para este evento: si la gente lo ve y lo puede comprar desde la app
+/// pública, y el enlace para compartirlo.
+///
+/// Estaba sólo en la base (`aftr_publico`), sin forma de tocarlo desde acá ni
+/// desde la web, así que no había manera de sacar un evento de AFTR sin
+/// despublicarlo entero.
+class _Aftr extends ConsumerStatefulWidget {
+  const _Aftr({required this.evento});
+  final Fila evento;
+  @override
+  ConsumerState<_Aftr> createState() => _AftrState();
+}
+
+class _AftrState extends ConsumerState<_Aftr> {
+  late bool _on = widget.evento['aftr_publico'] as bool? ?? true;
+  bool _guardando = false;
+  String get _id => widget.evento['id'] as String;
+  String get _enlace => 'https://aftr-web.vercel.app/#/evento/$_id';
+
+  @override
+  Widget build(BuildContext context) {
+    final e = widget.evento;
+    final publicado = e['publicado'] == true;
+    final cerrado = e['estado'] == 'cerrado';
+    // el evento sólo aparece en AFTR si se cumplen todas; el boliche además
+    // tiene que estar activo y visible, y eso se configura en el club
+    final motivo = cerrado
+        ? 'El evento está cerrado, así que no aparece.'
+        : !publicado
+        ? 'Falta publicar el evento: hasta que lo publiques no aparece en AFTR.'
+        : !_on
+        ? 'Apagado: no aparece en AFTR ni se puede comprar.'
+        : 'Visible en AFTR: la gente lo ve y puede comprar su entrada.';
+    final bien = _on && publicado && !cerrado;
+    return ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      children: [
+        const Text(
+          'AFTR',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'La app donde el público compra la entrada.',
+          style: TextStyle(color: VenueColors.textoSuave),
+        ),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Mostrar en AFTR'),
+          subtitle: const Text('Que el evento se vea y se pueda comprar'),
+          value: _on,
+          onChanged: _guardando || cerrado
+              ? null
+              : (v) async {
+                  setState(() {
+                    _on = v;
+                    _guardando = true;
+                  });
+                  try {
+                    await ref
+                        .read(gestionRepositoryProvider)
+                        .editar(_id, {'aftr_publico': v});
+                    if (mounted) {
+                      avisar(context, v ? 'Visible en AFTR' : 'Apagado en AFTR');
+                    }
+                  } catch (err) {
+                    if (mounted) {
+                      setState(() => _on = !v);
+                      avisar(context, '$err', tipo: TipoAviso.aviso);
+                    }
+                  } finally {
+                    if (mounted) setState(() => _guardando = false);
+                  }
+                },
+        ),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              bien ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+              size: 18,
+              color: bien ? VenueColors.ok : VenueColors.aviso,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(motivo, style: TextStyle(color: VenueColors.textoSuave)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const TituloBloque('Enlace del evento'),
+        Text(_enlace, style: TextStyle(color: VenueColors.textoSuave)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: _enlace));
+                  if (context.mounted) avisar(context, 'Enlace copiado');
+                },
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                label: const Text('Copiar'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => SharePlus.instance.share(
+                  ShareParams(text: '${e['nombre']} · $_enlace'),
+                ),
+                icon: const Icon(Icons.ios_share_rounded, size: 18),
+                label: const Text('Compartir'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Cada relacionador tiene su propio enlace con su nombre, en Eventos. '
+          'Este es el del evento, sin comisión a nadie.',
+          style: TextStyle(color: VenueColors.textoSuave, fontSize: 12),
         ),
       ],
     );
