@@ -46,10 +46,19 @@ trabajo. Última actualización: 2026-11-05.
 - [x] `miComision` sin el respaldo que bajaba `pct_boliche` y `cut_rel` al rrpp
 - [x] `rrpp_eventos`: comisión de jefe por `rol_en_club`, no por `profiles.rol`
       global (migración `…080000`)
-- [ ] Registrar en `impl.rpc_permiso` las cuatro que quedaron fuera de la matriz:
-      `comisiones_mesas`, `opciones_operacion`, `reparto_jefe`, `ranking_teams`.
-      Las cuatro ya llaman a `impl.exigir` adentro, así que es el invariante de
-      `db/19:311-330` lo que falta, no una fuga
+- [x] Cobertura de guardas, resuelta de otra forma que la del plan. **No son
+      cuatro las que quedaron fuera de la matriz: son 119.** Todo lo que se
+      escribió después de `db/19` (AFTR, PULSE, relacionadores, credenciales)
+      comprueba adentro con `impl.exigir` o `rol_en_club` en vez de pasar por
+      `impl.rpc_permiso`. Son dos estilos válidos y el chequeo de `db/19`
+      conocía uno solo. Meter las cuatro en la matriz no arreglaba nada: el
+      chequeo seguiría fallando por las otras 115, y envolver las 119 sería
+      reescribir toda la API a ciegas.
+      En su lugar, `tests/rpc_con_guarda.py` comprueba lo que importa: que cada
+      función `security definer` de `public` esté en la matriz, compruebe
+      adentro, o sea una excepción con el motivo escrito. Hoy da 79 / 104 / 10
+      y ninguna sin control. Las cuatro del plan comprueban adentro: revisadas
+      una por una
 - [ ] Probar con `curl`, no con la app: token de rrpp contra `mesas`, `bonos` y
       `team_reparto`; repetir con un jefe; y un rrpp en dos boliches, jefe en uno
 
