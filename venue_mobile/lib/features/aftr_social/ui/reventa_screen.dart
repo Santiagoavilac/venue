@@ -10,6 +10,7 @@ import '../../authentication/data/sesion.dart';
 import '../../clubs/data/clubs.dart';
 import '../data/social_aftr.dart';
 import 'historias_screen.dart';
+import '../../../core/widgets/esqueleto.dart';
 
 class ReventaScreen extends ConsumerStatefulWidget {
   const ReventaScreen({super.key});
@@ -131,7 +132,7 @@ class _ReventaState extends ConsumerState<ReventaScreen>
         if (_ocupado) const LinearProgressIndicator(),
         Expanded(
           child: gestion.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const EsqueletoLista(),
             error: (e, _) => Center(
               child: TextButton(
                 onPressed: _refrescar,
@@ -620,7 +621,7 @@ class _OrdenState extends ConsumerState<_OrdenReventa>
               ),
             ),
           );
-        if (!s.hasData) return const Center(child: CircularProgressIndicator());
+        if (!s.hasData) return const EsqueletoLista(filas: 3);
         final j = s.data!;
         final disputa = ['disputa', 'en_disputa'].contains(j['estado']);
         return SafeArea(

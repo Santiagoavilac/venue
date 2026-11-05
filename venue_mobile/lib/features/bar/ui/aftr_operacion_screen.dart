@@ -9,6 +9,7 @@ import '../../../core/widgets/avisos.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/data/eventos.dart';
 import '../data/aftr_operacion.dart';
+import '../../../core/widgets/esqueleto.dart';
 
 class AftrOperacionScreen extends ConsumerStatefulWidget {
   const AftrOperacionScreen({super.key});
@@ -157,7 +158,7 @@ class _OperacionState extends ConsumerState<AftrOperacionScreen> {
                   ),
                 );
               if (!s.hasData)
-                return const Center(child: CircularProgressIndicator());
+                return const EsqueletoLista(conFoto: false);
               return switch (_tabs[_tab]) {
                 'Pedidos' => _pedidos(s.data as List),
                 'Mesas' => _mesas(Map<String, dynamic>.from(s.data as Map)),

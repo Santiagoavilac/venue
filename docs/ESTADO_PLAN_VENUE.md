@@ -20,7 +20,13 @@ trabajo. Última actualización: 2026-11-05.
       `_ChipPagado` y `_Estado` de Pagos, `_Estado` del relacionador,
       `_Etiqueta` de Eventos y los dos `_EstadoTexto`. El dorado de las
       cortesías pasó a `VenueColors.cortesia`. Prueba: `test/insignia_test.dart`
-- [ ] `EsqueletoLista` con `skeletonizer` en lugar de las 46 ruleditas
+- [x] `EsqueletoLista`, `EsqueletoResumen` y `EsqueletoBloque` con `skeletonizer`
+      (`core/widgets/esqueleto.dart`). `VistaAsync` ya no muestra una ruedita:
+      por defecto pinta el esqueleto de la lista, y cada pantalla puede pasar el
+      suyo con `cargando:`. Eso cubre sus 22 usos de una; además se cambiaron
+      a mano los de Inicio, el relacionador, Listas, POS, Barra AFTR, reventa e
+      historias. Quedan a propósito las ruleditas chicas de botones y recuadros.
+      Prueba: `test/esqueleto_test.dart`
 - [ ] Sacar `HeroEvento` de `gestion_screen.dart` a `core/widgets/`
 - [~] Borrar lo muerto: ya salieron `Indicador`, `GrillaIndicadores`, `FichaDato`
       y `Kpi` con sus parámetros ignorados (`horizontal`, `color` de ficha).

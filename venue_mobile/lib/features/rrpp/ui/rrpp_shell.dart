@@ -23,6 +23,7 @@ import '../../vip_tables/ui/mesas_screen.dart';
 import '../data/rrpp.dart';
 import 'gestion_solicitudes.dart';
 import '../../../core/widgets/insignia.dart';
+import '../../../core/widgets/esqueleto.dart';
 
 const _aftr = 'https://www.aftrvenue.com/';
 
@@ -161,7 +162,7 @@ class _Pagina extends ConsumerWidget {
           const SizedBox(height: 12),
           ...ev.when(
             data: hijos,
-            loading: () => const [Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))],
+            loading: () => const [EsqueletoResumen()],
             error: (e, _) => [
               _Vacio.accion('No pudimos cargar tus datos', mensajeDeError(e),
                   accion: OutlinedButton(onPressed: () => _refrescar(ref), child: const Text('Reintentar'))),
@@ -1150,7 +1151,7 @@ class _ExplorarState extends ConsumerState<_Explorar> {
               future: _f,
               builder: (_, s) {
                 if (s.hasError) return Text(mensajeDeError(s.error!));
-                if (!s.hasData) return const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()));
+                if (!s.hasData) return const EsqueletoLista(filas: 3, conFoto: false);
                 final l = s.data!;
                 if (l.isEmpty) {
                   return _Vacio(_q.isEmpty ? 'Todavía no hay boliches abiertos a solicitudes' : 'No encontramos boliches',

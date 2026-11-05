@@ -10,6 +10,7 @@ import '../../../core/widgets/estado_vista.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/data/eventos.dart';
 import '../data/barra.dart';
+import '../../../core/widgets/esqueleto.dart';
 
 /// Punto de venta de la barra.
 ///
@@ -204,7 +205,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         alTocar: _cargar,
       );
     }
-    if (_barras == null) return const Center(child: CircularProgressIndicator());
+    if (_barras == null) return const EsqueletoLista(conFoto: false);
     if (_barras!.isEmpty) {
       return const MensajeVista(
         icono: Icons.local_bar_outlined,

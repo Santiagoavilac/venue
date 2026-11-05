@@ -13,6 +13,7 @@ import '../../../core/widgets/avisos.dart';
 import '../../clubs/data/clubs.dart';
 import '../../events/data/eventos.dart';
 import '../data/social_aftr.dart';
+import '../../../core/widgets/esqueleto.dart';
 
 class HistoriasScreen extends ConsumerStatefulWidget {
   const HistoriasScreen({super.key});
@@ -124,7 +125,7 @@ class _HistoriasState extends ConsumerState<HistoriasScreen>
         if (_ocupado) const LinearProgressIndicator(),
         Expanded(
           child: datos.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const EsqueletoLista(),
             error: (e, _) => Center(
               child: TextButton(
                 onPressed: () => ref.invalidate(historiasGestionProvider),

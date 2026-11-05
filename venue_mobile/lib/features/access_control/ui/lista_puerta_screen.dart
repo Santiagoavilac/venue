@@ -417,21 +417,3 @@ class _Caja extends StatelessWidget {
     );
   }
 }
-
-class _EstadoTexto extends StatelessWidget {
-  const _EstadoTexto(this.texto, this.color);
-  final String texto;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
-    child: Text(
-      texto,
-      style: TextStyle(
-        color: color,
-        fontSize: 11.5,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-  );
-}

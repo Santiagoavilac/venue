@@ -34,6 +34,7 @@ import '../../access_control/ui/accesos_screen.dart';
 import '../../analytics/ui/reporte_screen.dart';
 import 'panel_perfil.dart';
 import 'tutorial.dart';
+import '../../../core/widgets/esqueleto.dart';
 
 class _Seccion {
   const _Seccion(
@@ -342,7 +343,7 @@ class _InicioShellState extends ConsumerState<InicioShell>
     ref.watch(_seccionActualProvider);
     return rol.when(
       loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+          const Scaffold(body: EsqueletoResumen()),
       error: (e, _) => Scaffold(
         body: VistaAsync(
           valor: rol,

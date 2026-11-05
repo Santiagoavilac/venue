@@ -18,6 +18,7 @@ import '../../tickets/ui/ticket_sheet.dart';
 import '../data/listas.dart';
 import 'limites_jefe.dart';
 import '../../../core/widgets/insignia.dart';
+import '../../../core/widgets/esqueleto.dart';
 
 /// Reglas de quién puede qué sobre un invitado. Son las mismas de la web;
 /// el servidor las vuelve a aplicar en cada RPC.
@@ -420,7 +421,7 @@ class _ListasScreenState extends ConsumerState<ListasScreen> {
               if (invitados.isLoading && todos.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: EsqueletoLista(filas: 4),
                 )
               else if (q.length >= 2) ...[
                 // buscador global: encuentra al anotado en cualquier lista

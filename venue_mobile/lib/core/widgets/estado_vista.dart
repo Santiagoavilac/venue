@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../networking/supabase.dart';
 import '../theme/venue_theme.dart';
+import 'esqueleto.dart';
 
 /// Mensaje centrado para pantallas sin datos o con error.
 class MensajeVista extends StatelessWidget {
@@ -67,18 +68,26 @@ class VistaAsync<T> extends StatelessWidget {
     required this.valor,
     required this.datos,
     this.reintentar,
+    this.cargando,
   });
 
   final AsyncValue<T> valor;
   final Widget Function(T) datos;
   final VoidCallback? reintentar;
 
+  /// Qué se ve mientras carga. Por defecto, el esqueleto de una lista: la
+  /// forma de lo que viene en gris, que es lo que pide el informe, en vez de
+  /// una ruedita que no dice nada y mueve todo al llegar los datos. Las
+  /// pantallas que no son una lista pasan el suyo ([EsqueletoResumen],
+  /// [EsqueletoBloque]).
+  final Widget? cargando;
+
   @override
   Widget build(BuildContext context) {
     return valor.when(
       skipLoadingOnRefresh: true,
       data: datos,
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => cargando ?? const EsqueletoLista(),
       error: (e, _) => MensajeVista(
         icono: esFallaDeRed(e) ? Icons.wifi_off_rounded : Icons.error_outline,
         titulo: esFallaDeRed(e) ? 'Sin conexión' : 'No se pudo cargar',
