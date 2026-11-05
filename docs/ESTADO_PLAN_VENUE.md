@@ -3,9 +3,9 @@
 Avance de `PLAN_EXPERIENCIA_VENUE.md`. Se actualiza en el mismo commit que el
 trabajo. Última actualización: 2026-11-05.
 
-**Las cuatro fases están cerradas.** Lo único que queda del plan es lo que no
-se puede hacer desde acá: probar la privacidad con `curl` contra un proyecto
-real y aplicar las migraciones en Supabase. Está al final, en Pendiente de
+**Las cuatro fases están cerradas y las migraciones están aplicadas** en el
+proyecto `cxksjarupexptfksnptg` (05/11/2026). Lo único que queda es probar la
+privacidad con `curl` usando sesiones reales. Está al final, en Pendiente de
 verdad.
 
 ## Fase 0 · Cimientos
@@ -140,12 +140,15 @@ verdad.
 
 Nada de esto se puede cerrar sin un proyecto real delante:
 
-1. **Aplicar las migraciones en Supabase**, en orden:
-   `20261105060000` y `20261105061000` (privacidad de mesas, parte 1 y 2 — el
-   orden importa: la 2 cierra la tabla recién cuando la app ya lee la vista),
-   `20261105070000` (foto del autor en historias) y `20261105080000`
-   (comisión de jefe por boliche). Hasta entonces la app funciona, pero sin
-   esos arreglos.
+1. ~~Aplicar las migraciones en Supabase~~ **Hecho.** Estaban aplicadas todas
+   menos tres (`061000`, `070000`, `080000`), que se aplicaron una por una
+   verificando antes y después. El historial del proyecto no las tenía
+   registradas aunque estuvieran aplicadas, así que también se puso al día con
+   `supabase migration repair`: ahora `migration list` dice la verdad.
+   Al revisar los permisos apareció un agujero que no estaba en el plan y se
+   cerró con `20261105090000`: `mesas_detalle` tenía INSERT/UPDATE/DELETE para
+   `authenticated` y, como corre con los permisos de su dueño, cualquiera con
+   sesión podía escribir en `mesas` sin pasar por RLS.
 2. **Probar la privacidad con `curl`**, como pide el plan: la interfaz ya
    ocultaba los datos y salían igual por el endpoint REST.
 3. **Mirar las pantallas en un teléfono.** Todo lo de acá está verificado con
