@@ -1,0 +1,68 @@
+# Estado del plan de Venue
+
+Avance de `PLAN_EXPERIENCIA_VENUE.md`. Se actualiza en el mismo commit que el
+trabajo. Última actualización: 2026-11-05.
+
+## Fase 0 · Cimientos
+
+- [x] Librerías: `flutter_animate`, `skeletonizer`, `lucide_icons_flutter` en `pubspec.yaml`
+- [x] `venue_mobile/lib/core/theme/tokens.dart` (tipografía y espaciado)
+- [ ] Una sola paleta efectiva: el cromo hardcodeado (`acceso_oscuro.dart`, tutorial,
+      degradés de `HeroEvento`) lee del tema. Arregla la pestaña Catálogo gris
+- [ ] `TarjetaCifra` único que reemplace las cinco variantes
+- [ ] Badge de estado único que reemplace las siete
+- [ ] `EsqueletoLista` con `skeletonizer` en lugar de las 46 ruleditas
+- [ ] Sacar `HeroEvento` de `gestion_screen.dart` a `core/widgets/`
+- [ ] Borrar lo muerto: `GrillaIndicadores`, `MarcaClub`, parámetros ignorados de
+      `Indicador`, `FichaDato` y `AccionRapida`
+
+## Fase 1 · Privacidad en el servidor
+
+- [x] `mesas`: columnas de dinero fuera de la tabla cruda, la app lee `mesas_detalle`
+      (migraciones `…060000` y `…061000`)
+- [x] `bonos` y `team_reparto` con el criterio de `db/47` y `db/49`
+- [x] `pct_boliche` solo para admin y jefe (`eventoConComisionProvider`)
+- [x] `miComision` sin el respaldo que bajaba `pct_boliche` y `cut_rel` al rrpp
+- [x] `rrpp_eventos`: comisión de jefe por `rol_en_club`, no por `profiles.rol`
+      global (migración `…080000`)
+- [ ] Registrar en `impl.rpc_permiso` las cuatro que quedaron fuera de la matriz:
+      `comisiones_mesas`, `opciones_operacion`, `reparto_jefe`, `ranking_teams`.
+      Las cuatro ya llaman a `impl.exigir` adentro, así que es el invariante de
+      `db/19:311-330` lo que falta, no una fuga
+- [ ] Probar con `curl`, no con la app: token de rrpp contra `mesas`, `bonos` y
+      `team_reparto`; repetir con un jefe; y un rrpp en dos boliches, jefe en uno
+
+## Fase 2 · Evento activo
+
+- [x] El fallback es el próximo por empezar, no `lista.first`
+- [x] El evento elegido se persiste
+- [x] La píldora siempre visible, también con un solo evento
+- [x] Tocar un evento en una lista ya no cambia el evento global
+- [x] Prueba `venue_mobile/test/evento_activo_test.dart`
+- [ ] Línea fija arriba en Mesas, Pagos y Accesos con de qué evento son los datos
+
+## Fase 3 · Pantalla por pantalla
+
+- [~] **Mesas** — la fuga cerrada y la app leyendo `mesas_detalle`. Falta precios
+      condicionados a `eventos.comision_mesas`, el plano y el tutorial
+- [ ] **Eventos / Gestión** — una sola lista con eje temporal, "Crear evento"
+      arriba, datos reales en Gestionar evento, arreglar el campo `_cut` que se
+      manda sin dibujarse (`gestion_screen.dart:1511,1619`)
+- [ ] **Pagos** — hoy no usa ninguna primitiva del sistema
+- [ ] **Accesos** — unificar `_Dato` con `TarjetaCifra`
+- [ ] **Reporte** — tokens y gráficos con `fl_chart`
+- [ ] **Shell del relacionador** — `_Cifra`, `_Vacio` y `_Estado` a los compartidos
+
+## Fase 4 · Tutoriales
+
+- [ ] Guía por pantalla, con su clave en `SharedPreferences`
+- [ ] Cubrir Mesas, Accesos, Pagos y Gestión de evento
+- [ ] Tutorial en `RrppShell` (hoy los relacionadores no tienen ninguno)
+- [ ] Que use los colores del tema (`tutorial.dart:119,172`)
+
+## Fuera del plan, ya hecho
+
+- Teclado que no se bajaba cuando el campo que lo abrió desaparecía: `VigilanteDelTeclado`
+  en las dos apps
+- AFTR: foto de perfil en las historias, y publicar reventa sin número de cuenta
+  cuando hay QR de cobro
