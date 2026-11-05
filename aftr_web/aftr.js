@@ -407,7 +407,7 @@ async function pintarDescubrir() {
     const todos = E.eventos || [];
     const lista = enRango(todos, E.cuando);
     let html = `<div class="envoltura"><h1 class="titular saludo aparecer">Descubrir</h1>
-      <div id="historias-aftr"></div><a class="pildora" style="margin:12px 20px" href="#/reventa">Reventa oficial ↗</a>${tiraFechas(todos)}`;
+      <div id="historias-aftr"></div>${tiraFechas(todos)}`;
     if (!E.eventos) {
       html += `<div style="padding:12px 20px"><div class="esq" style="aspect-ratio:.82;border-radius:24px;max-height:74vh"></div></div>`;
     } else if (!lista.length) {
@@ -432,6 +432,9 @@ async function pintarDescubrir() {
       Object.entries(gen).slice(0, 3).forEach(([g, l]) => (html += carrusel(g, l)));
       if (E.cuando === "todo" && lista.length > 1) html += `<div class="titulo-sec"><h3>Próximos</h3></div>${lista.map(filaEvento).join("")}`;
     }
+    // La reventa estaba detrás de una pildorita arriba de todo, o sea casi
+    // escondida. Es un mercado: va con las entradas que hay ahora.
+    html += reventaEnInicio();
     if (E.lugares?.length) html += `<div class="titulo-sec"><h3>Lugares</h3></div>${E.lugares.map(filaLugar).join("")}`;
     vista.innerHTML = html + "</div>";
     socialAftr().mountFeed($("#historias-aftr")).catch(e=>avisar(mensaje(e)));
@@ -439,8 +442,39 @@ async function pintarDescubrir() {
     $$("[data-cuando]").forEach((b) => (b.onclick = () => { E.cuando = b.dataset.cuando; cuerpo(); }));
   };
   cuerpo();
-  await Promise.all([cargarEventos(), cargarLugares().catch(() => [])]);
+  await Promise.all([cargarEventos(), cargarLugares().catch(() => []), cargarMercado()]);
   if (ruta().nombre === "descubrir") cuerpo();
+}
+
+/* Las entradas en reventa, para el inicio. Si falla no se avisa: es una
+   sección de más, no se le arruina el inicio a nadie por eso. */
+async function cargarMercado() {
+  try {
+    const d = await rpc("aftr_reventa", { p_accion: "mercado", p_datos: {} });
+    E.mercado = d?.ofertas || [];
+  } catch { E.mercado = E.mercado || []; }
+}
+function reventaEnInicio() {
+  const l = E.mercado;
+  // mientras no se sabe, no se anuncia nada: el inicio no tiene que saltar
+  if (!l) return "";
+  if (!l.length) {
+    return `<a class="fila presionable" style="margin:30px 20px 0" href="#/reventa">
+      <div class="cuerpo"><b style="font-size:15px">Reventa oficial</b>
+      <span class="suave">No podés ir: vendé tu entrada con el QR protegido.</span></div>
+      <span class="tenue">↗</span></a>`;
+  }
+  return `<div class="titulo-sec"><h3>Reventa oficial</h3><a class="texto-accion" href="#/reventa">Ver todo</a></div>
+    <div class="carrusel">${l.slice(0, 12).map((o) => {
+      const enPago = o.estado === "reservada";
+      return `<a class="tarjeta-reventa presionable" href="#/reventa">
+        <span class="etq vivo">✓ ENTRADA OFICIAL</span>
+        <b class="fuerte">${esc(o.evento || "")}</b>
+        <span class="suave">${esc(o.club || "")}</span>
+        <b class="precio">${bs(Math.round((o.precio_centavos || 0) / 100))}</b>
+        <span class="${enPago ? "oro" : "suave"}">${enPago ? "En pago · vuelve en minutos" : `Vende ${esc(o.vendedor || "alguien de AFTR")}`}</span>
+      </a>`;
+    }).join("")}</div>`;
 }
 
 /* ── evento ─────────────────────────────────────────────────────────── */

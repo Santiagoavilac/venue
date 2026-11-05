@@ -33,11 +33,13 @@ class _ReventaState extends ConsumerState<ReventaScreen> {
   bool _comprando = false;
   Future<void> _comprar(DatosSocial oferta) async {
     if (_comprando || !await asegurarCuenta(context, ref) || !mounted) return;
+    // El vendedor acepta primero: hasta entonces no se ve ningún dato de cobro
+    // y no hay nada que pagar. El texto decía lo contrario.
     final acepta = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Iniciar compra'),
-      content: Text('${oferta['evento']}\n${precioReventa(oferta['precio_centavos'])}\n\nVas a tener ${oferta['pago_minutos'] ?? 15} minutos para pagar directamente al vendedor e informar el pago. La entrada queda bloqueada durante la operación.'),
+      title: const Text('Pedir esta entrada'),
+      content: Text('${oferta['evento']}\n${precioReventa(oferta['precio_centavos'])}\n\nSe le pide la entrada al vendedor. Cuando acepte vas a ver sus datos de cobro y tenés ${oferta['pago_minutos'] ?? 15} minutos para pagarle. Hasta entonces no transfieras nada.'),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Volver')),
-        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Iniciar orden'))]));
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Enviar pedido'))]));
     if (acepta != true || !mounted) return;
     setState(() => _comprando = true);
     try {

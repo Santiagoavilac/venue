@@ -15,6 +15,7 @@ import '../auth/asegurar_cuenta.dart';
 import '../../data/modelos.dart';
 import '../splash/splash.dart';
 import '../historias/historias.dart';
+import '../reventa/reventa.dart' show precioReventa;
 import '../../data/social_repo.dart';
 
 /// La noche elegida en la tira de fechas; null es "Todo".
@@ -82,6 +83,10 @@ class DescubrirScreen extends ConsumerWidget {
             error: (e, _) => [SliverToBoxAdapter(child: _Vacio(mensajeDeError(e), reintentar: () => ref.invalidate(eventosProvider)))],
             data: (todos) => _secciones(todos, noche, ahora),
           ),
+          // La reventa estaba sólo detrás de un botón de texto en Accesos, o
+          // sea escondida para quien no fue a buscarla. Es un mercado: vive
+          // donde la gente mira.
+          const SliverToBoxAdapter(child: ReventaEnInicio()),
           ...lugares.maybeWhen(
             data: (l) => l.isEmpty
                 ? const <Widget>[]
@@ -284,6 +289,110 @@ class FechasAftr extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// La reventa oficial en el inicio: las entradas que hay ahora, y si no hay
+/// ninguna, la puerta para publicar la tuya. Antes esto vivía detrás de un
+/// botón de texto arriba de Accesos.
+class ReventaEnInicio extends ConsumerWidget {
+  const ReventaEnInicio({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mercado = ref.watch(mercadoProvider);
+    final ofertas = listaSocial(mercado.value?['ofertas']);
+    // mientras carga no se anuncia nada: el inicio no tiene que saltar
+    if (mercado.isLoading && mercado.value == null) return const SizedBox.shrink();
+    if (ofertas.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 30, 20, 0),
+        child: Presionable(
+          onTap: () => context.push('/reventa'),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Aftr.superficie,
+              borderRadius: BorderRadius.circular(Aftr.radio),
+              border: Border.all(color: Aftr.borde),
+            ),
+            child: Row(children: [
+              const Icon(Icons.swap_horiz_rounded, color: Aftr.acento),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Reventa oficial', style: Aftr.fuerte(16)),
+                const SizedBox(height: 2),
+                Text('No podés ir: vendé tu entrada con el QR protegido.',
+                  style: Aftr.cuerpo(13)),
+              ])),
+              const Icon(Icons.chevron_right_rounded, color: Aftr.texto3),
+            ]),
+          ),
+        ),
+      );
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      TituloSeccion('Reventa oficial',
+        accion: 'Ver todo', onAccion: () => context.push('/reventa')),
+      SizedBox(
+        height: 164,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: ofertas.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 12),
+          itemBuilder: (_, i) => _OfertaChica(ofertas[i]),
+        ),
+      ),
+    ]);
+  }
+}
+
+class _OfertaChica extends StatelessWidget {
+  const _OfertaChica(this.o);
+  final DatosSocial o;
+
+  @override
+  Widget build(BuildContext context) {
+    final enPago = o['estado'] == 'reservada';
+    return Presionable(
+      onTap: () => context.push('/reventa?evento=${o['evento_id']}'),
+      child: Container(
+        width: 232,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Aftr.superficie,
+          borderRadius: BorderRadius.circular(Aftr.radio),
+          border: Border.all(color: Aftr.borde),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.verified_outlined, size: 14, color: Aftr.vivo),
+            const SizedBox(width: 5),
+            // Expanded y no a secas: la etiqueta va espaciada y con el texto
+            // más grande del sistema se desborda la tarjeta.
+            Expanded(child: Text('ENTRADA OFICIAL', maxLines: 1,
+              overflow: TextOverflow.ellipsis, style: Aftr.etiqueta(c: Aftr.vivo))),
+          ]),
+          const SizedBox(height: 12),
+          Text('${o['evento'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: Aftr.fuerte(17)),
+          const SizedBox(height: 4),
+          Text('${o['club'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: Aftr.cuerpo(12)),
+          const Spacer(),
+          Text(precioReventa(o['precio_centavos']), style: Aftr.fuerte(21)),
+          Text(
+            enPago
+                ? 'En pago · vuelve en minutos'
+                : 'Vende ${o['vendedor'] ?? 'alguien de AFTR'}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Aftr.cuerpo(12, c: enPago ? Aftr.acento : Aftr.texto2),
+          ),
+        ]),
       ),
     );
   }

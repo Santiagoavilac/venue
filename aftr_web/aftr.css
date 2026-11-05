@@ -407,3 +407,11 @@ body.con-saldo .mapa-arriba { top: 8px; }
 .aviso-pago { padding: 16px; margin: 0 0 16px; border-radius: 20px; background: var(--sup2); border: 1px solid color-mix(in srgb, var(--alerta) 45%, transparent); }
 .aviso-pago.ok { border-color: color-mix(in srgb, var(--vivo) 45%, transparent); }
 .aviso-pago .boton { display: inline-block; width: auto; }
+
+/* Las entradas en reventa, en el inicio. Antes la reventa era una pildorita
+   arriba de todo: un mercado escondido no es un mercado. */
+.tarjeta-reventa { flex: 0 0 232px; scroll-snap-align: start; display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 20px; background: var(--sup); border: 1px solid var(--borde); text-decoration: none; color: inherit; }
+.tarjeta-reventa > b.fuerte { font-size: 17px; line-height: 1.2; margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tarjeta-reventa > .suave { font-size: 12px; }
+.tarjeta-reventa > .precio { font-size: 21px; margin-top: auto; padding-top: 10px; }
+.tarjeta-reventa > .oro { color: var(--acento); font-size: 12px; }
