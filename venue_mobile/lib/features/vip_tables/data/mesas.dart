@@ -105,6 +105,7 @@ class Mesa {
   const Mesa({
     required this.id,
     required this.eventoId,
+    this.mia = true,
     required this.planta,
     required this.etiqueta,
     required this.categoria,
@@ -158,6 +159,10 @@ class Mesa {
   final String? metodoPago;
   final bool cortesia;
 
+  /// Si esta sesión puede ver los datos de venta de esta mesa: el precio,
+  /// quién la vendió y el cliente. Lo decide el servidor en mesas_detalle.
+  final bool mia;
+
   bool get libre => estado == 'disponible';
   /// Se dibuja como lounge (lounge, VIP, box).
   bool get esLounge => tipoMesa(categoria).lounge;
@@ -207,6 +212,9 @@ class Mesa {
       pagoVerificado: j['pago_verificado'] == true,
       metodoPago: j['metodo_pago'] as String?,
       cortesia: j['cortesia'] == true,
+      // sólo la vista lo manda, y null no es "sí": ve_registro devuelve null
+      // cuando no hay con qué comparar, y eso no da derecho a ver nada
+      mia: j['mia'] == true,
     );
   }
 }
@@ -373,12 +381,14 @@ class MesasRepository {
   }
 
   Future<List<Mesa>> mesas(String eventoId) async {
-    final r = await _sb.from('mesas').select().eq('evento_id', eventoId).order('etiqueta', ascending: true);
+    // mesas_detalle da el plano completo pero esconde la plata de las mesas
+    // que no son de uno; la tabla cruda la lee cualquiera del boliche
+    final r = await _sb.from('mesas_detalle').select().eq('evento_id', eventoId).order('etiqueta', ascending: true);
     return r.map(Mesa.desde).toList();
   }
 
   Future<List<Mesa>> grupo(String grupoId) async {
-    final r = await _sb.from('mesas').select().eq('grupo_id', grupoId).order('etiqueta', ascending: true);
+    final r = await _sb.from('mesas_detalle').select().eq('grupo_id', grupoId).order('etiqueta', ascending: true);
     return r.map(Mesa.desde).toList();
   }
 

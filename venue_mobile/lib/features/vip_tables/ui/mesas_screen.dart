@@ -199,7 +199,11 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
                   m.reservadaAt != null,
             )
             .toList();
-        final total = vendidas.fold<num>(0, (a, m) => a + m.precio);
+        // sólo se suma lo que esta sesión puede ver: un relacionador no
+        // tiene por qué conocer la recaudación de mesas del boliche
+        final mias = vendidas.where((m) => m.mia).toList();
+        final total = mias.fold<num>(0, (a, m) => a + m.precio);
+        final verTotal = mias.length == vendidas.length;
 
         void tocar(Mesa m) {
           if (_editando) {
@@ -233,7 +237,7 @@ class _MesasScreenState extends ConsumerState<MesasScreen> {
             children: [
               Text(
                 '${vendidas.length} de ${todas.length} ${esPortero ? 'ocupadas' : 'vendidas'}'
-                '${!esPortero && vendidas.isNotEmpty ? ' · $total Bs' : ''}',
+                '${!esPortero && mias.isNotEmpty ? (verTotal ? ' · $total Bs' : ' · $total Bs tuyos') : ''}',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -955,7 +959,9 @@ class _ListaMesas extends StatelessWidget {
                                     if (m.teamId != null &&
                                         teams[m.teamId] != null)
                                       teams[m.teamId]!,
-                                    if (conPlata && m.precio > 0)
+                                    // m.mia lo decide el servidor: si la mesa
+                                    // no es suya, el precio ni siquiera llegó
+                                    if (conPlata && m.mia && m.precio > 0)
                                       '${m.precio} Bs',
                                   ].join(' · '),
                                   maxLines: 1,

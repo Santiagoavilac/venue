@@ -779,7 +779,8 @@ class _MesaVendidaState extends ConsumerState<_MesaVendida> {
           ].join(' · '),
           style: TextStyle(color: VenueColors.textoSuave, fontSize: 15),
         ),
-        if (vendedor != null)
+        // si la mesa no es de esta sesión, el servidor no manda el vendedor
+        if (vendedor != null && prim.mia)
           Text(
             'La vendió ${vendedor.nombre} · ${vendedor.team}',
             style: TextStyle(color: VenueColors.textoSuave),
@@ -1611,7 +1612,9 @@ class _ConfirmarPagos extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pend = (ref.watch(mesasProvider).value ?? const <Mesa>[])
-        .where((m) => m.porVerificar)
+        // sólo las que esta sesión puede ver: a un relacionador no le llegan
+        // ni el precio ni el vendedor de las mesas ajenas
+        .where((m) => m.porVerificar && m.mia)
         .toList();
     final equipo = ref.watch(equipoProvider).value ?? const <String, Miembro>{};
     final repo = ref.read(mesasRepositoryProvider);

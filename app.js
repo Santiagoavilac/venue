@@ -199,7 +199,7 @@ async function copyText(txt) {
 // registro de mesas/combos en texto (formato planimetría), copiado al portapapeles
 async function copyRegistroMesas() {
   const [{ data: ms }, { data: coms }] = await Promise.all([
-    sb.from("mesas")
+    sb.from("mesas_detalle")
       .select("id, cliente, combo_qty, precio, etiqueta, c:combos(nombre,precio)")
       .eq("evento_id", ev.id).neq("estado", "disponible").order("etiqueta"),
     sb.rpc("comisiones_mesas", { p_evento: ev.id })
@@ -6639,7 +6639,7 @@ async function barrerReservasVencidas() {
 }
 async function loadMesas() {
   await barrerReservasVencidas();
-  const { data } = await sb.from("mesas").select("*").eq("evento_id", ev.id).order("etiqueta");
+  const { data } = await sb.from("mesas_detalle").select("*").eq("evento_id", ev.id).order("etiqueta");
   mesas = data || [];
 }
 /* combos, teams y fondos casi no cambian durante la noche: se guardan por
@@ -7273,7 +7273,7 @@ async function correrBusqueda(q) {
       sb.from("entradas")
         .select("id, code, cliente, estado, used_at, rrpp_id, precio, fase_id")
         .eq("evento_id", ev.id).or(`cliente.ilike.${like},code.eq.${code}`).limit(12),
-      sb.from("mesas")
+      sb.from("mesas_detalle")
         .select("id, etiqueta, cliente, estado, categoria, planta, precio, pago_verificado, combo_qty")
         .eq("evento_id", ev.id).or(`cliente.ilike.${like},etiqueta.ilike.${like}`).limit(12),
     ]);
@@ -7428,7 +7428,7 @@ async function sheetMesaSeguridad(m) {
   if (m.estado === "disponible") return sheet(`<div class="sh-h">${esc(m.etiqueta)} · ${tag}</div><div class="empty">Libre</div>`);
   let prim = m;
   if (m.grupo_id) {
-    const { data: gm } = await sb.from("mesas").select("etiqueta,cliente,combo_id,precio").eq("grupo_id", m.grupo_id);
+    const { data: gm } = await sb.from("mesas_detalle").select("etiqueta,cliente,combo_id,precio").eq("grupo_id", m.grupo_id);
     const p2 = (gm || []).find(x => +x.precio > 0); if (p2) prim = p2;
   }
   const combo = combosCache.find(c => c.id === prim.combo_id);
@@ -7667,7 +7667,7 @@ async function sheetMesa(m) {
     // si es parte de un grupo, la mesa primaria (precio>0) tiene el combo y las manillas
     let grupoMesas = [m];
     if (m.grupo_id) {
-      const { data: gm } = await sb.from("mesas").select("*").eq("grupo_id", m.grupo_id).order("etiqueta");
+      const { data: gm } = await sb.from("mesas_detalle").select("*").eq("grupo_id", m.grupo_id).order("etiqueta");
       if (gm?.length) grupoMesas = gm;
     }
     const prim = grupoMesas.find(x => +x.precio > 0) || grupoMesas[0];
