@@ -14,6 +14,10 @@ import '../data/entradas.dart';
 import '../../teams/ui/chip_team.dart';
 import 'reporte_teams.dart';
 import 'ticket_sheet.dart';
+import 'dart:typed_data';
+import '../../../core/media/imagenes.dart';
+import '../../../core/theme/tokens.dart';
+import '../../vip_tables/ui/mesa_hojas.dart' show ImagenComprobante;
 
 enum _Alcance { mias, team, todas }
 
@@ -52,6 +56,12 @@ class EntradasScreen extends ConsumerStatefulWidget {
 
 class _EntradasScreenState extends ConsumerState<EntradasScreen> {
   final _cliente = TextEditingController();
+
+  /// La foto del pago que mandó el cliente, cuando el boliche no vende por
+  /// AFTR: se adjunta a todas las entradas de esta tanda.
+  Uint8List? _comprobante;
+  String? _comprobanteUrl;
+  bool _subiendo = false;
   bool _generando = false;
   int? _progreso;
   int _escritos = 0;
@@ -93,6 +103,29 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
     );
   }
 
+  /// Elegir la captura del pago. Se sube una sola vez y se reusa para toda
+  /// la tanda: el cliente paga una transferencia por varias entradas.
+  Future<void> _elegirComprobante() async {
+    final b = await elegirImagen(lado: 1400);
+    if (b == null) return;
+    setState(() {
+      _comprobante = b;
+      _comprobanteUrl = null;
+      _subiendo = true;
+    });
+    try {
+      final url = await ref.read(archivosProvider).subirComprobante(b, 'entrada');
+      if (mounted) setState(() => _comprobanteUrl = url);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _comprobante = null);
+        avisar(context, mensajeDeError(e), tipo: TipoAviso.aviso);
+      }
+    } finally {
+      if (mounted) setState(() => _subiendo = false);
+    }
+  }
+
   Future<void> _generar(Evento ev, Map<String, Fase> fases, Set<String> casa) async {
     final nombres = expandirNombres(_cliente.text);
     if (nombres.isEmpty || _generando) return;
@@ -109,7 +142,8 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
     String? corte;
     for (final nombre in nombres) {
       try {
-        creadas.add(await repo.generar(ev.id, nombre));
+        creadas.add(await repo.generar(ev.id, nombre,
+            comprobanteUrl: _comprobanteUrl, metodo: _comprobanteUrl == null ? null : 'transferencia'));
         if (mounted && _progreso != null) setState(() => _progreso = creadas.length);
       } catch (e) {
         corte = mensajeDeError(e);
@@ -118,6 +152,9 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
     }
     if (creadas.isNotEmpty) {
       _cliente.clear();
+      // el comprobante es de esta tanda: la siguiente venta es otro pago
+      _comprobante = null;
+      _comprobanteUrl = null;
       _recargar();
     }
     if (mounted) {
@@ -333,6 +370,22 @@ class _EntradasScreenState extends ConsumerState<EntradasScreen> {
                   ),
                 ),
               ]),
+              // Para los boliches que no venden por AFTR: el cliente le paga
+              // al relacionador por fuera y le manda la captura. Queda pegada
+              // a la entrada, así el jefe rinde con la prueba en la mano.
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _subiendo ? null : _elegirComprobante,
+                  icon: _subiendo
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(_comprobanteUrl != null ? Icons.check_circle_rounded : Icons.receipt_long_outlined,
+                          size: 20, color: _comprobanteUrl != null ? VenueColors.ok : null),
+                  label: Text(_comprobanteUrl != null
+                      ? 'Comprobante listo · cambiar'
+                      : 'Adjuntar comprobante del pago'),
+                ),
+              ),
               if (veOtras) ...[
                 const SizedBox(height: 10),
                 SegmentedButton<_Alcance>(
@@ -665,6 +718,13 @@ class _FilaEntrada extends StatelessWidget {
               ),
             ),
           ),
+          // la captura del pago, cuando la entrada se vendió por fuera
+          if (e.conComprobante)
+            IconButton(
+              tooltip: 'Ver el comprobante del pago',
+              icon: Icon(Icons.receipt_long_rounded, size: 20, color: VenueColors.ok),
+              onPressed: () => _hojaComprobante(context, e),
+            ),
           PopupMenuButton<String>(
             tooltip: 'Acciones',
             onSelected: (v) => v == 'anular' ? alAnular?.call() : alEliminar(),
@@ -679,3 +739,28 @@ class _FilaEntrada extends StatelessWidget {
     );
   }
 }
+
+/// La captura del pago de una entrada vendida por fuera de AFTR.
+void _hojaComprobante(BuildContext context, Entrada e) => showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('Pago de ${e.cliente}', style: Tipo.bloque),
+            const SizedBox(height: 4),
+            Text(
+              [
+                '#${e.codigo}',
+                '${e.precio} Bs',
+                if ((e.metodoPago ?? '').isNotEmpty) e.metodoPago!,
+              ].join(' · '),
+              style: Tipo.apoyo,
+            ),
+            const SizedBox(height: Esp.lg),
+            ImagenComprobante(referencia: e.comprobanteUrl!, ancho: 320),
+          ]),
+        ),
+      ),
+    );

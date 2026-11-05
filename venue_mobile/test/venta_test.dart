@@ -118,4 +118,33 @@ void main() {
     ], {'l': 'Invitados'});
     expect(h.map((i) => '${i.nombre}/${i.categoria}'), ['Luis/Entradas', 'Ana/Invitados']);
   });
+
+  group('entrada vendida por fuera de AFTR', () {
+    Entrada desde(Map<String, dynamic> j) => Entrada.desde({
+      'id': 'e1',
+      'code': 'ABC123',
+      'cliente': 'Alguien',
+      'precio': 100,
+      'estado': 'valida',
+      ...j,
+    });
+
+    test('guarda la captura del pago y cómo pagó', () {
+      final e = desde({
+        'comprobante_url':
+            'https://x/storage/v1/object/public/comprobantes/uid/pago.jpg',
+        'metodo_pago': 'transferencia',
+      });
+      expect(e.conComprobante, isTrue);
+      expect(e.metodoPago, 'transferencia');
+    });
+
+    test('una entrada de AFTR no tiene comprobante y no lo simula', () {
+      final e = desde({});
+      expect(e.conComprobante, isFalse);
+      expect(e.comprobanteUrl, isNull);
+      // una cadena vacía tampoco cuenta como comprobante
+      expect(desde({'comprobante_url': ''}).conComprobante, isFalse);
+    });
+  });
 }
