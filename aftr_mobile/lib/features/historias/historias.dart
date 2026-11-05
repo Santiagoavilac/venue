@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/networking/supabase.dart';
 import '../../core/theme/aftr_theme.dart';
+import '../../core/widgets/avatar.dart';
 import '../../core/widgets/piezas.dart';
 import '../../data/aftr_repo.dart';
 import '../../data/modelos.dart';
@@ -31,6 +32,7 @@ class HistoriasFila extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(historiasProvider);
     final grupos = agruparHistorias(listaSocial(feed.value?['historias']));
+    final yo = ref.watch(perfilProvider).value;
     return SizedBox(
       height: 116,
       child: ListView.separated(
@@ -41,6 +43,7 @@ class HistoriasFila extends ConsumerWidget {
         itemBuilder: (_, i) {
           if (i == 0) {
             return _CirculoHistoria(nombre: 'Tu historia', agregar: true,
+              foto: yo?.foto, archivo: yo?.archivoFoto,
               onTap: () async {
                 if (!await asegurarCuenta(context, ref) || !context.mounted) return;
                 await Navigator.of(context, rootNavigator: true).push<void>(
@@ -49,6 +52,7 @@ class HistoriasFila extends ConsumerWidget {
           }
           final h = grupos[i - 1].first;
           return _CirculoHistoria(nombre: '${h['nombre'] ?? h['autor'] ?? 'AFTR'}',
+            foto: h['foto'] as String?, archivo: h['foto_archivo'] as String?,
             onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
               MaterialPageRoute(builder: (_) => HistoriasVisor(
                 grupos: grupos, grupoInicial: i - 1,
@@ -60,10 +64,15 @@ class HistoriasFila extends ConsumerWidget {
 }
 
 class _CirculoHistoria extends StatelessWidget {
-  const _CirculoHistoria({required this.nombre, required this.onTap, this.agregar = false});
+  const _CirculoHistoria({required this.nombre, required this.onTap,
+    this.agregar = false, this.foto, this.archivo});
   final String nombre;
   final VoidCallback onTap;
   final bool agregar;
+  /// Foto del autor: URL directa (logo del boliche) o ruta por firmar.
+  final String? foto;
+  final String? archivo;
+  bool get _conFoto => (foto ?? '').isNotEmpty || (archivo ?? '').isNotEmpty;
   @override
   Widget build(BuildContext context) => Semantics(
     button: true, label: agregar ? 'Publicar una historia' : 'Historias de $nombre',
@@ -77,8 +86,18 @@ class _CirculoHistoria extends StatelessWidget {
           child: Container(alignment: Alignment.center,
             decoration: const BoxDecoration(color: Aftr.superficie2, shape: BoxShape.circle,
               border: Border.fromBorderSide(BorderSide(color: Aftr.fondo, width: 3))),
-            child: agregar ? const Icon(Icons.add_rounded, color: Aftr.texto) :
-              Text(nombre.isEmpty ? 'A' : nombre.substring(0, 1).toUpperCase(), style: Aftr.titular(28))),
+            // la foto de perfil del autor; sin foto queda la inicial, y en el
+            // propio círculo el + sigue visible en una esquina
+            child: !_conFoto
+              ? (agregar ? const Icon(Icons.add_rounded, color: Aftr.texto) :
+                  Text(nombre.isEmpty ? 'A' : nombre.substring(0, 1).toUpperCase(), style: Aftr.titular(28)))
+              : Stack(alignment: Alignment.bottomRight, children: [
+                  AvatarRemoto(nombre: nombre, foto: foto, archivo: archivo, radio: 27),
+                  if (agregar) Container(
+                    decoration: BoxDecoration(color: Aftr.acento, shape: BoxShape.circle,
+                      border: Border.all(color: Aftr.fondo, width: 2)),
+                    child: const Icon(Icons.add_rounded, size: 13, color: Aftr.fondo)),
+                ])),
         ),
         const SizedBox(height: 7),
         Text(nombre, maxLines: 1, overflow: TextOverflow.ellipsis, style: Aftr.cuerpo(11, c: Aftr.texto)),
@@ -324,6 +343,9 @@ class _VisorState extends ConsumerState<HistoriasVisor> with WidgetsBindingObser
               minHeight: 3, color: Aftr.texto, backgroundColor: Colors.white30, borderRadius: BorderRadius.circular(3))))]),
           const SizedBox(height: 8),
           Row(children: [
+            AvatarRemoto(nombre: '${_h['nombre'] ?? _h['autor'] ?? 'AFTR'}',
+              foto: _h['foto'] as String?, archivo: _h['foto_archivo'] as String?, radio: 16),
+            const SizedBox(width: 10),
             Expanded(child: Text('${_h['nombre'] ?? _h['autor'] ?? 'AFTR'}', style: Aftr.fuerte(16))),
             IconButton(onPressed: _opciones, icon: const Icon(Icons.more_horiz)),
             IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),

@@ -25,6 +25,24 @@ String extensionFoto(Uint8List bytes) {
   throw const FormatException('Elegí una foto JPG, PNG o WebP.');
 }
 
+/// Firma la foto de perfil de cualquiera para poder mostrarla (el bucket es
+/// privado: la URL dura una hora). Queda en caché por ruta, así el feed de
+/// historias no vuelve a pedirla al desplazarse.
+final fotoFirmadaProvider = FutureProvider.family<String?, String>((
+  ref,
+  ruta,
+) async {
+  try {
+    return await ref
+        .watch(supabaseProvider)
+        .storage
+        .from(bucketPerfil)
+        .createSignedUrl(ruta, 3600);
+  } catch (_) {
+    return null;
+  }
+});
+
 class FotoPerfilRepo {
   FotoPerfilRepo(this.sb);
   final SupabaseClient sb;

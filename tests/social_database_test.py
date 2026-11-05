@@ -12,12 +12,17 @@ alter table storage.objects enable row level security;
 grant usage on schema storage to anon,authenticated,service_role;
 grant select,insert,delete on storage.objects to authenticated;
 grant select on storage.objects to anon;
+-- stub de storage.foldername: alcanza para [1], la carpeta del dueño
+create function storage.foldername(name text) returns text[] language sql immutable as $$select string_to_array(name,'/')$$;
 create table link_visita(id bigserial primary key,rrpp_id uuid,evento_id uuid references eventos(id) on delete cascade,cliente_id uuid,at timestamptz default now());
 create table ingreso_sin_tope(user_id uuid,club_id text);
 create table intento_validacion(user_id uuid,evento_id uuid,ok boolean,at timestamptz default now());
 alter table registros add column qr_anulado boolean default false;
 ''')
 sql('set check_function_bodies=on;'+(root/'supabase/migrations/20261101004007_historias_reventa_oficial.sql').read_text())
+sql('alter table clubs add column if not exists logo_url text;')
+sql((root/'supabase/migrations/20261031234249_aftr_perfil_foto.sql').read_text())
+sql('set check_function_bodies=on;'+(root/'supabase/migrations/20261105070000_historias_foto_autor.sql').read_text())
 
 def uid(n): return f'00000000-0000-4000-8000-{n:012d}'
 C,B,OTHER,ADMIN,CLUBADMIN,EV,ENT,FASE=[uid(n) for n in range(1,9)]
@@ -161,5 +166,36 @@ class SocialDB(unittest.TestCase):
  def test_23_changed_promoter_role_cannot_keep_claiming_sales(self):
   h=self.rrpp_story();sql(f"update profiles set rol='portero' where id='{C}'")
   with self.assertRaisesRegex(AssertionError,'vigente'):sql(f"select aftr_comprar_historia('{h['id']}','{EV}',null,1)",B)
+
+ def story(self,user=C):
+  path=f'{user}/{uid(99)}.jpg'
+  sql(f"insert into storage.objects(bucket_id,name) values('aftr-historias','{path}');insert into aftr_media_validada values('{path}','{user}','imagen',5000,500,'sha',now());")
+  return history('publicar',{'storage_path':path,'identidad':'usuario'},user)
+ def test_24_story_carries_author_photo(self):
+  foto=f'{C}/0123456789abcdef.png'
+  sql(f"insert into storage.objects(bucket_id,name) values('aftr-perfiles','{foto}');update aftr_clientes set foto_archivo='{foto}' where user_id='{C}'")
+  self.story()
+  h=history('feed',None,B)['historias'][0]
+  self.assertEqual(h['foto_archivo'],foto)
+  # otro con sesión puede firmar la foto vigente, pero no los restos de una
+  # foto cambiada ni archivos que no son foto de nadie
+  self.assertEqual(sql(f"select count(*) from storage.objects where name='{foto}'",B,'authenticated'),'1')
+  viejo=f'{C}/fedcba9876543210.png'
+  sql(f"insert into storage.objects(bucket_id,name) values('aftr-perfiles','{viejo}')")
+  self.assertEqual(sql(f"select count(*) from storage.objects where name='{viejo}'",B,'authenticated'),'0')
+  self.assertEqual(sql(f"select count(*) from storage.objects where bucket_id='aftr-perfiles'",C,'authenticated'),'2')
+ def test_25_story_without_photo_keeps_feed_working(self):
+  self.story()
+  h=history('feed',None,B)['historias'][0]
+  self.assertIsNone(h['foto_archivo']);self.assertIsNone(h['foto'])
+
+ def test_26_offer_without_account_number_needs_qr(self):
+  # publicar con QR de cobro y sin número de cuenta tiene que alcanzar
+  qr=f'{C}/{uid(700)}.jpg';sql(f"insert into storage.objects(bucket_id,name) values('aftr-p2p','{qr}')")
+  metodo={'titular':'Seller Name','banco':'Banco','cuenta':''}
+  with self.assertRaisesRegex(AssertionError,'titular'):call('publicar',{'entrada_id':ENT,'precio_centavos':7000,'metodo':metodo,'client_key':uid(701)})
+  f=call('publicar',{'entrada_id':ENT,'precio_centavos':7000,'metodo':{**metodo,'qr_path':qr},'client_key':uid(702)})
+  o=call('comprar',{'oferta_id':f['id'],'client_key':uid(703)},B)
+  self.assertEqual(call('orden',{'id':o['id']},B)['metodo']['qr_path'],qr)
 
 unittest.main(argv=[sys.argv[0]],verbosity=2)

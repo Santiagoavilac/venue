@@ -90,6 +90,24 @@
       }
       return path;
     }
+    // La foto de perfil del autor de una historia. Viene como URL (logo del
+    // boliche) o como ruta del bucket privado, que se firma una sola vez por
+    // ruta y se reusa en todo el feed.
+    const fotosDeAutor=new Map();
+    function fotoDeAutor(h) {
+      if(h?.foto)return Promise.resolve(h.foto);
+      const ruta=h?.foto_archivo;if(!ruta)return Promise.resolve(null);
+      if(!fotosDeAutor.has(ruta))fotosDeAutor.set(ruta,sign('aftr-perfiles',ruta,3600).catch(()=>null));
+      return fotosDeAutor.get(ruta);
+    }
+    // Pinta la foto sobre el círculo donde ya está la inicial: si no hay foto o
+    // falla la firma, la inicial queda como estaba.
+    async function pintarFoto(el,h) {
+      if(!el)return;
+      const url=await fotoDeAutor(h);
+      if(!url||!el.isConnected)return;
+      el.style.backgroundImage=`url("${encodeURI(url)}")`;el.classList.add('so-con-foto');
+    }
     const errorBox = (text,action='Reintentar') => `<div class="so-empty"><span class="so-empty-icon">↻</span><p>${html(text)}</p><button class="so-btn so-secondary" data-retry>${action}</button></div>`;
     const heading = (over,title,sub='') => `<div class="so-heading"><span class="so-eyebrow">${html(over)}</span><h1>${html(title)}</h1>${sub?`<p>${html(sub)}</p>`:''}</div>`;
     const cardOrder = o => `<button type="button" class="so-order-card" data-order="${html(o.id)}"><div><span class="so-state ${html(o.estado)}">${html(estado(o.estado))}</span><h3>${html(nombre(o.evento))}</h3><small>${html(o.vendedor||o.comprador||fecha(o.created_at))}</small></div><div><strong>${dinero(o.precio_centavos)}</strong><span>Ver operación ↗</span></div></button>`;
@@ -103,6 +121,7 @@
           container.innerHTML=`<div class="social so-feed"><button type="button" class="so-story-add" data-create-story><span>+</span><small>Tu historia</small></button>${groups.map((g,i)=>`<button type="button" class="so-story-author" data-group="${i}"><span class="so-ring"><span>${html((g[0].nombre||g[0].autor||'?').slice(0,2).toUpperCase())}</span></span><small>${html(g[0].nombre||g[0].autor)}</small>${g[0].identidad!=='usuario'?`<i>${g[0].identidad==='club'?'Boliche':'RRPP'}</i>`:''}</button>`).join('')}${!groups.length?'<p class="so-feed-empty">La noche empieza acá.<br><span>Compartí tu primera historia.</span></p>':''}</div>`;
           bind(container,'[data-create-story]',async()=>{if(await auth())await composer();});
           bind(container,'[data-group]',b=>viewer(groups,Number(b.dataset.group)));
+          container.querySelectorAll('[data-group]').forEach(b=>void pintarFoto(b.querySelector('.so-ring>span'),groups[Number(b.dataset.group)][0]));
         }catch(e){if(container.isConnected){container.innerHTML=`<div class="social so-feed-error">Historias no disponibles <button data-retry>Reintentar</button></div>`;bind(container,'[data-retry]',refresh);}}
       };
       feedRefresh=refresh;await refresh();
@@ -126,6 +145,7 @@
         if(Date.parse(current.vence_at)<=now()){notify('Esta historia ya venció.');next();return;}
         box.innerHTML=`<div class="so-story-stage"><div class="so-story-media"><span class="so-loading">Cargando historia…</span></div><div class="so-story-top"><div class="so-segments">${groups[gi].map((_,i)=>`<span><i style="transform:scaleX(${i<si?1:0})" data-segment="${i}"></i></span>`).join('')}</div><div class="so-story-id"><span class="so-avatar">${html((current.nombre||current.autor||'?').slice(0,2))}</span><div><strong>${html(current.nombre||current.autor)}</strong><small>${html(fecha(current.created_at))}</small></div><button type="button" class="so-icon" data-story-pause aria-label="Pausar historia">Ⅱ</button>${current.tipo==='video'?'<button type="button" class="so-icon" data-sound aria-label="Activar sonido">♫</button>':''}<button type="button" class="so-icon" data-story-menu aria-label="Opciones de historia">⋯</button></div></div><div class="so-story-foot">${current.evento_id?`<p>${html(nombre(current.evento))}</p>`:''}${current.cta?`<button class="so-btn" data-story-cta>${current.cta==='mesa'?'Reservar mesa':'Comprar entradas'} ↗</button>`:''}</div></div>`;
         const stage=q('.so-story-stage',box);const media=q('.so-story-media',box);
+        void pintarFoto(q('.so-avatar',box),current);
         bind(box,'[data-story-pause]',b=>{held=!held;b.textContent=held?'▶':'Ⅱ';if(video){if(held)video.pause();else video.play().catch(()=>{});}});
         bind(box,'[data-sound]',b=>{if(video){video.muted=!video.muted;b.textContent=video.muted?'♫':'♪';b.setAttribute('aria-label',video.muted?'Activar sonido':'Silenciar');}});
         bind(box,'[data-story-menu]',async()=>{
@@ -212,12 +232,16 @@
     async function sell(entries=null,selectedId=null) {
       if(!(await auth()))return;
       if(!entries)entries=(await resale('mias')).entradas||[];
-      const box=modal('Vendé tu entrada',`<p class="so-muted">Al publicarla, tu entrada queda bloqueada para ingreso y transferencias. Podés retirarla mientras nadie la haya reservado.</p>${!entries.length?'<div class="so-empty"><p>No tenés entradas habilitadas para reventa. El boliche debe permitirla y la entrada debe estar pagada y sin uso.</p></div>':`<form class="so-form" data-sell-form><label>Entrada<select name="entrada_id">${entries.map(e=>`<option value="${html(e.id)}" ${e.id===selectedId?'selected':''}>${html(nombre(e.evento))} · ${html(e.code||e.id.slice(0,8))}</option>`).join('')}</select></label><label>Precio de venta (Bs)<input name="precio" inputmode="decimal" placeholder="100.00" required></label><h3>¿Dónde te pagan?</h3><label>Titular de la cuenta<input name="titular" autocomplete="name" maxlength="100" required></label><label>Banco<input name="banco" maxlength="100" required></label><label>Número de cuenta<input name="cuenta" inputmode="numeric" maxlength="60" required></label><label>QR de cobro (opcional)<input type="file" data-bank-qr accept="image/jpeg,image/png,image/webp"></label><p class="so-muted">Los datos de cobro se muestran únicamente al comprador que reserve la entrada. AFTR no cobra comisión por esta reventa.</p><label class="so-check"><input type="checkbox" required> Entiendo que debo confirmar el dinero recibido para entregar la entrada.</label><div class="so-form-error" role="alert" data-error></div><button class="so-btn">Publicar entrada</button></form>`}`);
+      const box=modal('Vendé tu entrada',`<p class="so-muted">Al publicarla, tu entrada queda bloqueada para ingreso y transferencias. Podés retirarla mientras nadie la haya reservado.</p>${!entries.length?'<div class="so-empty"><p>No tenés entradas habilitadas para reventa. El boliche debe permitirla y la entrada debe estar pagada y sin uso.</p></div>':`<form class="so-form" data-sell-form><label>Entrada<select name="entrada_id">${entries.map(e=>`<option value="${html(e.id)}" ${e.id===selectedId?'selected':''}>${html(nombre(e.evento))} · ${html(e.code||e.id.slice(0,8))}</option>`).join('')}</select></label><label>Precio de venta (Bs)<input name="precio" inputmode="decimal" placeholder="100.00" required></label><h3>¿Dónde te pagan?</h3><label>Titular de la cuenta<input name="titular" autocomplete="name" maxlength="100" required></label><label>Banco<input name="banco" maxlength="100" required></label><label>Número de cuenta (opcional si adjuntás tu QR)<input name="cuenta" inputmode="numeric" maxlength="60"></label><label>QR de cobro<input type="file" data-bank-qr accept="image/jpeg,image/png,image/webp"></label><p class="so-muted">Los datos de cobro se muestran únicamente al comprador que reserve la entrada. AFTR no cobra comisión por esta reventa.</p><label class="so-check"><input type="checkbox" required> Entiendo que debo confirmar el dinero recibido para entregar la entrada.</label><div class="so-form-error" role="alert" data-error></div><button class="so-btn">Publicar entrada</button></form>`}`);
       if(!entries.length)return;
       const form=q('form',box),key=crypto.randomUUID();let qrPath=null;
       q('[data-bank-qr]',box).onchange=()=>qrPath=null;
       form.onsubmit=async e=>{e.preventDefault();const b=q('button',form);if(b.disabled)return;b.disabled=true;
-        try {const price=centavos(form.elements.precio.value);if(price===null)throw new Error('Ingresá un precio válido con hasta dos decimales.');const f=q('[data-bank-qr]',form).files[0];if(f&&!qrPath)qrPath=await upload(f,'aftr-p2p');
+        try {const price=centavos(form.elements.precio.value);if(price===null)throw new Error('Ingresá un precio válido con hasta dos decimales.');const f=q('[data-bank-qr]',form).files[0];
+          // con el QR adjunto ya hay cómo pagar: el número de cuenta solo es
+          // obligatorio cuando no hay QR
+          if(!form.elements.cuenta.value.trim()&&!f&&!qrPath)throw new Error('Poné el número de cuenta o adjuntá tu QR de cobro.');
+          if(f&&!qrPath)qrPath=await upload(f,'aftr-p2p');
           await resale('publicar',{entrada_id:form.elements.entrada_id.value,precio_centavos:price,metodo:{titular:form.elements.titular.value.trim(),banco:form.elements.banco.value.trim(),cuenta:form.elements.cuenta.value.trim(),qr_path:qrPath},client_key:key});notify('Entrada publicada. El QR está bloqueado mientras esté en venta.');await op.walletRefresh?.();await mineResale();
         }catch(err){q('[data-error]',form).textContent=err.message;}finally{if(b.isConnected)b.disabled=false;}
       };
@@ -240,7 +264,7 @@
           ${o.estado==='completada'?`<div class="so-callout so-success">${buyer?'Tu entrada nueva ya está en Accesos. El QR anterior quedó invalidado.':'La entrada fue entregada con un QR nuevo.'}</div>`:''}
           ${['vencida','cancelada'].includes(o.estado)?'<div class="so-callout">El plazo terminó. No realices una transferencia. Si ya pagaste, abrí una disputa.</div>':''}
           ${o.estado==='en_disputa'?'<div class="so-callout">La entrada permanece bloqueada. Solo la administración de AFTR puede resolver esta disputa. Adjuntá los datos necesarios en el historial.</div>':''}
-          ${o.metodo?`<section class="so-panel"><span class="so-eyebrow">${buyer?'PAGÁ DIRECTAMENTE AL VENDEDOR':'DATOS DE COBRO'}</span><dl><dt>Titular</dt><dd>${html(o.metodo.titular)}</dd><dt>Banco</dt><dd>${html(o.metodo.banco)}</dd><dt>Cuenta</dt><dd>${html(o.metodo.cuenta)}</dd></dl>${o.metodo.qr_path?'<button class="so-btn so-secondary" data-bank-image>Ver QR de cobro</button>':''}</section>`:''}
+          ${o.metodo?`<section class="so-panel"><span class="so-eyebrow">${buyer?'PAGÁ DIRECTAMENTE AL VENDEDOR':'DATOS DE COBRO'}</span><dl><dt>Titular</dt><dd>${html(o.metodo.titular)}</dd><dt>Banco</dt><dd>${html(o.metodo.banco)}</dd>${o.metodo.cuenta?`<dt>Cuenta</dt><dd>${html(o.metodo.cuenta)}</dd>`:''}</dl>${o.metodo.qr_path?'<button class="so-btn so-secondary" data-bank-image>Ver QR de cobro</button>':''}</section>`:''}
           ${seller&&o.estado==='pago_informado'?'<p class="so-muted">Verificá el abono en tu banco. Confirmar entrega la entrada de forma definitiva.</p><button class="so-btn" data-confirm>Confirmar dinero recibido y entregar</button>':''}
           <div class="so-actions">${buyer&&['vencida','cancelada'].includes(o.estado)&&!o.resolucion?'<button class="so-link so-danger" data-dispute>Pagué fuera de plazo · Abrir disputa</button>':''}${(buyer&&o.estado==='pendiente_pago')?'<button class="so-link so-danger" data-cancel>Cancelar operación</button>':''}${(buyer||seller)&&['pago_informado','pendiente_pago'].includes(o.estado)?'<button class="so-link" data-dispute>Abrir disputa</button>':''}${o.comprobante_path?'<button class="so-link" data-proof>Ver comprobante</button>':''}</div><div data-proof-form></div>
           <h3 class="so-section-title">Historial de la operación</h3><div class="so-timeline">${(o.historial||[]).map(h=>`<article><span class="so-timeline-dot"></span><div><small>${html(h.autor||'AFTR')} · ${html(fecha(h.created_at))}</small><p>${html(h.texto||estado(h.tipo))}</p>${h.archivo_path?`<button class="so-link" data-file="${html(h.archivo_path)}">Ver archivo adjunto</button>`:''}</div></article>`).join('')||'<p class="so-muted">Operación creada.</p>'}</div>${active&&(buyer||seller||o.puede_resolver)?'<form class="so-form" data-message-form><label>Agregar información<textarea name="texto" rows="2" maxlength="1000" required placeholder="Dejá un mensaje para los participantes y AFTR"></textarea></label><label>Archivo adjunto (opcional)<input name="archivo" type="file" accept="image/jpeg,image/png,image/webp"></label><button class="so-btn so-secondary">Enviar al historial</button></form>':''}

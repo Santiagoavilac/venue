@@ -153,6 +153,7 @@ class _PublicarReventaState extends ConsumerState<PublicarReventaScreen> {
     if (!_publicada && _qrPath != null) _repo?.borrar('aftr-p2p', _qrPath!);
     super.dispose();
   }
+  bool get _tieneQr => _qr != null || _qrPath != null;
   Future<void> _elegirQr() async {
     try {
       final archivo = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 90);
@@ -162,6 +163,7 @@ class _PublicarReventaState extends ConsumerState<PublicarReventaScreen> {
       if (!mounted) return;
       if (_qrPath != null) { await _repo!.borrar('aftr-p2p', _qrPath!); _qrPath = null; }
       setState(() => _qr = b);
+      _form.currentState?.validate();
     } catch (e) { if (mounted) setState(() => _error = mensajeDeError(e)); }
   }
   Future<void> _publicar() async {
@@ -200,13 +202,22 @@ class _PublicarReventaState extends ConsumerState<PublicarReventaScreen> {
         TextFormField(controller: _precio, enabled: !_ocupado, keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: const InputDecoration(labelText: 'Precio en Bs', hintText: '150.00'),
           validator: (v) => (centavosDe(v ?? '') ?? 0) <= 0 ? 'Ingresá un precio mayor a cero, con hasta dos decimales.' : null),
-        const SizedBox(height: 26), Text('Dónde vas a recibir el pago', style: Aftr.fuerte(19)), const SizedBox(height: 14),
-        for (final campo in [(_titular, 'Titular de la cuenta'), (_banco, 'Banco'), (_cuenta, 'Número de cuenta')]) ...[
+        const SizedBox(height: 26), Text('Dónde vas a recibir el pago', style: Aftr.fuerte(19)), const SizedBox(height: 8),
+        Text('Alcanza con el QR de cobro: el número de cuenta solo hace falta si no adjuntás uno.', style: Aftr.cuerpo(13)),
+        const SizedBox(height: 14),
+        for (final campo in [(_titular, 'Titular de la cuenta'), (_banco, 'Banco')]) ...[
           TextFormField(controller: campo.$1, enabled: !_ocupado, maxLength: 120,
             decoration: InputDecoration(labelText: campo.$2),
             validator: (v) => (v ?? '').trim().isEmpty ? 'Completá este dato.' : null), const SizedBox(height: 10)],
+        // con QR adjunto el comprador ya tiene cómo pagar: pedir además el
+        // número de cuenta dejaba la publicación trabada sin motivo
+        TextFormField(controller: _cuenta, enabled: !_ocupado, maxLength: 120,
+          decoration: InputDecoration(labelText: 'Número de cuenta${_tieneQr ? ' (opcional)' : ''}'),
+          validator: (v) => _tieneQr || (v ?? '').trim().isNotEmpty ? null
+            : 'Poné el número de cuenta o adjuntá tu QR de cobro.'),
+        const SizedBox(height: 10),
         if (_qr != null) SizedBox(height: 180, child: Image.memory(_qr!, fit: BoxFit.contain)),
-        OutlinedButton.icon(onPressed: _ocupado ? null : _elegirQr, icon: const Icon(Icons.qr_code_2), label: Text(_qr == null ? 'Adjuntar QR de cobro (opcional)' : 'Cambiar QR de cobro')),
+        OutlinedButton.icon(onPressed: _ocupado ? null : _elegirQr, icon: const Icon(Icons.qr_code_2), label: Text(_qr == null ? 'Adjuntar QR de cobro' : 'Cambiar QR de cobro')),
         const SizedBox(height: 14), Text('Cuando alguien compre, revisá el ingreso en tu banco antes de confirmar. Al confirmar, tu QR de entrada se invalida definitivamente.', style: Aftr.cuerpo(13)),
         if (_error != null) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text(_error!, style: Aftr.cuerpo(14, c: Aftr.alerta))),
         const SizedBox(height: 20), BotonAftr('Publicar entrada', cargando: _ocupado, onTap: entradas.isEmpty ? null : _publicar),
@@ -318,7 +329,7 @@ class _OrdenState extends ConsumerState<OrdenReventaScreen> {
             Text('Datos para pagar al vendedor', style: Aftr.fuerte(19)), const SizedBox(height: 12),
             _PanelReventa(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               for (final campo in [('Titular', metodo['titular']), ('Banco', metodo['banco']), ('Cuenta', metodo['cuenta'])])
-                Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [Expanded(child: SelectableText('${campo.$1}: ${campo.$2 ?? ''}', style: Aftr.cuerpo(14, c: Aftr.texto))),
+                if ('${campo.$2 ?? ''}'.trim().isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [Expanded(child: SelectableText('${campo.$1}: ${campo.$2 ?? ''}', style: Aftr.cuerpo(14, c: Aftr.texto))),
                   IconButton(tooltip: 'Copiar ${campo.$1.toLowerCase()}', onPressed: () => Clipboard.setData(ClipboardData(text: '${campo.$2 ?? ''}')), icon: const Icon(Icons.copy_outlined, size: 18))])),
               if (metodo['qr_path'] != null) ImagenP2p(path: '${metodo['qr_path']}'),
             ])),
