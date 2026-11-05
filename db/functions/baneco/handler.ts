@@ -6,7 +6,8 @@ import { Banco, type Datos, type Entorno, ErrorBanco } from "./bank.ts";
    El webhook del banco y la app nativa no mandan Origin: ahí no hay nada que
    autorizar en el navegador, y el permiso real lo da el token de la petición. */
 const PROPIOS = [
-  "https://aftrvenue.com", "https://www.aftrvenue.com",
+  "https://www.aftrvenue.com", "https://aftrvenue.com",
+  "https://aftr-web.vercel.app", "https://venue-web-amber.vercel.app",
   "http://localhost:5173", "http://localhost:8000", "http://127.0.0.1:5173",
 ];
 const BASE_CORS = {

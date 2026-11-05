@@ -111,6 +111,33 @@ class _AccesosScreenState extends ConsumerState<AccesosScreen> {
                 ],
               ),
             ),
+            // Quien compró sin cuenta: sus entradas están, pero viven en este
+            // teléfono. Se lo decimos una vez, arriba, sin bloquear nada.
+            if (ref.watch(esAnonimoProvider))
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Aftr.superficie2,
+                  borderRadius: BorderRadius.circular(Aftr.radio),
+                  border: Border.all(color: Aftr.borde),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Tus entradas viven en este teléfono', style: Aftr.fuerte(16)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Entrá con Google o Apple y te siguen a cualquier lado. '
+                    'También se te habilitan PULSE, mesas, historias y reventa.',
+                    style: Aftr.cuerpo(13),
+                  ),
+                  const SizedBox(height: 14),
+                  BotonAftr(
+                    'Guardar mi cuenta',
+                    secundario: true,
+                    onTap: () => asegurarCuenta(context, ref),
+                  ),
+                ]),
+              ),
             for (final p in accesos?.revisar ?? const <PagoEnRevision>[])
               AvisoPagoTarde(
                 monto: p.monto,

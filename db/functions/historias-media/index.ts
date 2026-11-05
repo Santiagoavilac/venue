@@ -5,7 +5,8 @@ import { validarMedio } from './media.ts';
    y localhost para desarrollo. Se pueden agregar por la variable
    ORIGENES_PERMITIDOS sin tocar el código. */
 const propios = [
-  'https://aftrvenue.com', 'https://www.aftrvenue.com',
+  'https://www.aftrvenue.com', 'https://aftrvenue.com',
+  'https://aftr-web.vercel.app', 'https://venue-web-amber.vercel.app',
   'http://localhost:5173', 'http://localhost:8000', 'http://127.0.0.1:5173',
 ];
 const permitidos = () => [

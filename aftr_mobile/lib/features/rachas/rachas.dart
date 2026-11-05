@@ -16,7 +16,9 @@ class LlamaDeRacha extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(usuarioIdProvider) == null) return const SizedBox.shrink();
+    // Con sesión anónima no se pide: las rachas piden cuenta de verdad y el
+    // servidor contesta con un error que no tiene sentido mostrar acá.
+    if (!ref.watch(conCuentaProvider)) return const SizedBox.shrink();
     final r = ref.watch(rachasProvider).value;
     // mientras no se sabe no se dibuja nada: la cabecera no tiene que saltar
     if (r == null) return const SizedBox.shrink();

@@ -20,6 +20,19 @@ final usuarioIdProvider = Provider<String?>(
   (ref) => ref.watch(sesionProvider).value?.user.id,
 );
 
+/// La sesión es anónima: la que se crea sola al comprar sin cuenta. Sirve para
+/// que la entrada tenga dueño y el QR aparezca en Accesos, pero se pierde con
+/// el teléfono, así que PULSE, mesas, historias, reventa y rachas piden una
+/// cuenta de verdad.
+final esAnonimoProvider = Provider<bool>(
+  (ref) => ref.watch(sesionProvider).value?.user.isAnonymous ?? false,
+);
+
+/// Hay cuenta de verdad: alguien entró con Google o Apple.
+final conCuentaProvider = Provider<bool>(
+  (ref) => ref.watch(usuarioIdProvider) != null && !ref.watch(esAnonimoProvider),
+);
+
 bool esFallaDeRed(Object e) {
   if (e is PostgrestException || e is AuthApiException) return false;
   if (e is SocketException || e is TimeoutException || e is HandshakeException) {

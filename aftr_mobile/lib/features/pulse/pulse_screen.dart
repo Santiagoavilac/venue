@@ -166,6 +166,10 @@ class _ElegirPagoState extends ConsumerState<_ElegirPago> {
   @override
   Widget build(BuildContext context) {
     final saldo = ref.watch(pulseSaldoProvider);
+    // Quien compró sin cuenta no tiene PULSE: el saldo es plata y vive en la
+    // cuenta, no en el teléfono. Para ese caso queda el QR del banco, que es
+    // lo que vino a hacer.
+    final conCuenta = ref.watch(conCuentaProvider);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -176,13 +180,15 @@ class _ElegirPagoState extends ConsumerState<_ElegirPago> {
             Text(widget.titulo, style: Aftr.fuerte(24)),
             const SizedBox(height: 12),
             Text(
-              saldo.hasValue
+              !conCuenta
+                  ? 'Pagá con el QR de tu banco. Tu entrada queda en Accesos.'
+                  : saldo.hasValue
                   ? 'Tu saldo: ${importePulse(saldo.value!['saldo_centavos'])} PULSE'
                   : 'Tu saldo se verifica al pagar.',
               style: Aftr.cuerpo(15),
             ),
             const SizedBox(height: 24),
-            BotonAftr(
+            if (conCuenta) BotonAftr(
               ocupado ? 'Procesando…' : 'Pagar con PULSE',
               onTap: ocupado
                   ? null
@@ -209,10 +215,10 @@ class _ElegirPagoState extends ConsumerState<_ElegirPago> {
                       }
                     },
             ),
-            const SizedBox(height: 12),
+            if (conCuenta) const SizedBox(height: 12),
             BotonAftr(
               'Pagar con QR',
-              secundario: true,
+              secundario: !conCuenta ? false : true,
               onTap: ocupado
                   ? null
                   : () async {

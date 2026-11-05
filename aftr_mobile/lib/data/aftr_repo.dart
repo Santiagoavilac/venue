@@ -123,6 +123,23 @@ class AftrRepo {
 
   /// Crea el pedido y devuelve su id. Se paga con QR del banco (o lo
   /// confirma el boliche a mano); recién ahí salen las entradas.
+  /// Los datos de quien compra sin cuenta. Crea su perfil y deja anotado que
+  /// declaró ser mayor de 18 y que aceptó los términos, con la fecha.
+  Future<void> datosDeCompra({
+    required String nombre,
+    required String apellido,
+    required String email,
+    required String ci,
+    String telefono = '',
+  }) => _rpc('aftr_datos_de_compra', {
+    'p_nombre': nombre.trim(),
+    'p_apellido': apellido.trim(),
+    'p_email': email.trim(),
+    'p_ci': ci.trim(),
+    'p_telefono': telefono.trim().isEmpty ? null : telefono.trim(),
+    'p_acepta': true,
+  });
+
   /// [clave] es la del toque, no la de la llamada: con el celular lento, dos
   /// toques o un reintento de red crearían dos pedidos y el cupo quedaría
   /// retenido dos veces. Mandando la misma clave, el servidor devuelve el

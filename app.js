@@ -1454,6 +1454,14 @@ async function screenEntradas() {
             <small style="color:var(--text-muted)">Uno por línea. Máximo 40 por tanda.</small>
           </div>
           <div id="enResumen" class="iv-resumen">Escribí al menos un nombre.</div>
+          <!-- Los boliches que no venden por AFTR exigen la foto del pago: sin
+               esto, desde la compu no se podía generar ninguna entrada con
+               precio. Se sube una vez y vale para toda la tanda. -->
+          <div class="field" id="enComp" hidden>
+            <label for="tnComp">Comprobante del pago</label>
+            <input type="file" id="tnComp" accept="image/*">
+            <small style="color:var(--text-muted)">El cliente te paga por fuera y te manda la captura. Queda pegada a cada entrada de esta tanda.</small>
+          </div>
           <button class="btn primary" id="btnGen">Generar entradas</button>
         </div>`;
 
@@ -1492,6 +1500,15 @@ async function screenEntradas() {
     });
   };
 
+  // el campo del comprobante sólo donde hace falta: si el boliche no lo exige
+  // no se le pone un paso más a nadie
+  (async () => {
+    try {
+      const { data } = await sb.from("clubs").select("exige_comprobante").eq("id", club).single();
+      const caja = $("#enComp");
+      if (caja && data?.exige_comprobante) caja.hidden = false;
+    } catch {}
+  })();
   conectarGenerar();
   function conectarGenerar() {
   const btn = $("#btnGen");
@@ -1500,10 +1517,20 @@ async function screenEntradas() {
     if (!nombres.length) return toast("Pegá al menos un nombre", "warn");
     if (nombres.length > 40) return toast("Máximo 40 por tanda", "warn");
     btn.disabled = true;
+    let comprobante = null;
+    const archivo = $("#tnComp")?.files?.[0];
+    if (archivo) {
+      try {
+        btn.textContent = "Subiendo comprobante…";
+        comprobante = await subirComprobanteEntrada(archivo);
+      } catch (e) { btn.disabled = false; return toast(e.message || "No se pudo subir el comprobante", "warn"); }
+    }
     let ok = 0, ultima = null, corte = null; const creados = [];
     for (const nm of nombres) {
       btn.textContent = `Generando ${ok + 1}/${nombres.length}…`;
-      const { data, error: e2 } = await sb.rpc("generar_entrada", { p_evento: ev.id, p_cliente: nm });
+      const { data, error: e2 } = await sb.rpc("generar_entrada", {
+        p_evento: ev.id, p_cliente: nm,
+        p_comprobante_url: comprobante, p_metodo: comprobante ? "transferencia" : null });
       if (e2) { corte = e2.message; break; }
       ok++; ultima = data; creados.push(data.code);
     }
@@ -7940,6 +7967,17 @@ async function sheetContabilidad(pendientes) {
     });
   };
   bind();
+}
+
+/* la foto del pago de una tanda de entradas: una sola para todas */
+async function subirComprobanteEntrada(file) {
+  const dataUrl = await comprimirImg(file, 1100, 0.8);
+  const blob = await dataUrlToBlob(dataUrl);
+  const path = `${me.id}/entrada-${Date.now()}.jpg`;
+  const { error } = await sb.storage.from("comprobantes").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+  if (error) throw error;
+  const { data: { publicUrl } } = sb.storage.from("comprobantes").getPublicUrl(path);
+  return publicUrl;
 }
 
 /* sube la foto del comprobante a Storage y devuelve su URL pública */

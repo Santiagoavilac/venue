@@ -83,7 +83,8 @@ class _EventoScreenState extends ConsumerState<EventoScreen> {
   }
 
   Future<void> _comprar(EventoDetalle d) async {
-    if (!await asegurarCuenta(context, ref)) return;
+    // Comprar no pide cuenta: pide los datos de la entrada una sola vez.
+    if (!await asegurarParaComprar(context, ref)) return;
     if (!mounted) return;
     final fase = d.ventaPorFases ? (d.fases.where((f) => f.id == _fase && f.comprable).firstOrNull ?? d.faseActual) : null;
     await abrirCompra(context, d, fase, historia: widget.historia);
