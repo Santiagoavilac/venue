@@ -113,10 +113,12 @@ trabajo. Última actualización: 2026-11-05.
       Dos arreglos que hacían falta para esto: un paso sin objetivo dejaba la
       pantalla negra (se dibujaba el velo y no la tarjeta) y además se quedaba
       con el agujero del paso anterior
-- [~] Mesas ya tiene la suya (el plano, qué significa cada ícono, acomodar el
-      plano si es admin, y mirar de qué evento son las mesas). Faltan Accesos,
-      Pagos y Gestión de evento
-- [ ] Tutorial en `RrppShell` (hoy los relacionadores no tienen ninguno)
+- [x] Mesas, Accesos, Pagos y Gestión tienen la suya, con los pasos del flujo
+      real de cada una. La de Pagos cambia según quien mire: el que rinde ve
+      cómo se arma su cuenta; el que cobra, qué verificar antes de marcar
+- [x] `RrppShell` tiene la suya: su espacio, los eventos y el enlace, las
+      ganancias con sus tres estados, y que el historial es suyo aunque lo
+      saquen de un boliche
 - [x] Los colores salen de `Oscuro`, no de hexadecimales sueltos (quedó hecho
       al unificar la paleta)
 

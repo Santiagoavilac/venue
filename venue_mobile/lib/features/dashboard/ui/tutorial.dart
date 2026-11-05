@@ -347,6 +347,9 @@ class _GuiaDePantallaState extends ConsumerState<GuiaDePantalla> {
     final pasos = widget.pasos();
     if (pasos.isEmpty) return widget.child;
     return Stack(
+      // la guía cubre la pantalla entera: sin esto se encoge al tamaño del
+      // contenido y la tarjeta queda apretada en una esquina
+      fit: StackFit.expand,
       children: [
         widget.child,
         Positioned.fill(

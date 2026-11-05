@@ -25,6 +25,7 @@ import 'gestion_solicitudes.dart';
 import '../../../core/widgets/insignia.dart';
 import '../../../core/widgets/esqueleto.dart';
 import '../../../core/widgets/estado_vista.dart';
+import '../../dashboard/ui/tutorial.dart';
 
 const _aftr = 'https://www.aftrvenue.com/';
 
@@ -101,7 +102,41 @@ class _RrppShellState extends ConsumerState<RrppShell> {
         ),
       ),
     );
-    return Scaffold(
+    return GuiaDePantalla(
+      guia: 'rrpp',
+      pasos: () => const [
+        PasoTutorial(
+          icono: Icons.home_rounded,
+          titulo: 'Tu espacio',
+          texto: 'Acá está lo tuyo en todos los boliches donde trabajás: lo que '
+              'vendiste, lo que entró y lo que te queda por cobrar.',
+          objetivo: _sinFlechaRrpp,
+        ),
+        PasoTutorial(
+          icono: Icons.event_rounded,
+          titulo: 'Eventos',
+          texto: 'Los que vienen y los que ya trabajaste. Desde un evento '
+              'próximo sacás tu enlace para compartir y anotar invitados.',
+          objetivo: _sinFlechaRrpp,
+        ),
+        PasoTutorial(
+          icono: Icons.account_balance_wallet_rounded,
+          titulo: 'Ganancias',
+          texto: 'Tu comisión evento por evento, con su estado: estimada '
+              'mientras la noche sigue, por cobrar cuando el evento cerró, y '
+              'pagada cuando el boliche la marca.',
+          objetivo: _sinFlechaRrpp,
+        ),
+        PasoTutorial(
+          icono: Icons.person_rounded,
+          titulo: 'Tus boliches',
+          texto: 'En Perfil están los boliches con los que trabajás y podés '
+              'pedir unirte a otros. Tu historial es tuyo y queda aunque te '
+              'saquen de un boliche.',
+          objetivo: _sinFlechaRrpp,
+        ),
+      ],
+      child: Scaffold(
       backgroundColor: VenueColors.fondo,
       body: ancho
           ? Row(children: [
@@ -127,9 +162,13 @@ class _RrppShellState extends ConsumerState<RrppShell> {
                   NavigationDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: d.$3),
               ],
             ),
+      ),
     );
   }
 }
+
+/// Los pasos que explican el espacio entero no apuntan a ningún botón.
+Rect? _sinFlechaRrpp() => null;
 
 // ── piezas comunes ──────────────────────────────────────────────────────
 

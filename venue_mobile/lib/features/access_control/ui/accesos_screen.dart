@@ -11,6 +11,7 @@ import '../../tickets/ui/entradas_screen.dart';
 import 'escaner_screen.dart';
 import '../../events/ui/cambiar_evento.dart';
 import '../../events/data/gestion.dart';
+import '../../dashboard/ui/tutorial.dart';
 
 /// Accesos para quien vende: Listas, Entradas y —para quien valida en la
 /// puerta— Escáner. El resumen de números está en la tarjeta del evento.
@@ -37,7 +38,33 @@ class AccesosScreen extends ConsumerWidget {
         ref.invalidate(numerosEventoProvider(ev.id));
       });
     }
-    return DefaultTabController(
+    return GuiaDePantalla(
+      guia: 'accesos',
+      pasos: () => [
+        const PasoTutorial(
+          icono: Icons.format_list_bulleted_rounded,
+          titulo: 'Listas',
+          texto: 'Acá anotás invitados y los marcás cuando llegan. Cada lista '
+              'tiene su cupo y su hora límite, que pone el boliche.',
+          objetivo: _sinFlecha,
+        ),
+        const PasoTutorial(
+          icono: Icons.qr_code_2_rounded,
+          titulo: 'Entradas',
+          texto: 'Las entradas prepagadas con QR. Desde acá se venden, se '
+              'reenvían y se ve cuáles ya se usaron.',
+          objetivo: _sinFlecha,
+        ),
+        if (conEscaner)
+          const PasoTutorial(
+            icono: Icons.qr_code_scanner_rounded,
+            titulo: 'Escáner',
+            texto: 'En la puerta, el escáner valida el QR y marca el ingreso. '
+                'Un QR ya usado avisa en rojo y no deja pasar dos veces.',
+            objetivo: _sinFlecha,
+          ),
+      ],
+      child: DefaultTabController(
       length: conEscaner ? 3 : 2,
       child: Column(
         children: [
@@ -62,9 +89,13 @@ class AccesosScreen extends ConsumerWidget {
           ),
         ],
       ),
+      ),
     );
   }
 }
+
+/// Los pasos que explican una pantalla entera no apuntan a ningún botón.
+Rect? _sinFlecha() => null;
 
 /// Un ingreso ya ocurrido, de lista o de entrada, para el Historial.
 class Ingreso {

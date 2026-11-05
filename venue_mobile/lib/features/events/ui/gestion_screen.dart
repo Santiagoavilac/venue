@@ -22,6 +22,7 @@ import '../../analytics/data/reporte.dart';
 import '../data/eventos.dart';
 import '../data/gestion.dart';
 import 'hero_evento.dart';
+import '../../dashboard/ui/tutorial.dart';
 
 Future<T?> _hoja<T>(BuildContext context, Widget child) =>
     showModalBottomSheet<T>(
@@ -178,7 +179,40 @@ class GestionEventosScreen extends ConsumerWidget {
         ) ??
         false;
 
-    return RefreshIndicator(
+    return GuiaDePantalla(
+      guia: 'gestion',
+      pasos: () => [
+        const PasoTutorial(
+          icono: Icons.add_rounded,
+          titulo: 'Crear un evento',
+          texto: 'Arriba de todo. El evento nace como borrador: sólo lo ves vos '
+              'hasta que lo publiques, así podés dejarlo a medio armar.',
+          objetivo: _sinFlechaGestion,
+        ),
+        const PasoTutorial(
+          icono: Icons.campaign_rounded,
+          titulo: 'Publicarlo',
+          texto: 'Publicar es lo que lo hace visible para tu equipo y para la '
+              'gente. Antes conviene dejar listas las listas, las mesas y las '
+              'fases de precio.',
+          objetivo: _sinFlechaGestion,
+        ),
+        const PasoTutorial(
+          icono: Icons.event_note_outlined,
+          titulo: 'Hoy, próximos y pasados',
+          texto: 'La lista va en ese orden. Tocá un evento para trabajarlo: el '
+              'escáner, las listas y las mesas pasan a ser las de ese evento.',
+          objetivo: _sinFlechaGestion,
+        ),
+        const PasoTutorial(
+          icono: Icons.insights_rounded,
+          titulo: 'Cómo va la noche',
+          texto: '"Gestionar evento" abre con cuánta gente entró y cuánta plata '
+              'va, sin tener que ir al reporte.',
+          objetivo: _sinFlechaGestion,
+        ),
+      ],
+      child: RefreshIndicator(
       onRefresh: () async {
         recargar();
         await ref.read(eventosGestionProvider.future);
@@ -346,9 +380,13 @@ class GestionEventosScreen extends ConsumerWidget {
           );
         },
       ),
+      ),
     );
   }
 }
+
+/// Los pasos que explican la pantalla entera no apuntan a ningún botón.
+Rect? _sinFlechaGestion() => null;
 
 class _TarjetaEvento extends StatelessWidget {
   const _TarjetaEvento({

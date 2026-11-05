@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:venue_mobile/features/authentication/data/sesion.dart';
 import 'package:venue_mobile/features/dashboard/ui/tutorial.dart';
 
 void main() {
@@ -96,4 +99,43 @@ void main() {
     // recorrido de la barra a quien ya lo hizo
     expect(await tutorialVisto('sin-prefs-uid', 'mesas'), isA<bool>());
   });
+
+  testWidgets('la guía de una pantalla sale una vez y se puede saltar', (
+    t,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await t.pumpWidget(
+      ProviderScope(
+        overrides: [usuarioIdProvider.overrideWithValue('uid-1')],
+        child: MaterialApp(
+          home: Scaffold(
+            body: GuiaDePantalla(
+              guia: 'mesas',
+              pasos: () => const [
+                PasoTutorial(
+                  icono: Icons.table_bar_outlined,
+                  titulo: 'El plano',
+                  texto: 'cada cuadrado es una mesa',
+                  objetivo: _sinObjetivo,
+                ),
+              ],
+              child: const Text('la pantalla'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    expect(find.text('la pantalla'), findsOneWidget);
+    expect(find.text('El plano'), findsOneWidget);
+
+    await t.tap(find.text('Listo'));
+    await t.pumpAndSettle();
+    expect(find.text('El plano'), findsNothing);
+    expect(await tutorialVisto('uid-1', 'mesas'), isTrue);
+    // la del inicio sigue sin verse: cada guía se recuerda aparte
+    expect(await tutorialVisto('uid-1'), isFalse);
+  });
 }
+
+Rect? _sinObjetivo() => null;

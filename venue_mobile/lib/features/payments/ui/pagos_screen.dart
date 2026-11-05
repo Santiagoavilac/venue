@@ -19,6 +19,7 @@ import '../../../core/widgets/insignia.dart';
 import '../../events/ui/cambiar_evento.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/patron.dart';
+import '../../dashboard/ui/tutorial.dart';
 
 Future<T?> _hoja<T>(BuildContext context, Widget child) => showModalBottomSheet<T>(
       context: context,
@@ -102,7 +103,39 @@ class PagosScreen extends ConsumerWidget {
       }
     }
 
-    return Column(children: [
+    return GuiaDePantalla(
+      guia: 'pagos',
+      pasos: () => [
+        PasoTutorial(
+          icono: Icons.account_balance_wallet_outlined,
+          titulo: rinde ? 'Tu cuenta de la noche' : 'Quién te tiene que pagar',
+          texto: rinde
+              ? 'Arriba está lo tuyo: cuánto entró por las manillas que '
+                'ingresaron, cuánto es tu comisión y cuánto queda por rendir.'
+              : 'Cada relacionador con lo que recaudó, su comisión y lo que te '
+                'tiene que entregar.',
+          objetivo: () => null,
+        ),
+        PasoTutorial(
+          icono: Icons.upload_file_rounded,
+          titulo: 'El comprobante',
+          texto: rinde
+              ? 'Cuando transferís, subí la captura acá. Queda guardada en la '
+                'operación y el boliche la verifica; sin eso, la rendición '
+                'sigue figurando pendiente.'
+              : 'Cada captura que suben queda acá para verificarla. Marcar '
+                'pagado sin verla es confiar en la captura.',
+          objetivo: () => null,
+        ),
+        const PasoTutorial(
+          icono: Icons.calendar_today_outlined,
+          titulo: 'Es de este evento',
+          texto: 'Las cuentas son del evento que dice arriba. Si cambiás de '
+              'evento ahí, cambia todo lo de esta pantalla.',
+          objetivo: _sinFlechaPagos,
+        ),
+      ],
+      child: Column(children: [
       const DeQueEvento(),
       Expanded(
         child: RefreshIndicator(
@@ -260,9 +293,13 @@ class PagosScreen extends ConsumerWidget {
       ),
         ),
       ),
-    ]);
+    ]),
+    );
   }
 }
+
+/// Los pasos que explican la pantalla entera no apuntan a ningún botón.
+Rect? _sinFlechaPagos() => null;
 
 /// La cuenta propia: cuántas manillas ingresaron, comisión, lo que hay que
 /// pagar y si ya le pusieron el check.
