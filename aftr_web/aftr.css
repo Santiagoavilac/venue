@@ -187,6 +187,10 @@ input { font: inherit; color: var(--texto); }
 .barra-compra .cuerpo { flex: 1; }
 .barra-compra .boton { width: 170px; }
 body.con-compra #tabs { display: none; }
+/* Y la página reserva el alto de la barra de compra, no el de las pestañas que
+   acaba de esconder. El 83px de respaldo es por si el medidor no llegó a
+   correr; lo real lo pone medirBarraCompra() en --alto-compra. */
+body.con-compra #vista { padding-bottom: calc(var(--alto-compra, 83px) + 40px); }
 .puntos { position: absolute; bottom: 18px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; z-index: 3; }
 .puntos i { width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.45); transition: width .32s var(--curva), background .3s; }
 .puntos i.si { width: 18px; background: #fff; }

@@ -80,6 +80,33 @@ function avisar(t) {
 
 /* ── hoja de abajo ──────────────────────────────────────────────────── */
 let alCerrarHoja = null, versionHoja = 0;
+/* La barra de "Comprar" está fija abajo y tapa el final de la página.
+ *
+ * Qué se rompía: #vista reservaba abajo el alto de la barra de pestañas
+ * (--tabs), pero en la pantalla de un evento las pestañas se esconden y en su
+ * lugar aparece la barra de compra, que es más alta. En escritorio --tabs vale
+ * 0, así que la página reservaba 40 px contra una barra de 83: los últimos
+ * 43 px -el bloque "Dónde"- quedaban abajo de la barra y no había forma de
+ * bajar hasta ellos.
+ *
+ * Se mide la barra en vez de escribir su alto a mano porque a mano se desfasa
+ * con el primer cambio de tipografía o de botón, que es justo lo que pasó.
+ */
+let observaBarra = null;
+function medirBarraCompra() {
+  observaBarra?.disconnect();
+  observaBarra = null;
+  const barra = $(".barra-compra");
+  if (!barra) return document.body.style.removeProperty("--alto-compra");
+  const medir = () => document.body.style.setProperty("--alto-compra", `${barra.offsetHeight}px`);
+  medir();
+  // si cambia el texto del precio o rota el teléfono, se vuelve a medir
+  if (typeof ResizeObserver === "function") {
+    observaBarra = new ResizeObserver(medir);
+    observaBarra.observe(barra);
+  }
+}
+
 function abrirHoja(html, alCerrar) {
   alCerrarHoja?.();
   versionHoja++;
@@ -451,6 +478,7 @@ async function pintar() {
   const r = ruta();
   document.body.classList.toggle("en-mapa", r.nombre === "mapa");
   document.body.classList.remove("con-compra");
+  medirBarraCompra();
   $$("[data-tab]").forEach((a) => a.classList.toggle("activa", a.dataset.tab === r.nombre));
   $("#barra").hidden = r.nombre === "evento" || r.nombre === "lugar";
   window.scrollTo(0, 0);
@@ -638,6 +666,7 @@ async function pintarEvento(id) {
         <div class="fuerte" style="font-size:20px">${esc(seVende() ? bs(precio()) : "No disponibles")}</div></div>
         <button class="boton" data-comprar ${seVende() ? "" : "disabled"}>Comprar</button></div>`;
     document.body.classList.add("con-compra");
+    medirBarraCompra();
     $$("[data-fase]").forEach((b) => (b.onclick = () => { fase = b.dataset.fase; render(); }));
     $("[data-comprar]").onclick = async () => { if (await asegurarParaComprar()) hojaCompra(d, d.venta_por_fases ? faseSel() : null); };
     $("[data-mesa]") && ($("[data-mesa]").onclick = async () => { if (await asegurarCuenta()) hojaMesa(d); });
