@@ -40,10 +40,41 @@ desde la consola y se reemplaza el secreto.
 La clave de Apple quedó además en `~/Documents/venue-claves/`, porque Apple la
 deja bajar **una sola vez**. No está en el repo ni va a estarlo.
 
+## Cómo funciona de punta a punta
+
+    la app pide el permiso  ->  guarda su token en `dispositivos`
+    algo pasa en la base    ->  impl.avisar() encola en `avisos_push`
+    el cron, cada minuto    ->  la Edge Function `push` entrega por FCM
+
+Se guarda **el aparato y no la persona**: una fila por token, con de qué app
+es. Un teléfono puede tener las dos apps y la misma persona puede entrar desde
+varios teléfonos, así que atarlo a la persona perdería aparatos. Si el mismo
+token vuelve —reinstalación, o un teléfono prestado— cambia de dueño en vez de
+duplicarse.
+
+Cada app manda con **su propia cuenta de servicio**: que una no pueda
+notificarle a los usuarios de la otra no depende de que nadie se olvide, son
+credenciales distintas.
+
+Un token que FCM da por muerto se borra en el mismo paso, y si todos los
+aparatos de un aviso están muertos el aviso se cierra en vez de reintentarse.
+
+### El permiso se pide tarde, a propósito
+
+En AFTR, recién cuando la persona ya tiene una entrada que esperar. En Venue,
+en la pantalla de inicio, cuando ya hay trabajo que seguir. **En iOS negar el
+permiso es definitivo**: el sistema no vuelve a preguntar. Pedirlo en la
+primera pantalla, antes de que se entienda para qué sirve, es la forma más
+rápida de perderlo para siempre.
+
+Para probar: `python3 tests/test_push.py` (11 comprobaciones; habla con Google
+de verdad y no deja residuo).
+
 ## Lo único que falta, y es un arrastre
 
-**Subir la clave de APNs a los dos proyectos de Firebase.** Sin eso el push
-llega a Android pero no a iPhone.
+~~Subir la clave de APNs a los dos proyectos de Firebase.~~ **Hecho el
+06/11/2026**, en las cuatro ranuras: desarrollo y producción de los dos
+proyectos.
 
     Firebase → Configuración del proyecto → Cloud Messaging
       → Configuración de la app para Apple → Clave de autenticación de APNS

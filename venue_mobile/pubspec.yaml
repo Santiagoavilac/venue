@@ -52,6 +52,8 @@ dependencies:
   apple_maps_flutter: ^1.4.0
   geocoding: ^5.0.0
   video_player: ^2.14.1
+  firebase_core: ^5.1.0
+  firebase_messaging: ^17.0.1
 
 dev_dependencies:
   flutter_test:

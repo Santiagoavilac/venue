@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/notificaciones.dart';
 import '../../../core/routing/secciones.dart';
 import '../../../core/sync/cola_offline.dart';
 import '../../../core/theme/venue_theme.dart';
@@ -315,6 +316,16 @@ class _InicioShellState extends ConsumerState<InicioShell>
       if (ref.read(pendientesProvider) > 0) _drenar();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _drenar());
+    // Las notificaciones: el aparato se registra con la sesión que haya, y el
+    // permiso se pide acá y no al abrir la app, cuando ya hay trabajo que
+    // seguir. En iOS negarlo es para siempre, así que preguntar antes de
+    // tiempo es perderlo.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final n = ref.read(notificacionesProvider);
+      n.escucharCambios();
+      await n.registrar();
+      if (!await n.yaDecidido()) await n.pedirPermiso();
+    });
   }
 
   @override

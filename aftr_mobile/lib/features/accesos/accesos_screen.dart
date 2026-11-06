@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 
 import '../../core/networking/supabase.dart';
+import '../../core/notificaciones.dart';
 import '../../core/theme/aftr_theme.dart';
 import '../../core/widgets/logo.dart';
 import '../../core/widgets/movimiento.dart';
@@ -30,6 +31,22 @@ class AccesosScreen extends ConsumerStatefulWidget {
 class _AccesosScreenState extends ConsumerState<AccesosScreen> {
   String? _abierta;
   bool _brillo = false;
+  // null mientras no se sabe; false si todavía no decidió
+  bool? _avisosDecididos;
+
+  @override
+  void initState() {
+    super.initState();
+    // El aparato se registra cada vez que se abre Accesos: si la persona ya
+    // dio el permiso antes, acá se vuelve a guardar el token por si rotó.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final n = ref.read(notificacionesProvider);
+      n.escucharCambios();
+      await n.registrar();
+      final decidido = await n.yaDecidido();
+      if (mounted) setState(() => _avisosDecididos = decidido);
+    });
+  }
 
   Future<void> _abrir(Acceso? a) async {
     setState(() => _abierta = a?.id);
@@ -86,6 +103,17 @@ class _AccesosScreenState extends ConsumerState<AccesosScreen> {
             130 + MediaQuery.paddingOf(context).bottom,
           ),
           children: [
+            // El permiso se pide acá y no al abrir la app: recién cuando ya
+            // hay una entrada que esperar. En iOS la negativa es para
+            // siempre, así que preguntar antes de tiempo es perderlo.
+            if (_avisosDecididos == false && proximos.isNotEmpty)
+              _PedirAvisos(
+                onSi: () async {
+                  await ref.read(notificacionesProvider).pedirPermiso();
+                  if (mounted) setState(() => _avisosDecididos = true);
+                },
+                onNo: () => setState(() => _avisosDecididos = true),
+              ),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
@@ -621,5 +649,42 @@ class _SinCuenta extends StatelessWidget {
         ),
       ),
     ),
+  );
+}
+
+
+/// Pedir el permiso de notificaciones, con el motivo adelante.
+///
+/// Sin decir para qué, la mitad lo niega; y en iOS negarlo es definitivo.
+class _PedirAvisos extends StatelessWidget {
+  const _PedirAvisos({required this.onSi, required this.onNo});
+
+  final Future<void> Function() onSi;
+  final VoidCallback onNo;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 14),
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: Aftr.superficie2,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Aftr.borde),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('¿Te avisamos?', style: Aftr.fuerte(17)),
+      const SizedBox(height: 6),
+      Text(
+        'Cuando se confirme un pago, cuando alguien te mande una entrada y '
+        'cuando esté por empezar la fiesta.',
+        style: Aftr.cuerpo(14, c: Aftr.texto2),
+      ),
+      const SizedBox(height: 14),
+      Row(children: [
+        Expanded(child: BotonAftr('Sí, avisame', onTap: onSi)),
+        const SizedBox(width: 10),
+        TextButton(onPressed: onNo, child: const Text('Ahora no')),
+      ]),
+    ]),
   );
 }
