@@ -312,6 +312,7 @@ function abrirIngreso(motivo) {
       <p class="suave aparecer" style="--o:2;margin:0 0 32px">${esc(motivo || "Descubrí, reservá y entrá. Todo desde un solo lugar.")}</p>
       <button class="boton aparecer" style="--o:4" data-p="apple"><svg width="20" height="20" viewBox="0 0 24 24" fill="#000"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.1zM13.9 4.9c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3-1.5z"/></svg>Continuar con Apple</button>
       <button class="boton sec aparecer" style="--o:5" data-p="google"><b style="font-size:18px">G</b>Continuar con Google</button>
+      <button class="enlace aparecer" style="--o:6" data-correo>Continuar con mi correo</button>
       <p class="tenue" style="text-align:center;font-size:12px;margin:18px 0 0">Al continuar aceptás los términos y la política de privacidad de AFTR.</p>
     </div>`;
   document.body.append(d);
@@ -330,6 +331,77 @@ function abrirIngreso(motivo) {
       : await sb.auth.signInWithOAuth(opciones);
     if (error) { avisar(error.message.includes("not enabled") ? "Ese ingreso todavía no está activado." : mensaje(error)); cerrar(); }
   }));
+  $("[data-correo]", d).onclick = () => pasoCorreo(d, cerrar);
+}
+
+/* Entrar con un código al correo.
+ *
+ * Un código de seis dígitos y no un enlace: el enlace se abre en el navegador
+ * del correo y deja la sesión ahí, no donde la persona la pidió, y desde la
+ * compu no sirve si el correo lo lee en el teléfono. El código se copia y
+ * entra donde estaba.
+ */
+function pasoCorreo(d, cerrar) {
+  let correo = "", paso = 0, error = null, ocupado = false;
+  const dentro = $(".dentro", d);
+  const pintar = () => {
+    dentro.innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px">
+        <button class="redondo" data-atras style="background:var(--sup2)">${ICO.atras}</button>
+        <div class="palabra-barra" style="height:20px;margin:0">${["a", "f", "t", "r"].map((l) => `<img src="img/${l}.svg" alt="">`).join("")}</div>
+      </div>
+      <h1 class="titular aparecer" style="font-size:32px;margin:34px 0 10px">
+        ${paso === 0 ? "Entrá con tu correo." : "Te mandamos un código."}</h1>
+      <p class="suave aparecer" style="--o:2;margin:0 0 26px">
+        ${paso === 0 ? "Te mandamos un código de seis dígitos." : `Fijate en ${esc(correo)}. Vence en diez minutos.`}</p>
+      <form data-form class="formulario">
+        <label class="campo"><span>${paso === 0 ? "Correo" : "Código"}</span>
+          <input name="dato" type="${paso === 0 ? "email" : "text"}" required
+            autocomplete="${paso === 0 ? "email" : "one-time-code"}"
+            ${paso === 1 ? 'inputmode="numeric" maxlength="6" pattern="[0-9]{6}"' : ""}
+            value="${esc(paso === 0 ? correo : "")}"></label>
+        ${error ? `<p class="mal-texto">${esc(error)}</p>` : ""}
+        <button class="boton" type="submit">${paso === 0 ? "Mandarme el código" : "Entrar"}</button>
+        ${paso === 1 ? `<button class="enlace" type="button" data-otro>Cambiar el correo</button>` : ""}
+      </form>`;
+    const form = $("[data-form]", dentro);
+    $("[data-atras]", dentro).onclick = () => (paso === 1 ? ((paso = 0), (error = null), pintar()) : cerrar());
+    $("[data-otro]", dentro)?.addEventListener("click", () => { paso = 0; error = null; pintar(); });
+    form.onsubmit = async (ev) => {
+      ev.preventDefault();
+      if (ocupado) return;
+      const valor = form.dato.value.trim();
+      const boton = $("button[type=submit]", form);
+      ocupado = true; boton.disabled = true; boton.innerHTML = `<span class="giro"></span>`;
+      try {
+        if (paso === 0) {
+          correo = valor.toLowerCase();
+          // Con sesión de invitado se le engancha el correo a la sesión que ya
+          // tiene, para que no pierda las entradas que compró sin cuenta.
+          const { error: e } = esAnonimo()
+            ? await sb.auth.updateUser({ email: correo })
+            : await sb.auth.signInWithOtp({ email: correo, options: { shouldCreateUser: true } });
+          if (e) throw e;
+          paso = 1; error = null;
+        } else {
+          const { error: e } = await sb.auth.verifyOtp({
+            email: correo, token: valor,
+            type: esAnonimo() ? "email_change" : "email",
+          });
+          if (e) throw e;
+          return cerrar();
+        }
+      } catch (e) {
+        error = mensaje(e);
+      } finally {
+        ocupado = false;
+      }
+      pintar();
+      $("input[name=dato]", dentro)?.focus();
+    };
+    $("input[name=dato]", dentro)?.focus();
+  };
+  pintar();
 }
 /* ── los 18+ y los términos ─────────────────────────────────────────── */
 // Una sola casilla para las dos cosas: las dos son obligatorias y separarlas

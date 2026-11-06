@@ -152,3 +152,28 @@ de un origen autorizado no agregan riesgo. Vale para `baneco` y para
 
 **Al agregar un dominio o al tocar el CORS, probarlo desde el navegador**, no
 con `curl`: `curl` no hace preflight y por eso esto pasó una semana sin verse.
+
+## El correo: entradas e ingreso
+
+Las dos cosas van por **Resend**, con el dominio `aftrvenue.com` verificado. Los
+registros que lo verifican (`resend._domainkey`, y los CNAME `send` y `rsend`)
+conviven con el Zoho que ya estaba: el MX y el SPF del dominio **no se tocaron**,
+porque Resend usa esos CNAME como camino de vuelta en vez de meterse en el SPF
+del dominio.
+
+- **Las entradas** las manda la Edge Function `correo`, desde la cola `correos`,
+  llamada por el cron `aftr-correos` cada minuto. Secretos: `RESEND_API_KEY` y
+  `CORREO_CRON_TOKEN` (y el mismo token en el Vault, como `correo_cron_token`,
+  que es de donde lo saca el cron).
+- **El ingreso** lo manda Supabase Auth por el SMTP de Resend
+  (`smtp.resend.com:465`, usuario `resend`, clave la misma API key). Va un
+  **código de seis dígitos**, no un enlace: el enlace se abre en el navegador
+  del correo y deja la sesión ahí, no donde la persona la pidió. El código vive
+  diez minutos.
+
+Antes de esto, Supabase mandaba con su SMTP de prueba: **2 correos por hora** y
+sólo a gente del equipo. Ahora el límite está en 200 por hora.
+
+Si alguna vez hay que rotar la API key de Resend, son **tres** lugares: el
+secreto `RESEND_API_KEY` de las funciones, el `smtp_pass` de Auth, y el panel de
+Resend.
