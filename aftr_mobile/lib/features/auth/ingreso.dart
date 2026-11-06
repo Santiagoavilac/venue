@@ -100,6 +100,35 @@ class Ingreso {
     return (n == null || n.trim().isEmpty) ? null : n.trim();
   }
 
+  /// Pide un código de seis dígitos al correo.
+  ///
+  /// Con sesión de invitado no se abre una cuenta nueva: se le engancha el
+  /// correo a la que ya tiene, igual que `linkIdentity` con Google y Apple.
+  /// Si no, las entradas que compró sin cuenta quedarían colgadas de un
+  /// usuario al que nadie vuelve a entrar.
+  Future<void> pedirCodigo(String correo) async {
+    final c = correo.trim().toLowerCase();
+    if (anonimo) {
+      await _sb.auth.updateUser(UserAttributes(email: c));
+    } else {
+      await _sb.auth.signInWithOtp(email: c, shouldCreateUser: true);
+    }
+  }
+
+  /// Entra con el código. El tipo depende de si venía de invitado: para
+  /// enganchar el correo a una sesión que ya existe, Supabase lo trata como
+  /// un cambio de correo, no como un ingreso nuevo.
+  Future<void> entrarConCodigo(String correo, String codigo) async {
+    final eraAnonimo = anonimo;
+    await _sb.auth.verifyOTP(
+      email: correo.trim().toLowerCase(),
+      token: codigo.trim(),
+      type: eraAnonimo ? OtpType.emailChange : OtpType.email,
+    );
+  }
+
+  bool get anonimo => _sb.auth.currentUser?.isAnonymous == true;
+
   Future<void> salir() async {
     try {
       if (_googleNonceActivo != null) await GoogleSignIn.instance.signOut();

@@ -7,6 +7,7 @@ import '../../../core/networking/supabase.dart';
 import '../../../core/widgets/fondo_video.dart';
 import '../../../core/routing/router.dart';
 import '../data/sesion.dart';
+import 'codigo_correo_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -207,9 +208,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ],
                             const SizedBox(height: 18),
                             if (clave)
-                              const Text(
-                                '¿Olvidaste tu contraseña? Pedile a tu jefe de team o al administrador que te la restablezca.',
-                                style: TextStyle(color: suave, fontSize: 13, height: 1.4),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '¿Olvidaste tu contraseña? Pedile a tu jefe de team o al administrador que te la restablezca.',
+                                    style: TextStyle(color: suave, fontSize: 13, height: 1.4),
+                                  ),
+                                  TextButton(
+                                    onPressed: _enviando
+                                        ? null
+                                        : () async {
+                                            final ok = await Navigator.of(context).push<bool>(
+                                              MaterialPageRoute(
+                                                  builder: (_) => const CodigoCorreoScreen()),
+                                            );
+                                            // con sesión abierta, el router
+                                            // redirige solo adonde corresponde
+                                            // según el rol
+                                            if (ok == true) return;
+                                          },
+                                    style: TextButton.styleFrom(
+                                        foregroundColor: Colors.white, padding: EdgeInsets.zero),
+                                    child: const Text('O entrá con un código a tu correo',
+                                        style: TextStyle(decoration: TextDecoration.underline)),
+                                  ),
+                                ],
                               )
                             else
                               Align(

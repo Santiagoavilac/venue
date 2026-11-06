@@ -125,6 +125,31 @@ class AuthRepository {
     await _revisar(r.user?.id, relacionador: true);
   }
 
+  /// Entrar con un código al correo, para quien no se acuerda la clave.
+  ///
+  /// `shouldCreateUser: false` a propósito y es lo importante: en Venue las
+  /// cuentas se crean por enlace con rol, no a mano. Si esto pudiera crear
+  /// usuarios, cualquiera con un correo se abriría una cuenta de equipo sin
+  /// que nadie lo invite. Así, el código sólo llega a una cuenta que ya
+  /// existe; a un correo desconocido no le llega nada.
+  Future<void> pedirCodigo(String correo) async {
+    final c = correo.trim().toLowerCase();
+    if (!c.contains('@')) {
+      throw const AuthException('Escribí tu correo, no tu usuario.');
+    }
+    await _sb.auth.signInWithOtp(email: c, shouldCreateUser: false);
+  }
+
+  Future<void> entrarConCodigo(String correo, String codigo,
+      {required bool relacionador}) async {
+    final r = await _sb.auth.verifyOTP(
+      email: correo.trim().toLowerCase(),
+      token: codigo.trim(),
+      type: OtpType.email,
+    );
+    await _revisar(r.user?.id, relacionador: relacionador);
+  }
+
   Future<void> _revisar(String? uid, {required bool relacionador}) async {
     if (uid == null) return;
     final p = await _sb

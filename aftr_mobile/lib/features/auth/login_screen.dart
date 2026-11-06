@@ -15,6 +15,7 @@ import '../../core/widgets/movimiento.dart';
 import '../../core/widgets/piezas.dart';
 import '../../data/aftr_repo.dart' show perfilProvider;
 import '../splash/splash.dart';
+import 'correo_screen.dart';
 import 'ingreso.dart';
 
 /// Ingreso: las fotos de noche siguen pasando detrás (más lento que en el
@@ -132,7 +133,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                   onTap: _cargando == null ? () => _entrar('google') : null,
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 6),
+              Aparecer(
+                orden: 6,
+                child: Center(
+                  child: TextButton(
+                    onPressed: _cargando == null
+                        ? () async {
+                            final ok = await Navigator.of(context).push<bool>(
+                              MaterialPageRoute(builder: (_) => const CorreoScreen()),
+                            );
+                            if (ok == true && context.mounted) context.pop(true);
+                          }
+                        : null,
+                    child: const Text('Continuar con mi correo'),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               Center(
                 child: Text.rich(
                   TextSpan(
