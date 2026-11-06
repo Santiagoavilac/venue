@@ -32,7 +32,9 @@ async function actualizarSaldoFijo() {
   }
 }
 function iniciarSaldoFijo() {
-  const uid = E.perfil ? E.sesion?.user.id : null;
+  // El invitado tiene perfil pero no tiene PULSE: el enlace fijo lo llevaría
+  // a una pantalla que le pide cuenta.
+  const uid = E.perfil && !esAnonimo() ? E.sesion?.user.id : null;
   $('#saldo-fijo').hidden = !uid;
   document.body.classList.toggle('con-saldo', !!uid);
   if (saldoUid === uid) return;

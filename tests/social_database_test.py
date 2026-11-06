@@ -37,6 +37,22 @@ sql('set check_function_bodies=on;'+limites.split('-- ── los frenos')[0])
 sql('set check_function_bodies=on;'+(root/'supabase/migrations/20261106150000_reventa_el_vendedor_acepta.sql').read_text())
 # y la corrección: el precio lo pone el boliche, no la plataforma
 sql('set check_function_bodies=on;'+(root/'supabase/migrations/20261106190000_el_precio_lo_pone_el_boliche.sql').read_text())
+# Comprar sin cuenta: acá hace falta la primera mitad -las columnas del
+# comprador, impl.es_anonimo, impl.aftr_cuenta_real y el formulario-. La
+# segunda inyecta la línea en quince RPC que en este esquema de prueba no
+# existen, así que levantaría "No existe public.X en plpgsql".
+# auth.jwt() no la crea el arranque de pulse: impl.es_anonimo la necesita para
+# saber si la sesión es de invitado. Acá se arma del mismo setting que usa
+# auth.uid(), más uno para marcar la sesión como anónima.
+sql('''create function auth.jwt() returns jsonb language sql stable as $$
+ select jsonb_build_object(
+  'sub', nullif(current_setting('request.jwt.claim.sub',true),''),
+  'is_anonymous', coalesce(nullif(current_setting('request.jwt.claim.is_anonymous',true),''),'false')::boolean)$$;
+grant execute on function auth.jwt() to public;''')
+invitado = (root/'supabase/migrations/20261106240000_comprar_sin_cuenta.sql').read_text()
+sql('set check_function_bodies=on;'+invitado.split('-- Lo que pide cuenta de verdad')[0])
+# y los 18+ al abrir cuenta normal
+sql('set check_function_bodies=on;'+(root/'supabase/migrations/20261106250000_mayor_de_edad_al_abrir_cuenta.sql').read_text())
 
 def uid(n): return f'00000000-0000-4000-8000-{n:012d}'
 C,B,OTHER,ADMIN,CLUBADMIN,EV,ENT,FASE=[uid(n) for n in range(1,9)]
@@ -307,5 +323,53 @@ class SocialDB(unittest.TestCase):
   # el QR de cobro aparece con todo lo demás: recién cuando el vendedor acepta
   call('aceptar',{'id':o['id']})
   self.assertEqual(call('orden',{'id':o['id']},B)['metodo']['qr_path'],qr)
+
+ # ── los 18+ y los términos ─────────────────────────────────────────
+ # Qué se rompía: el formulario de compra sin cuenta guardaba la constancia,
+ # pero quien abría cuenta con Google o Apple pasaba por aftr_crear_perfil,
+ # que no pedía ni guardaba nada. Y el parámetro tiene que quedar opcional
+ # porque hay apps publicadas que llaman con dos argumentos.
+ def test_34_abrir_cuenta_guarda_los_18_y_los_terminos(self):
+  sql(f"delete from aftr_clientes where user_id='{OTHER}'")
+  p=json.loads(sql(f"select aftr_crear_perfil('nueva','Nueva',true)",OTHER))
+  self.assertTrue(p['mayor_edad'])
+  self.assertIsNotNone(p['acepto_at'])
+
+ def test_35_una_app_vieja_de_dos_argumentos_sigue_entrando(self):
+  sql(f"delete from aftr_clientes where user_id='{OTHER}'")
+  p=json.loads(sql(f"select aftr_crear_perfil('vieja','Vieja')",OTHER))
+  self.assertFalse(p['mayor_edad'])
+  self.assertIsNone(p['acepto_at'])
+
+ def test_36_lo_aceptado_no_se_desacepta(self):
+  # una app vieja que manda false no borra la constancia de quien ya aceptó
+  sql(f"delete from aftr_clientes where user_id='{OTHER}'")
+  antes=json.loads(sql(f"select aftr_crear_perfil('mia','Mia',true)",OTHER))
+  sql("delete from aftr_intentos")  # el freno es de 5 por hora
+  despues=json.loads(sql(f"select aftr_crear_perfil('mia','Mia Otra')",OTHER))
+  self.assertTrue(despues['mayor_edad'])
+  self.assertEqual(despues['acepto_at'],antes['acepto_at'])
+
+ # ── quién es invitado y quién tiene cuenta ──────────────────────────
+ def test_37_la_sesion_anonima_se_reconoce(self):
+  self.assertEqual(sql("select impl.es_anonimo()",C),'f')
+  self.assertEqual(sql("set request.jwt.claim.is_anonymous='true'; select impl.es_anonimo()",C),'t')
+
+ def test_38_al_invitado_cuenta_real_le_pide_cuenta(self):
+  with self.assertRaisesRegex(AssertionError,'Google o Apple'):
+   sql("set request.jwt.claim.is_anonymous='true'; select impl.aftr_cuenta_real()",C)
+  # y a quien tiene cuenta le devuelve su cliente, como aftr_yo
+  self.assertEqual(sql("select (impl.aftr_cuenta_real()).usuario",C),'seller')
+
+ def test_39_el_formulario_de_compra_exige_los_18_y_un_correo(self):
+  sql(f"delete from aftr_clientes where user_id='{OTHER}'")
+  with self.assertRaisesRegex(AssertionError,'mayor de 18'):
+   sql("select aftr_datos_de_compra('Ana','Perez','ana@example.invalid','1234567',null,false)",OTHER)
+  with self.assertRaisesRegex(AssertionError,'correo'):
+   sql("select aftr_datos_de_compra('Ana','Perez','no-es-correo','1234567',null,true)",OTHER)
+  p=json.loads(sql("select aftr_datos_de_compra('Ana','Perez','ana@example.invalid','1234567',null,true)",OTHER))
+  self.assertTrue(p['mayor_edad'])
+  self.assertEqual(p['ci'],'1234567')
+  self.assertTrue(p['usuario'])  # el usuario se genera solo, sin pisar a nadie
 
 unittest.main(argv=[sys.argv[0]],verbosity=2)

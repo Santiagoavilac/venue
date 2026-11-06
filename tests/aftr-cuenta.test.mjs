@@ -15,6 +15,8 @@ function entorno() {
     esc:s=>String(s??''),
     sb:{channel:()=>canal,removeChannel(){},storage:{from:()=>({createSignedUrl:async()=>({data:{signedUrl:'https://example.invalid/foto-firmada'},error:null})})}},
     rpc:async()=>({saldo_centavos:12345}),
+    // lo define aftr.js, que en el navegador ya está cargado cuando esto corre
+    esAnonimo:()=>E.sesion?.user?.is_anonymous===true,
   });
   vm.runInContext(readFileSync(new URL('../aftr_web/pulse.js',import.meta.url),'utf8'),c);
   vm.runInContext(readFileSync(new URL('../aftr_web/cuenta-ui.js',import.meta.url),'utf8'),c);

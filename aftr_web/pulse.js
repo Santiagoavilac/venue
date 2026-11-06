@@ -10,6 +10,9 @@ function escucharPulse(tablas,fn) {
  canal.subscribe();limpiar=()=>{clearTimeout(espera);sb.removeChannel(canal);};
 }
 async function hojaMetodoPago(orden,titulo) {
+ // El invitado no tiene PULSE y no puede recargarlo: ofrecérselo es ofrecerle
+ // un botón que falla. Va derecho al QR del banco, que es lo que sí puede.
+ if(esAnonimo())return hojaPago(orden,titulo);
  const c=abrirHoja(`<h2 class="fuerte">${esc(titulo)}</h2><p data-saldo>Consultando saldo…</p><button class="boton" data-pulse>Pagar con PULSE</button><button class="boton sec" data-qr style="margin-top:12px">Pagar con QR</button><a class="opcion" href="#/pulse" data-recargar>Recargar PULSE</a>`);
  rpc('aftr_pulse').then(s=>{if(c.isConnected)$('[data-saldo]',c).textContent=`Tu saldo: ${pulseImporte(s.saldo_centavos)} PULSE`;}).catch(()=>{$('[data-saldo]',c).textContent='Tu saldo se verifica al pagar.';});
  $('[data-pulse]',c).onclick=async()=>{const boton=$('[data-pulse]',c);boton.disabled=true;try{await rpc('aftr_pagar_pulse',{p_orden:orden});cerrarHoja();avisar('Compra confirmada. Revisá tus accesos.');await cargarAccesos();pintar();}catch(e){avisar(mensaje(e));}finally{boton.disabled=false;}};
@@ -17,7 +20,7 @@ async function hojaMetodoPago(orden,titulo) {
  $('[data-recargar]',c).onclick=cerrarHoja;
 }
 async function pintarPulse(iniciar=true) {
- if(!E.sesion){await asegurarCuenta();return;}
+ if(!(await asegurarCuenta()))return;
  const s=await rpc('aftr_pulse');if(ruta().nombre!=='pulse')return;
  vista.innerHTML=`<div class="pagina pulse-pagina"><p class="etq">AFTR WALLET</p><h1 class="titular pulse-saldo">${pulseImporte(s.saldo_centavos)}</h1><p>PULSE</p><p class="suave">1 PULSE = Bs 1</p>
  <form id="recarga-pulse"><label for="importe-pulse">Importe en Bs</label><input id="importe-pulse" name="importe" inputmode="decimal" placeholder="100.00" required><p class="tenue" style="margin:6px 0 0;font-size:12px">Hasta Bs 300 por semana</p><button class="boton" type="submit">Recargar con QR</button></form>
@@ -28,7 +31,7 @@ async function pintarPulse(iniciar=true) {
  if(iniciar)escucharPulse(['pulse_cuentas','pulse_movimientos','pulse_recargas'],()=>pintarPulse(false));
 }
 async function pintarMisMesas(iniciar=true) {
- if(!E.sesion){await asegurarCuenta();return;}
+ if(!(await asegurarCuenta()))return;
  const d=await rpc('aftr_mis_mesas');if(ruta().nombre!=='mis-mesas')return;
  vista.innerHTML=`<div class="pagina pulse-pagina"><h1 class="titular">Mis mesas</h1>${d.mesas.length?d.mesas.map(m=>`<section class="pulse-mesa"><h2 class="fuerte">${esc(m.etiqueta)}</h2><p>${esc(m.evento)} · ${esc(m.club)}</p><p class="suave">${esc(m.fecha)} · Planta ${esc(m.planta)}</p>
  ${m.mi_estado==='invitado'?`<button class="texto-accion" data-aceptar="${esc(m.id)}">Aceptar invitación</button><button class="texto-accion" data-declinar="${esc(m.id)}">Declinar</button>`:`<a class="boton sec" href="#/mi-mesa/${esc(m.id)}">Ver mi mesa</a>`}</section>`).join(''):'<p class="suave">Tus mesas e invitaciones aparecerán acá.</p>'}
@@ -38,7 +41,7 @@ async function pintarMisMesas(iniciar=true) {
 }
 const carritosMesa=new Map();
 async function pintarMiMesa(id,iniciar=true) {
- if(!E.sesion){await asegurarCuenta();return;}
+ if(!(await asegurarCuenta()))return;
  const [mis,carta,pedidos]=await Promise.all([rpc('aftr_mis_mesas'),rpc('aftr_carta_mesa',{p_mesa:id}),rpc('aftr_mis_pedidos_mesa',{p_mesa:id})]);
  if(ruta().nombre!=='mi-mesa'||ruta().id!==id)return;
  const m=mis.mesas.find(x=>x.id===id);if(!m)throw new Error('Esta mesa no está disponible.');

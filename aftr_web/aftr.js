@@ -251,13 +251,30 @@ function pasados(j) {
 }
 
 /* ── cuenta: ingreso con Apple o Google, y la bienvenida ───────────── */
+// Quien compró sin cuenta tiene una sesión anónima: tiene perfil y tiene sus
+// entradas, pero no es una cuenta. Sin esto, con perfil alcanzaba para entrar
+// a PULSE, mesas, historias, reventa y rachas, y el servidor contestaba un
+// error crudo en vez de una pantalla que diga qué hacer.
+const esAnonimo = () => E.sesion?.user?.is_anonymous === true;
+
+/* Para todo lo que no sea comprar: hace falta cuenta de verdad. */
 async function asegurarCuenta() {
   if (!E.sesion) { abrirIngreso(); return false; }
+  if (esAnonimo()) { abrirIngreso("Esto necesita una cuenta. Tus entradas se guardan igual."); return false; }
   if (!E.perfil) await cargarPerfil();
   if (!E.perfil) { abrirBienvenida(); return false; }
   return true;
 }
-function abrirIngreso() {
+
+/* Para comprar: no se le pide cuenta a nadie. Si ya tiene perfil -cuenta o
+   invitado- sigue de largo; si no, elige entre dejar sus datos o entrar. */
+async function asegurarParaComprar() {
+  if (E.sesion && !E.perfil) await cargarPerfil();
+  if (E.perfil) return true;
+  if (E.sesion && !esAnonimo()) { abrirBienvenida(); return false; }
+  return abrirDatosDeCompra();
+}
+function abrirIngreso(motivo) {
   const d = document.createElement("div");
   d.className = "ingreso";
   d.innerHTML = `<div class="fotos" style="background-image:url(${FOTOS[0]})"></div><div class="velo"></div>
@@ -265,7 +282,7 @@ function abrirIngreso() {
       <div style="display:flex;align-items:center"><div class="palabra-barra" style="height:22px;margin:0">${["a", "f", "t", "r"].map((l) => `<img src="img/${l}.svg" alt="">`).join("")}</div>
         <button class="redondo" style="margin-left:auto" data-x aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <h1 class="titular aparecer">Your night<br>starts here.</h1>
-      <p class="suave aparecer" style="--o:2;margin:0 0 32px">Descubrí, reservá y entrá. Todo desde un solo lugar.</p>
+      <p class="suave aparecer" style="--o:2;margin:0 0 32px">${esc(motivo || "Descubrí, reservá y entrá. Todo desde un solo lugar.")}</p>
       <button class="boton aparecer" style="--o:4" data-p="apple"><svg width="20" height="20" viewBox="0 0 24 24" fill="#000"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.1zM13.9 4.9c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3-1.5z"/></svg>Continuar con Apple</button>
       <button class="boton sec aparecer" style="--o:5" data-p="google"><b style="font-size:18px">G</b>Continuar con Google</button>
       <p class="tenue" style="text-align:center;font-size:12px;margin:18px 0 0">Al continuar aceptás los términos y la política de privacidad de AFTR.</p>
@@ -277,16 +294,103 @@ function abrirIngreso() {
   $("[data-x]", d).onclick = cerrar;
   $$("[data-p]", d).forEach((b) => (b.onclick = async () => {
     b.innerHTML = `<span class="giro"></span>`;
-    const { error } = await sb.auth.signInWithOAuth({ provider: b.dataset.p, options: { redirectTo: location.href.split("#")[0] + location.hash } });
+    const opciones = { provider: b.dataset.p, options: { redirectTo: location.href.split("#")[0] + location.hash } };
+    // Con sesión anónima se engancha la cuenta a la que ya tiene en vez de
+    // abrir otra: si no, las entradas que compró de invitado quedan colgadas
+    // de un usuario al que ya nadie vuelve a entrar.
+    const { error } = esAnonimo()
+      ? await sb.auth.linkIdentity(opciones)
+      : await sb.auth.signInWithOAuth(opciones);
     if (error) { avisar(error.message.includes("not enabled") ? "Ese ingreso todavía no está activado." : mensaje(error)); cerrar(); }
   }));
 }
+/* ── los 18+ y los términos ─────────────────────────────────────────── */
+// Una sola casilla para las dos cosas: las dos son obligatorias y separarlas
+// es pedir dos toques para lo mismo. Y una sola función para las dos puertas
+// -abrir cuenta y comprar sin cuenta- para que digan exactamente lo mismo.
+const CASILLA_FALTA = "Para continuar tenés que ser mayor de 18 y aceptar los términos.";
+const casillaMayorEdad = (marcada) => `<label class="casilla">
+  <input type="checkbox" data-acepta ${marcada ? "checked" : ""}>
+  <span>Soy mayor de 18 años y acepto los <a href="/terminos" target="_blank" rel="noopener">términos y condiciones</a> de AFTR.</span></label>`;
+
+/* ── comprar sin cuenta ─────────────────────────────────────────────── */
+// Pedirle a alguien que abra una cuenta antes de saber si le gusta la fiesta
+// es perder a la mitad ahí mismo. Acá se llena esto una vez y se compra. Por
+// debajo hay una sesión anónima: es lo que hace que la entrada tenga dueño y
+// que el QR aparezca en Accesos, sin pedirle una contraseña a nadie.
+function abrirDatosDeCompra() {
+  return new Promise((resolver) => {
+    let listoYa = false;
+    const terminar = (v) => { if (!listoYa) { listoYa = true; resolver(v); } };
+    const campos = [
+      { n: "nombre", e: "Nombre", a: "given-name" },
+      { n: "apellido", e: "Apellido", a: "family-name" },
+      { n: "email", e: "Correo", a: "email", t: "email" },
+      { n: "ci", e: "Carnet de identidad", a: "off" },
+      { n: "telefono", e: "Celular (opcional)", a: "tel", t: "tel", opcional: true },
+    ];
+    const valores = {};
+    let acepta = false, error = null;
+    const c = abrirHoja("", () => terminar(false));
+    const render = () => {
+      c.innerHTML = `<h2 class="fuerte" style="font-size:22px;margin:10px 0 4px">Para tu entrada</h2>
+        <p class="suave" style="margin:0 0 18px">Sin crear cuenta ni contraseña. Tu QR te queda guardado en Accesos.</p>
+        <form data-form class="formulario">
+          ${campos.map((f) => `<label class="campo"><span>${esc(f.e)}</span>
+            <input name="${f.n}" type="${f.t || "text"}" autocomplete="${f.a}" value="${esc(valores[f.n] || "")}"
+              ${f.opcional ? "" : "required"}></label>`).join("")}
+          ${casillaMayorEdad(acepta)}
+          ${error ? `<p class="mal-texto">${esc(error)}</p>` : ""}
+          <button class="boton" type="submit">Continuar</button>
+          <button class="enlace" type="button" data-entrar>Mejor entro con mi cuenta</button>
+        </form>`;
+      const form = $("[data-form]", c);
+      $("[data-acepta]", c).onchange = (e) => (acepta = e.target.checked);
+      $("[data-entrar]", c).onclick = () => { cerrarHoja(); abrirIngreso(); };
+      form.onsubmit = async (ev) => {
+        ev.preventDefault();
+        for (const f of campos) valores[f.n] = form[f.n].value.trim();
+        if (!acepta) { error = CASILLA_FALTA; return render(); }
+        const boton = $("button[type=submit]", form);
+        boton.disabled = true;
+        boton.innerHTML = `<span class="giro"></span>`;
+        try {
+          // La sesión anónima se crea recién acá: sólo para quien va a comprar.
+          if (!E.sesion) {
+            const { error: e1 } = await sb.auth.signInAnonymously();
+            if (e1) throw e1;
+          }
+          E.perfil = await rpc("aftr_datos_de_compra", {
+            p_nombre: valores.nombre, p_apellido: valores.apellido,
+            p_email: valores.email, p_ci: valores.ci,
+            p_telefono: valores.telefono || null, p_acepta: true,
+          });
+          pintarAvatar();
+          cerrarHoja();
+          terminar(true);
+        } catch (e) {
+          // Una sesión anónima sin perfil rompe Accesos y no sirve para nada:
+          // si el formulario no llegó a guardar, se cierra.
+          if (esAnonimo() && !E.perfil) await sb.auth.signOut().catch(() => {});
+          error = mensaje(e);
+          render();
+        }
+      };
+      $("input[name=nombre]", c)?.focus();
+    };
+    render();
+  });
+}
+
 function sugerirUsuario(n) {
   return n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9_.]/g, "").slice(0, 24);
 }
 function abrirBienvenida() {
   const meta = E.sesion?.user?.user_metadata || {};
   let nombre = (meta.full_name || meta.name || "").trim(), usuario = sugerirUsuario(nombre), paso = 0;
+  // En el segundo paso y no en el primero: es el toque que crea la cuenta, así
+  // que es donde la constancia tiene sentido.
+  let acepta = false;
   const d = document.createElement("div");
   d.className = "ingreso";
   document.body.append(d);
@@ -301,11 +405,18 @@ function abrirBienvenida() {
           : `<div style="display:flex;align-items:baseline"><span class="fuerte tenue" style="font-size:24px">@</span><input id="campo" placeholder="usuario" value="${esc(usuario)}" autocapitalize="off" autocorrect="off" spellcheck="false"></div>`}
         <p style="margin:14px 0 0;font-size:14px;color:${error ? "var(--alerta)" : "var(--texto3)"}">${esc(error || (paso === 1 ? "Con este nombre te encuentran tus amigos para mandarte entradas." : ""))}</p>
       </div>
+      ${paso === 1 ? casillaMayorEdad(acepta) : ""}
       <button class="boton" data-sig>${paso === 0 ? "Siguiente" : "Empezar"}</button></div>`;
     const campo = $("#campo", d), sig = $("[data-sig]", d);
-    const valido = () => (paso === 0 ? campo.value.trim().length > 0 : /^[a-z0-9_.]{3,24}$/.test(campo.value.trim().toLowerCase()));
+    const valido = () => (paso === 0
+      ? campo.value.trim().length > 0
+      : /^[a-z0-9_.]{3,24}$/.test(campo.value.trim().toLowerCase()) && acepta);
     sig.disabled = !valido();
     campo.oninput = () => (sig.disabled = !valido());
+    $("[data-acepta]", d) && ($("[data-acepta]", d).onchange = (e) => {
+      acepta = e.target.checked;
+      sig.disabled = !valido();
+    });
     campo.onkeydown = (e) => e.key === "Enter" && valido() && sig.click();
     campo.focus();
     $("[data-atras]", d).onclick = async () => {
@@ -316,7 +427,7 @@ function abrirBienvenida() {
       if (paso === 0) { nombre = campo.value.trim(); if (!usuario) usuario = sugerirUsuario(nombre); paso = 1; return pintarPaso(); }
       sig.innerHTML = `<span class="giro"></span>`;
       try {
-        E.perfil = await rpc("aftr_crear_perfil", { p_usuario: campo.value.trim().toLowerCase(), p_nombre: nombre });
+        E.perfil = await rpc("aftr_crear_perfil", { p_usuario: campo.value.trim().toLowerCase(), p_nombre: nombre, p_acepta: acepta });
         pintarAvatar(); d.remove(); pintar(); iniciarSaldoFijo(); ofrecerGuia();
       } catch (e) { usuario = campo.value; pintarPaso(mensaje(e)); }
     };
@@ -528,7 +639,7 @@ async function pintarEvento(id) {
         <button class="boton" data-comprar ${seVende() ? "" : "disabled"}>Comprar</button></div>`;
     document.body.classList.add("con-compra");
     $$("[data-fase]").forEach((b) => (b.onclick = () => { fase = b.dataset.fase; render(); }));
-    $("[data-comprar]").onclick = async () => { if (await asegurarCuenta()) hojaCompra(d, d.venta_por_fases ? faseSel() : null); };
+    $("[data-comprar]").onclick = async () => { if (await asegurarParaComprar()) hojaCompra(d, d.venta_por_fases ? faseSel() : null); };
     $("[data-mesa]") && ($("[data-mesa]").onclick = async () => { if (await asegurarCuenta()) hojaMesa(d); });
     $$("[data-lista]").forEach((b) => (b.onclick = async () => {
       if (!(await asegurarCuenta())) return;
@@ -1023,24 +1134,47 @@ async function pintarCuenta() {
   const g = await rpc("aftr_mis_guardados").catch(() => ({ eventos: [], lugares: [] }));
   if (ruta().nombre !== "cuenta") return;
   const p = E.perfil;
+  // El invitado compró sin cuenta: tiene sus entradas y nada más. Lo que
+  // necesita es saberlo y tener un botón para pasar a tener cuenta sin
+  // perderlas; lo demás -PULSE, mesas, eliminar cuenta- no le aplica, y
+  // mostrárselo es mostrarle botones que fallan.
+  const invitado = esAnonimo();
   vista.innerHTML = `<div class="pagina"><h1 class="titular">Cuenta</h1>
     <div class="perfil aparecer"><button class="avatar" data-foto aria-label="Cambiar foto de perfil">${fotoPerfilHtml(p)}</button><div><b class="fuerte" style="font-size:24px">${esc(p?.nombre || "")}</b>
-      ${p ? `<div class="suave">@${esc(p.usuario)}</div>` : ""}</div></div>
+      ${p && !invitado ? `<div class="suave">@${esc(p.usuario)}</div>` : ""}
+      ${invitado ? `<div class="suave">Comprás sin cuenta</div>` : ""}</div></div>
+    ${invitado ? `<div class="paso-pago" style="margin-top:20px">${ICO.ok}<span>Tus entradas están guardadas acá. Con una cuenta las llevás a cualquier teléfono y además tenés PULSE, mesas, reventa y rachas.</span></div>
+      <button class="boton" style="margin-top:14px" data-cuenta>Crear mi cuenta</button>` : ""}
     ${!p ? `<button class="boton" style="margin-top:20px" data-perfil>Completar perfil</button>` : ""}
     ${g.eventos?.length ? `<h3 class="fuerte" style="font-size:22px;margin:30px 4px 14px">Guardados</h3><div class="carrusel" style="padding:0 4px">${g.eventos.map(tarjeta).join("")}</div>` : ""}
     ${g.lugares?.length ? `<h3 class="fuerte" style="font-size:22px;margin:30px 4px 6px">Siguiendo</h3>${g.lugares.map((l, i) => filaLugar(l, i).replace('class="fila ', 'style="padding:8px 4px" class="fila ')).join("")}` : ""}
     <h3 class="fuerte" style="font-size:22px;margin:30px 4px 6px">Ajustes</h3>
-    <button class="opcion" data-foto-editar>Cambiar foto de perfil</button><button class="opcion" data-guia>Ver guía de AFTR</button>
-    <a class="opcion" href="#/pulse">PULSE · Saldo y recargas</a><a class="opcion" href="#/mis-mesas">Mis mesas y pedidos</a>
+    ${invitado ? "" : `<button class="opcion" data-foto-editar>Cambiar foto de perfil</button>`}<button class="opcion" data-guia>Ver guía de AFTR</button>
+    ${invitado ? "" : `<a class="opcion" href="#/pulse">PULSE · Saldo y recargas</a><a class="opcion" href="#/mis-mesas">Mis mesas y pedidos</a>`}
     <a class="opcion" href="#/accesos">${ICO.ticket}Mis accesos</a>
-    <button class="opcion" data-salir>${ICO.salir}Cerrar sesión</button>
-    <button class="opcion mal" data-borrar>${ICO.borrar}Eliminar cuenta</button>
+    <a class="opcion" href="/terminos" target="_blank" rel="noopener">Términos y condiciones</a>
+    <button class="opcion" data-salir>${ICO.salir}${invitado ? "Borrar mis datos de este navegador" : "Cerrar sesión"}</button>
+    ${invitado ? "" : `<button class="opcion mal" data-borrar>${ICO.borrar}Eliminar cuenta</button>`}
     <img src="img/marca.svg" style="height:26px;margin:30px auto 8px;opacity:.35" alt=""><p class="tenue" style="text-align:center;font-size:12px;margin:0">AFTR · Nightlife &amp; Events</p></div>`;
-  $$("[data-foto], [data-foto-editar]").forEach(b => b.onclick = () => editarFotoWeb());
+  $$("[data-foto], [data-foto-editar]").forEach(b => b.onclick = () => (invitado ? abrirIngreso("Con una cuenta podés poner tu foto.") : editarFotoWeb()));
   $("[data-perfil]")?.addEventListener("click", abrirBienvenida);
+  $("[data-cuenta]")?.addEventListener("click", () => abrirIngreso("Enganchás tu cuenta y tus entradas se quedan donde están."));
   $("[data-guia]").onclick = () => abrirGuiaAftr();
-  $("[data-salir]").onclick = async () => { await sb.auth.signOut(); };
-  $("[data-borrar]").onclick = () => {
+  $("[data-salir]").onclick = async () => {
+    // Al invitado, cerrar sesión no es cerrar sesión: es perder las entradas,
+    // porque no hay cuenta a la que volver a entrar. Se avisa y se le ofrece
+    // primero la salida buena, que es engancharle una cuenta.
+    if (!invitado) return sb.auth.signOut();
+    const c = abrirHoja(`<h2 class="fuerte" style="font-size:22px;margin:14px 0 8px">¿Borrar tus datos?</h2>
+      <p class="suave">Compraste sin cuenta, así que tus entradas viven en este navegador. Si los borrás, se van con ellos y no hay forma de recuperarlas.</p>
+      <button class="boton" data-cuenta2 style="margin-top:22px">Mejor creo mi cuenta</button>
+      <button class="boton sec mal" data-si style="margin-top:10px">Borrar igual</button>
+      <button class="enlace" data-no>Cancelar</button>`);
+    $("[data-no]", c).onclick = cerrarHoja;
+    $("[data-cuenta2]", c).onclick = () => { cerrarHoja(); abrirIngreso("Enganchás tu cuenta y tus entradas se quedan donde están."); };
+    $("[data-si]", c).onclick = async () => { cerrarHoja(); await sb.auth.signOut(); };
+  };
+  $("[data-borrar]")?.addEventListener("click", () => {
     const c = abrirHoja(`<h2 class="fuerte" style="font-size:22px;margin:14px 0 8px">¿Eliminar tu cuenta?</h2>
       <p class="suave">Se borran tu perfil, tus guardados y los lugares que seguís. Las entradas que tengas dejan de estar a tu nombre en AFTR. No se puede deshacer.</p>
       <button class="boton" data-si style="margin-top:22px">Eliminar cuenta</button><button class="boton sec" data-no style="margin-top:10px">Cancelar</button>`);
@@ -1048,7 +1182,7 @@ async function pintarCuenta() {
     $("[data-si]", c).onclick = async () => {
       try { await rpc("aftr_eliminar_cuenta"); cerrarHoja(); await sb.auth.signOut(); avisar("Tu cuenta se eliminó."); } catch (e) { avisar(mensaje(e)); }
     };
-  };
+  });
 }
 
 /* ── inicio ─────────────────────────────────────────────────────────── */
@@ -1068,7 +1202,9 @@ async function alCambiarSesion(sesion) {
   iniciarSaldoFijo();
   if (guiaActual) guiaActual.dispatchEvent(new Event("cerrar-guia"));
   await cargarPerfil();
-  if (sesion && !E.perfil) abrirBienvenida();
+  // La sesión anónima nace sin perfil y lo completa el formulario de compra:
+  // sin esto, el onboarding de @usuario le tapaba el formulario encima.
+  if (sesion && !E.perfil && !esAnonimo()) abrirBienvenida();
   iniciarSaldoFijo();
   if (sesion) { cargarAccesos().catch(() => {}); ofrecerGuia(); }
   else $("#globo").hidden = true;

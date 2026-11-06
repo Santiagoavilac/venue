@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/networking/supabase.dart';
 import '../../core/theme/aftr_theme.dart';
 import '../../core/widgets/piezas.dart';
 import '../../data/aftr_repo.dart';
-import '../cuenta/cuenta_screen.dart' show aftrTerminos;
+import 'casilla_mayor_edad.dart';
 
 /// Comprar sin cuenta.
 ///
@@ -45,7 +44,7 @@ class _DatosState extends ConsumerState<DatosDeCompraScreen> {
   Future<void> _seguir() async {
     if (_ocupado || !(_form.currentState?.validate() ?? false)) return;
     if (!_acepta) {
-      setState(() => _error = 'Para continuar tenés que ser mayor de 18 y aceptar los términos.');
+      setState(() => _error = CasillaMayorEdad.falta);
       return;
     }
     setState(() {
@@ -123,49 +122,10 @@ class _DatosState extends ConsumerState<DatosDeCompraScreen> {
             opcional: true,
           ),
           const SizedBox(height: 6),
-          // Una sola casilla para las dos cosas: son las dos obligatorias y
-          // separarlas es pedir dos toques para lo mismo.
-          InkWell(
-            onTap: _ocupado ? null : () => setState(() => _acepta = !_acepta),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Checkbox(
-                  value: _acepta,
-                  onChanged: _ocupado ? null : (v) => setState(() => _acepta = v ?? false),
-                  side: const BorderSide(color: Aftr.bordeFuerte, width: 1.6),
-                  activeColor: Aftr.acento,
-                  checkColor: Aftr.fondo,
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Text.rich(
-                      TextSpan(children: [
-                        TextSpan(
-                          text: 'Soy mayor de 18 años y acepto los ',
-                          style: Aftr.cuerpo(13, c: Aftr.texto),
-                        ),
-                        TextSpan(
-                          text: 'términos y condiciones',
-                          style: Aftr.cuerpo(13, c: Aftr.acento, w: FontWeight.w600),
-                        ),
-                        TextSpan(text: ' de AFTR.', style: Aftr.cuerpo(13, c: Aftr.texto)),
-                      ]),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Leer los términos',
-                  onPressed: () => launchUrl(
-                    Uri.parse(aftrTerminos),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 18, color: Aftr.texto3),
-                ),
-              ]),
-            ),
+          CasillaMayorEdad(
+            valor: _acepta,
+            activa: !_ocupado,
+            alCambiar: (v) => setState(() => _acepta = v),
           ),
           if (_error != null) ...[
             const SizedBox(height: 10),

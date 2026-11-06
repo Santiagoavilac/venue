@@ -81,10 +81,14 @@ class AftrRepo {
     return Cliente.desde(datos);
   }
 
-  Future<Cliente> crearPerfil(String usuario, String nombre) async {
+  /// [acepta] deja anotado que declaró ser mayor de 18 y que aceptó los
+  /// términos, con la fecha. Lo aceptado no se desacepta: mandar `false` no
+  /// borra una constancia anterior.
+  Future<Cliente> crearPerfil(String usuario, String nombre, {bool acepta = false}) async {
     final r = await _rpc('aftr_crear_perfil', {
       'p_usuario': usuario,
       'p_nombre': nombre,
+      'p_acepta': acepta,
     });
     return Cliente.desde(Map<String, dynamic>.from(r as Map));
   }

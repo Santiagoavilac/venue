@@ -415,3 +415,34 @@ body.con-saldo .mapa-arriba { top: 8px; }
 .tarjeta-reventa > .suave { font-size: 12px; }
 .tarjeta-reventa > .precio { font-size: 21px; margin-top: auto; padding-top: 10px; }
 .tarjeta-reventa > .oro { color: var(--acento); font-size: 12px; }
+
+/* ── formularios de la hoja: comprar sin cuenta y los 18+ ─────────────
+   Etiquetas permanentes y no placeholders: el placeholder desaparece al
+   escribir y deja a la persona sin saber qué campo está llenando. Y todo lo
+   que se toca mide 48 px, que es el criterio P0 del informe. */
+.formulario { display: flex; flex-direction: column; gap: 0; }
+.campo { display: block; margin-bottom: 14px; }
+.campo > span { display: block; margin-bottom: 7px; font-size: 13px; color: var(--texto2); }
+.campo > input {
+  display: block; box-sizing: border-box; width: 100%; height: 48px;
+  background: var(--sup2); border: 1px solid var(--borde); border-radius: 10px;
+  padding: 0 14px; color: var(--texto); font: inherit;
+}
+.campo > input:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; border-color: var(--acento); }
+/* :user-invalid y no :invalid, que marca en rojo los campos vacíos antes de
+   que la persona escriba nada: el formulario entero aparecía con error. */
+.campo > input:user-invalid { border-color: var(--alerta); }
+
+.casilla {
+  display: flex; align-items: flex-start; gap: 12px;
+  min-height: 48px; padding: 12px 0; cursor: pointer;
+  font-size: 13px; line-height: 1.45; color: var(--texto);
+}
+.casilla input {
+  flex: 0 0 auto; width: 22px; height: 22px; margin: 0; accent-color: var(--acento);
+  /* 22 px de cuadrito, pero el área que se toca es la etiqueta entera */
+}
+.casilla input:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.casilla a { color: var(--acento); font-weight: 600; }
+
+.mal-texto { margin: 2px 0 12px; font-size: 14px; color: var(--alerta); }

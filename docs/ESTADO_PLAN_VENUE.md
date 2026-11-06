@@ -213,3 +213,73 @@ equipo `venue6`. Hasta que esté, el workflow falla a propósito y lo explica.
 Mejor todavía sería la integración de Git de Vercel, que trae previews por
 rama; para eso hay que darle acceso de escritura a `venuegestion-lab` sobre
 `Santiagoavilac/venue`.
+
+---
+
+## 06/11/2026 · Comprar sin cuenta, y los 18+ en las dos puertas
+
+Pedido: no obligar a nadie a abrir cuenta para comprar, pero sí para PULSE,
+mesas, historias, reventa y rachas; y decir siempre que es para mayores de 18
+y que se aceptan los términos.
+
+Hecho:
+
+- **Los 18+ y los términos, en una sola casilla y en las dos puertas.**
+  `aftr_crear_perfil` recibe `p_acepta` y guarda `mayor_edad` y `acepto_at`.
+  Queda opcional a propósito: hay apps publicadas que llaman con dos
+  argumentos y si se exigiera, nadie con la app vieja podría abrir cuenta. Lo
+  aceptado no se desacepta: una app vieja que manda `false` no borra una
+  constancia anterior. En la app la casilla es una sola pieza
+  (`casilla_mayor_edad.dart`) que usan el onboarding y la compra sin cuenta;
+  en la web es `casillaMayorEdad()`, igual.
+- **El formulario de compra sin cuenta en la web**, el mismo que ya estaba en
+  la app: nombre, apellido, correo, carnet, celular opcional y la casilla.
+  Crea la sesión anónima recién al enviar, y si el formulario no llega a
+  guardar la cierra, para no dejar una sesión sin perfil que rompe Accesos.
+- **La puerta del invitado, del lado del servidor.** Ayer puse la línea de
+  "cuenta real" en trece RPC y me faltaron nueve: `aftr_pulse` y
+  `aftr_mis_mesas` contestaban **200** a una sesión anónima. Cerradas también
+  `aftr_carta_mesa`, `aftr_mis_pedidos_mesa`, `aftr_mesa_retirar`,
+  `aftr_reservar_historia`, `aftr_guardar`, `aftr_seguir` y
+  `aftr_cambiar_foto`.
+- **Y una guarda que no se ejecutaba.** En `aftr_reservar_historia` la línea
+  estaba en el cuerpo, pero el `declare` llamaba a
+  `impl.historia_atribucion(...)`, y el declare corre antes del primer
+  `begin`: a un invitado le contestaba "La historia ya no está disponible" en
+  vez de pedirle cuenta. Revisadas las 22 funciones con guarda; era la única.
+- **Del lado del cliente, que no vea botones que fallan.** `asegurarCuenta`
+  rechaza al invitado y le abre el ingreso explicando por qué;
+  `asegurarParaComprar` es la única que no pide cuenta. El acceso fijo a
+  PULSE no se le muestra, el método de pago le va derecho al QR, y en Cuenta
+  ve qué es ser invitado y un botón para pasar a tener cuenta. Ese botón usa
+  `linkIdentity`, que engancha la cuenta a la sesión que ya tiene en vez de
+  abrir otra: si no, las entradas compradas de invitado quedan colgadas de un
+  usuario al que nadie vuelve a entrar. Para eso hubo que prender
+  `security_manual_linking_enabled` en el proyecto.
+- Y cerrar sesión siendo invitado ahora avisa: no hay cuenta a la que volver,
+  así que es perder las entradas.
+
+Verificado:
+
+- `tests/test_invitado.py` contra el REST de producción, **31/31**: lo público
+  abierto sin sesión, el invitado deja sus datos y le sirven `aftr_mi_perfil`
+  y `aftr_mis_accesos`, y **17 RPC** le piden cuenta con el mensaje de la app.
+  Se borra sola lo que crea.
+- 39 pruebas de base sobre PostgreSQL descartable (33 de antes y 6 nuevas: los
+  18+ al abrir cuenta, la app vieja de dos argumentos, que lo aceptado no se
+  desacepta, que la sesión anónima se reconoce, que `aftr_cuenta_real` la
+  rechaza, y que el formulario exige los 18 y un correo).
+- 34 pruebas de web (28 de antes y 6 nuevas de la puerta del invitado), 46 de
+  AFTR en Flutter (41 y 5 nuevas de la casilla y del onboarding), 159 de
+  Venue, `flutter analyze` sin errores ni advertencias en las dos, y
+  `tests/rpc_con_guarda.py` en verde.
+- Y en el navegador de verdad sobre `www.aftrvenue.com`: el formulario abre,
+  tocar Continuar sin marcar la casilla **no crea ninguna sesión** y muestra
+  el aviso, y no hay errores en consola. Ahí se vio y se arregló que todos los
+  campos salían en rojo antes de escribir nada
+  (`:invalid:not(:placeholder-shown)` marca los vacíos cuando no hay
+  `placeholder`; va `:user-invalid`).
+
+Queda: instalar la app nueva en el teléfono (la última es anterior a todo
+esto), y probar `linkIdentity` con una cuenta de Google de verdad, que es lo
+único que no se puede probar sin pasar por el ingreso del proveedor.

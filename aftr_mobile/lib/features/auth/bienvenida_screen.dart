@@ -7,6 +7,7 @@ import '../../core/theme/aftr_theme.dart';
 import '../../core/widgets/movimiento.dart';
 import '../../core/widgets/piezas.dart';
 import '../../data/aftr_repo.dart';
+import 'casilla_mayor_edad.dart';
 import 'ingreso.dart';
 
 /// Primera vez: nombre y @usuario, en dos pasos con barra de progreso (como
@@ -24,6 +25,7 @@ class _BienvenidaScreenState extends ConsumerState<BienvenidaScreen> {
   late final _usuario = TextEditingController(text: usuarioDesde(_nombre.text));
   int _paso = 0;
   bool _guardando = false;
+  bool _acepta = false;
   String? _error;
 
   @override
@@ -33,8 +35,9 @@ class _BienvenidaScreenState extends ConsumerState<BienvenidaScreen> {
     super.dispose();
   }
 
-  bool get _valido =>
-      _paso == 0 ? _nombre.text.trim().isNotEmpty : usuarioValido.hasMatch(_usuario.text.trim().toLowerCase());
+  bool get _valido => _paso == 0
+      ? _nombre.text.trim().isNotEmpty
+      : usuarioValido.hasMatch(_usuario.text.trim().toLowerCase()) && _acepta;
 
   Future<void> _siguiente() async {
     if (_paso == 0) {
@@ -47,7 +50,9 @@ class _BienvenidaScreenState extends ConsumerState<BienvenidaScreen> {
       _error = null;
     });
     try {
-      await ref.read(repoProvider).crearPerfil(_usuario.text.trim().toLowerCase(), _nombre.text.trim());
+      await ref
+          .read(repoProvider)
+          .crearPerfil(_usuario.text.trim().toLowerCase(), _nombre.text.trim(), acepta: _acepta);
       ref.invalidate(perfilProvider);
       if (mounted) context.pop(true);
     } catch (e) {
@@ -141,6 +146,16 @@ class _BienvenidaScreenState extends ConsumerState<BienvenidaScreen> {
                       ),
               ),
             ),
+            // En el segundo paso y no en el primero: es el toque que crea la
+            // cuenta, así que es donde la constancia tiene sentido.
+            if (_paso == 1) ...[
+              CasillaMayorEdad(
+                valor: _acepta,
+                activa: !_guardando,
+                alCambiar: (v) => setState(() => _acepta = v),
+              ),
+              const SizedBox(height: 10),
+            ],
             BotonAftr(_paso == 0 ? 'Siguiente' : 'Empezar', cargando: _guardando, onTap: _valido ? _siguiente : null),
           ]),
         ),
