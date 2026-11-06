@@ -27,3 +27,10 @@ entrypoint = "../db/functions/crear-usuario/index.ts"
 verify_jwt = false
 entrypoint = "../db/functions/correo/index.ts"
 import_map = "../db/functions/correo/import_map.json"
+
+[functions.wallet]
+# La entrada a Apple Wallet y Google Wallet. Se abre desde el correo, sin
+# sesión: el enlace lleva su propia firma y por eso va sin verificación de JWT.
+verify_jwt = false
+entrypoint = "../db/functions/wallet/index.ts"
+import_map = "../db/functions/wallet/import_map.json"

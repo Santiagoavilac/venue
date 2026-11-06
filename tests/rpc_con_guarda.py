@@ -45,6 +45,15 @@ EXCEPCIONES = {
     # nombre corto y una lista de nombres- y estan revocadas de anon y de
     # authenticated: las llama la Edge Function con la llave de servicio.
     'baneco_pasarela_de': 'elige la cuenta del cobro, solo service_role',
+    # Lo que el pase de billetera necesita: nombre, evento, lugar y el codigo
+    # que ya lleva el QR. Revocada de anon y authenticated: la llama la Edge
+    # Function con la llave de servicio, y antes comprueba la firma del enlace.
+    'wallet_entrada': 'arma el pase de billetera, solo service_role',
+    # La cola de correos: la toma y la cierra el cartero, que es la Edge
+    # Function llamada por el cron. Las dos estan revocadas de anon y de
+    # authenticated, asi que el permiso es el grant.
+    'correos_tomar': 'cola de correos, solo service_role',
+    'correos_resultado': 'cola de correos, solo service_role',
     'baneco_pasarelas': 'lista las cuentas en uso para el barrido, solo service_role',
     'baneco_finalizar_barrido': 'barrido del banco, solo service_role',
     'ver_invitacion': 'se resuelve por el token del enlace, que es el permiso',

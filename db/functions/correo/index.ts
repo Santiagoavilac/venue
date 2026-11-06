@@ -84,6 +84,31 @@ async function qrFirmado(codigo: string): Promise<string | null> {
   }
 }
 
+/* El enlace a la billetera lleva su propia firma: el correo se abre fuera de
+ * la app y sin sesión, así que la función `wallet` no tiene con qué saber
+ * quién es. La firma no protege un secreto -quien tiene el correo tiene la
+ * entrada- sino que impide ir probando códigos contra esa función. */
+async function firmaWallet(codigo: string) {
+  const secreto = env("WALLET_LINK_SECRET");
+  if (!secreto) return null;
+  const llave = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secreto).buffer,
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const f = new Uint8Array(await crypto.subtle.sign(
+    "HMAC", llave, new TextEncoder().encode(codigo).buffer));
+  return [...f].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 24);
+}
+
+async function enlacesBilletera(codigos: string[]) {
+  const base = `${env("SUPABASE_URL")}/functions/v1/wallet`;
+  return await Promise.all(codigos.map(async (c) => {
+    const f = await firmaWallet(c);
+    if (!f) return null;
+    const q = `c=${encodeURIComponent(c)}&f=${f}`;
+    return { apple: `${base}?${q}&t=apple`, google: `${base}?${q}&t=google` };
+  }));
+}
+
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
@@ -93,7 +118,11 @@ type Datos = Record<string, unknown>;
 const nombreCompleto = (d: Datos) =>
   [d.nombre, d.apellido].map((x) => String(x ?? "").trim()).filter(Boolean).join(" ");
 
-function cuerpoEntradas(d: Datos, codigos: string[], imagenes: (string | null)[]) {
+type Billetera = { apple: string; google: string } | null;
+
+function cuerpoEntradas(
+  d: Datos, codigos: string[], imagenes: (string | null)[], billeteras: Billetera[],
+) {
   const nombre = String(d.nombre ?? "").split(" ")[0];
   const persona = nombreCompleto(d) || "Invitado";
   const esMesa = d.tipo === "mesa";
@@ -124,6 +153,21 @@ function cuerpoEntradas(d: Datos, codigos: string[], imagenes: (string | null)[]
           : `<div style="padding:26px 10px;font-size:14px;color:#a1a1aa">Tu QR está en el PDF adjunto.</div>`}
         <div style="margin-top:14px;font-size:12px;color:#a1a1aa">A nombre de</div>
         <div style="margin-top:2px;font-size:17px;font-weight:700">${esc(persona)}</div>
+        ${billeteras[i] ? `
+        <div style="margin-top:16px">
+          <a href="${esc(billeteras[i]!.apple)}"
+             style="display:inline-block;margin:4px;padding:11px 16px;border-radius:10px;
+                    background:#f4f4f5;color:#0b0b0d;text-decoration:none;font-size:13px;font-weight:700">
+            Agregar a Apple Wallet</a>
+          <a href="${esc(billeteras[i]!.google)}"
+             style="display:inline-block;margin:4px;padding:11px 16px;border-radius:10px;
+                    background:transparent;border:1px solid rgba(255,255,255,.22);
+                    color:#f4f4f5;text-decoration:none;font-size:13px;font-weight:700">
+            Agregar a Google Wallet</a>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:#71717a">
+          En la billetera te aparece solo cuando se acerca la fecha o cuando llegás al lugar.
+        </div>` : ""}
       </div>`).join("")}
 
     <p style="margin:26px 0 0;font-size:13px;color:#71717a">
@@ -148,6 +192,7 @@ async function mandar(fila: Datos) {
 
   // los QR del cuerpo, firmados: Gmail en la web no dibuja los `cid:`
   const imagenes = await Promise.all(codigos.map((c) => qrFirmado(c)));
+  const billeteras = await enlacesBilletera(codigos);
 
   // y la entrada para descargar: una página por entrada, con el arte de fondo
   const arte = await bajarArte(d.arte);
@@ -173,7 +218,7 @@ async function mandar(fila: Datos) {
       to: [String(fila.destino)],
       ...(RESPONDER_A ? { reply_to: RESPONDER_A } : {}),
       subject: asunto,
-      html: cuerpoEntradas(d, codigos, imagenes),
+      html: cuerpoEntradas(d, codigos, imagenes, billeteras),
       attachments: todos,
     }),
     signal: AbortSignal.timeout(15000),

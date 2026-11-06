@@ -69,6 +69,10 @@ function cuando(fecha = new Date()) {
 
 // ── PEM ───────────────────────────────────────────────────────────────
 export function dePem(pem: string, tipo: string) {
+  // Un secreto guardado desde un archivo .env trae los saltos de línea como
+  // los dos caracteres \\ y n, no como saltos. Sin esto, el base64 lleva
+  // basura adentro y falla con "Failed to decode base64", que no dice nada.
+  pem = pem.replace(/\\n/g, "\n");
   const re = new RegExp(`-----BEGIN ${tipo}-----([\\s\\S]*?)-----END ${tipo}-----`, "g");
   const out: Uint8Array[] = [];
   for (const m of pem.matchAll(re)) {
