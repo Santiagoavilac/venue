@@ -62,3 +62,46 @@ Por qué no quedó hecho: el campo de ese diálogo sólo acepta un arrastre de
 verdad o el selector de archivos del sistema, y rechaza el archivo cuando se le
 suelta por programa ("Tipo de archivo no compatible"). Es el único paso de todo
 esto que necesita una mano.
+
+---
+
+# Wallet
+
+## Apple Wallet · listo para firmar
+
+| | |
+|---|---|
+| Pass Type ID | `pass.app.venue.aftr` |
+| Team | `WYCP7K767H` |
+| Certificado | emitido por Apple WWDR G4, vence **06/12/2027** |
+
+El certificado se pidió sin pasar por Llavero: la solicitud se generó con
+`openssl`, se subió al portal y se bajó el certificado. La llave privada nunca
+salió de esta máquina.
+
+Los tres pedazos están como secretos en Supabase —`WALLET_CERT`, `WALLET_WWDR`
+y `WALLET_KEY`, más `WALLET_PASS_TYPE` y `WALLET_TEAM`— y una copia de trabajo
+en `~/Documents/venue-claves/wallet/`. **No van al repo.**
+
+Verificado: un `.pkpass` armado con este certificado pasa
+`openssl smime -verify` **contra la raíz de Apple**, que es exactamente lo que
+hace el iPhone antes de dejar instalar un pase.
+
+**El certificado vence el 06/12/2027.** Cuando se acerque hay que pedir uno
+nuevo con la misma llave (`pase.key`) y reemplazar `WALLET_CERT`.
+
+## Google Wallet · listo para emitir
+
+| | |
+|---|---|
+| Merchant | `BCR2DN6DZL5N3TSV` |
+| Entidad emisora | `3388000000023222198` (`WALLET_GOOGLE_ISSUER`) |
+| API | habilitada en el proyecto `aftr-6d08d` |
+| Quién firma | la cuenta de servicio de FCM, con acceso de Desarrollador |
+
+Se reusa la cuenta de servicio de `FCM_AFTR` en vez de crear otra: es la misma
+identidad y una llave menos que cuidar.
+
+Falta pedir **acceso de publicación** en la consola de Google Pay (son 2 o 3
+días y pide completar el perfil de empresa). Hasta entonces los pases funcionan
+en modo demo, que alcanza para probar.
