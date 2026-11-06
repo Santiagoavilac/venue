@@ -20,3 +20,10 @@ entrypoint = "../db/functions/historias-media/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "../db/functions/crear-usuario/index.ts"
+
+[functions.correo]
+# El cartero: manda las entradas por correo desde la cola. Lo llama el cron,
+# nunca un navegador, así que va sin verificación de JWT y con su propio token.
+verify_jwt = false
+entrypoint = "../db/functions/correo/index.ts"
+import_map = "../db/functions/correo/import_map.json"
