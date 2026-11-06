@@ -125,3 +125,30 @@ Lo mejor sigue siendo la integración de Git de Vercel, porque además trae un
 preview por rama. Para eso hay que darle a `venuegestion-lab` acceso de
 escritura al repo `Santiagoavilac/venue`; con eso hecho, se conecta y el
 workflow se puede borrar.
+
+## CORS: los encabezados también, no sólo el origen
+
+Qué se rompía: al acotar el CORS de las Edge Functions quedó escrita a mano la
+lista de encabezados permitidos —`authorization, apikey, content-type`— y
+**supabase-js manda además `x-client-info`**. El navegador compara esa lista
+con lo que va a mandar y, si falta uno, **cancela el POST antes de enviarlo**.
+Resultado: pagar con QR desde la web no funcionaba, la llamada no llegaba nunca
+a la función, no quedaba registro de nada, y en pantalla salía "No pudimos
+conectar con el cobro".
+
+Cómo se encontró: en los registros de la función, dos llamadas de 248 ms y
+191 ms sin ninguna fila de cobro en la base. Demasiado rápido para hablar con
+el banco: eran los *preflight* OPTIONS, y el POST nunca salió.
+
+Por qué no se notó antes: la app nativa y las pruebas por `curl` no pasan por
+CORS, y antes el CORS era `*`, que deja pasar cualquier encabezado.
+
+Cómo quedó: cuando el origen es de los propios, se devuelven **los encabezados
+que el navegador pidió**, en vez de una lista nueva que se vuelve a quedar
+vieja con el próximo que agregue el SDK. Lo que protege es el origen, que se
+sigue comparando contra la lista; los encabezados de una llamada que ya viene
+de un origen autorizado no agregan riesgo. Vale para `baneco` y para
+`crear-usuario`; `historias-media` ya tenía `x-client-info` en su lista.
+
+**Al agregar un dominio o al tocar el CORS, probarlo desde el navegador**, no
+con `curl`: `curl` no hace preflight y por eso esto pasó una semana sin verse.

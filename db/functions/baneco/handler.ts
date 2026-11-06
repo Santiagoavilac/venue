@@ -14,12 +14,33 @@ const BASE_CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-cron, x-baneco-token",
 };
+// Los encabezados permitidos se devuelven como los pidió el navegador.
+//
+// Qué se rompía: la lista estaba escrita a mano -authorization, apikey,
+// content-type- y supabase-js manda además `x-client-info`. El navegador
+// compara la lista del preflight con lo que va a mandar, y si falta uno
+// cancela el POST antes de enviarlo: la llamada no llega nunca a la función,
+// no queda registro de nada, y en la pantalla sale "No pudimos conectar con
+// el cobro". Pagar con QR desde la web estuvo roto desde que se acotó el CORS
+// -antes era `*` y pasaba cualquier encabezado-, y no se notó porque la app
+// y las pruebas no pasan por CORS.
+//
+// Se devuelve lo pedido en vez de una lista nueva porque la lista se vuelve a
+// quedar vieja con el próximo encabezado que agregue el SDK. Lo que protege
+// acá es el origen, que se sigue comparando contra los propios; los
+// encabezados de una llamada que ya viene de un origen autorizado no agregan
+// riesgo.
 function cors(req: Request, extra?: string) {
   const permitidos = [...PROPIOS, ...(extra ?? "").split(",").map((o) => o.trim()).filter(Boolean)];
   const origen = req.headers.get("origin");
-  return origen && permitidos.includes(origen)
-    ? { ...BASE_CORS, "Access-Control-Allow-Origin": origen, Vary: "Origin" }
-    : BASE_CORS;
+  if (!origen || !permitidos.includes(origen)) return BASE_CORS;
+  const pedidos = req.headers.get("access-control-request-headers");
+  return {
+    ...BASE_CORS,
+    ...(pedidos ? { "Access-Control-Allow-Headers": pedidos } : {}),
+    "Access-Control-Allow-Origin": origen,
+    Vary: "Origin, Access-Control-Request-Headers",
+  };
 }
 const publico = (q: Datos | null, imagen = true) => q && ({
   estado: q.estado, qrId: q.qr_id, ...(imagen ? { imagen: q.qr_imagen } : {}), monto: q.monto, moneda: q.moneda, vence: q.vence,

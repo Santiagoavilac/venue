@@ -244,3 +244,42 @@ Deno.test("el QR se confirma contra la cuenta con la que se generó", async () =
   igual(consultada, "sitroom");
   igual(s.tablas.finalizacion[0].p_errores, 0);
 });
+
+/* ── CORS: los encabezados que el SDK manda de verdad ───────────────────
+ * Qué se rompía: la lista de encabezados permitidos estaba escrita a mano y
+ * supabase-js manda además x-client-info. El navegador cancelaba el POST en
+ * el preflight, así que pagar con QR desde la web no funcionaba y no quedaba
+ * registro de nada.
+ */
+Deno.test("el preflight permite los encabezados que pide el navegador", async () => {
+  const s = escenario();
+  s.config.ORIGENES_PERMITIDOS = "https://www.aftrvenue.com";
+  const r = await s.handler(new Request("https://local/baneco", {
+    method: "OPTIONS",
+    headers: {
+      Origin: "https://www.aftrvenue.com",
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "authorization,apikey,content-type,x-client-info",
+    },
+  }));
+  igual(r.status, 200);
+  igual(r.headers.get("Access-Control-Allow-Origin"), "https://www.aftrvenue.com");
+  const permitidos = r.headers.get("Access-Control-Allow-Headers") ?? "";
+  igual(permitidos.includes("x-client-info"), true);
+  // y la respuesta varía según lo pedido, para que no se cachee la de otro
+  igual((r.headers.get("Vary") ?? "").includes("Access-Control-Request-Headers"), true);
+});
+
+Deno.test("un origen ajeno no se autoriza aunque pida encabezados", async () => {
+  const s = escenario();
+  s.config.ORIGENES_PERMITIDOS = "https://www.aftrvenue.com";
+  const r = await s.handler(new Request("https://local/baneco", {
+    method: "OPTIONS",
+    headers: {
+      Origin: "https://no-es-nuestro.example",
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "authorization,x-client-info",
+    },
+  }));
+  igual(r.headers.get("Access-Control-Allow-Origin"), null);
+});
