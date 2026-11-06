@@ -288,11 +288,10 @@ esto), y probar `linkIdentity` con una cuenta de Google de verdad, que es lo
 
 ## 06/11/2026 · Probar las dos pasarelas nuevas (y de paso, una por boliche)
 
-**Lo que se pidió fue probar si sirven las dos pasarelas nuevas. La respuesta
-está al final: el banco las rechaza.** Lo de abajo -que cada boliche pueda
-cobrar a su propia cuenta- salió de esa prueba y es más de lo que se pidió:
-queda apagado, sin ningún boliche ni evento apuntado a ninguna pasarela, así
-que todo cobra a la cuenta de la plataforma exactamente como antes.
+**Lo que se pidió fue probar si sirven las dos pasarelas nuevas. Sirven: la
+respuesta y cómo se encontró el error están al final.** Lo de abajo -que cada
+boliche pueda cobrar a su propia cuenta- salió de esa prueba y es más de lo que
+se pidió, pero sin eso no había forma de probarlas.
 
 ### Cada boliche puede cobrar a su propia cuenta (apagado)
 
@@ -328,41 +327,39 @@ Lo que hubo que mover:
 
 Probado en producción: dos eventos de SitRoom, uno heredando la cuenta del
 boliche y el otro con la de Sitcom, comprando como invitado y pidiendo el QR a
-la Edge Function. **El camino funciona**: con la pasarela de la plataforma el
-QR sale (se generó, se verificó y se anuló en el banco al terminar). Con
-`sitroom` y `sitcom` llega a autenticar con esas credenciales y el banco las
-rechaza —ver abajo—, que es justamente la prueba de que no está usando la de
-la plataforma.
+la Edge Function. Cada uno generó su QR en su propia cuenta del banco (ver
+abajo).
 
 Verificado además: 23 pruebas de base de baneco sobre PostgreSQL descartable
 (16 de antes y 7 nuevas), 37 de la Edge Function en Deno (32 y 5 nuevas), 39 de
 base social, 28 de web y `tests/rpc_con_guarda.py` en verde.
 
-### Bloqueado: el banco rechaza las dos credenciales nuevas
+### Las dos pasarelas sirven
 
-    usuario adicional A… (cuenta de SitRoom) → 401 "Credenciales de autenticacion no validas."
-    usuario adicional B… (cuenta de Sitcom)  → 401 "Credenciales de autenticacion no validas."
+Sirven. Lo que estaba mal era el código: **el banco cruzó los códigos de 4
+dígitos respecto de los usuarios**. El código que mandó para una cuenta es la
+contraseña del usuario de la otra. Los usuarios y las cuentas del papel sí
+están bien; el cruce es sólo de los códigos, que están en los secretos y no
+acá.
 
-Los usuarios, las cuentas y las llaves no se escriben acá: están en los
-secretos de Supabase y en el chat con el banco.
+Cómo se encontró, por si vuelve a pasar: un usuario inventado devuelve **404
+"Usuario no habilitado para uso de apis"** y éstos devolvían **401
+"Credenciales de autenticacion no validas"**. Esa diferencia es la que dice
+que el usuario existe y está habilitado, y que lo que falla es la contraseña o
+la llave. Con eso quedaban dos cosas para probar, no veinte.
 
-Probado con el mismo cliente y el mismo cifrado AES que usa la pasarela que sí
-funciona, contra `apimkt.baneco.com.bo`. Se probó **una vez cada una** y se
-paró ahí: insistir con contraseñas distintas bloquea el usuario en el banco.
+Probado de punta a punta contra producción, con las dos cuentas:
 
-Los secretos ya están cargados con lo que mandó el banco, así que cuando se
-aclare la contraseña es cambiar un valor y nada más. Lo que hay que preguntarle
-a Rebeca (Banco Económico):
+- autenticación y `generateQR` directos contra `apimkt.baneco.com.bo`, cada
+  usuario acreditando a su cuenta del papel;
+- y por el camino real: comprando como invitado en dos eventos de SitRoom, uno
+  heredando la cuenta del boliche y el otro con pasarela propia de Sitcom. Cada
+  uno generó su QR en su cuenta (`pago_qr.pasarela` = `sitroom` y `sitcom`).
 
-1. El código de 4 dígitos que mandaron por cada cuenta, ¿es la contraseña de
-   APIMARKET del usuario adicional, o sólo el código de la cuenta? En la
-   pasarela que ya funciona la contraseña también es de 4 dígitos, por eso se
-   probó así.
-2. El primero figura en el correo como "usuario adicional **de consulta**";
-   sólo del segundo dice que se lo habilitó para APIMARKET. ¿Están los dos
-   habilitados para el sistema?
-3. ¿Hace falta una primera activación del usuario adicional antes de que la API
-   lo acepte?
+Los cuatro QR de prueba se anularon en el banco al terminar y los eventos de
+prueba quedaron despublicados.
 
-La clave de banca por internet del titular no se usó ni se va a usar: la API
-tiene sus propios usuarios.
+Falta pedirle al banco que **suba el límite del usuario de SitRoom**, que
+figura con *Importe Límite por Transacción: 0.01*. Con un centavo de tope no
+pasa ningún cobro de verdad.
+
