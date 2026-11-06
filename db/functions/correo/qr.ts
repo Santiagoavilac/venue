@@ -144,7 +144,10 @@ function trozo(tipo: string, datos: Uint8Array) {
   const nombre = new TextEncoder().encode(tipo);
   const cuerpo = new Uint8Array(nombre.length + datos.length);
   cuerpo.set(nombre); cuerpo.set(datos, nombre.length);
-  const out = new Uint8Array(8 + cuerpo.length + 4);
+  // largo(4) + tipo(4) + datos + crc(4). El tipo ya viene dentro de `cuerpo`,
+  // así que el total es 4 + cuerpo + 4 y no uno más: con cuatro bytes de más
+  // al final, cada trozo empuja al siguiente y el archivo deja de ser un PNG.
+  const out = new Uint8Array(4 + cuerpo.length + 4);
   const v = new DataView(out.buffer);
   v.setUint32(0, datos.length);
   out.set(cuerpo, 4);

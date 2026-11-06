@@ -57,6 +57,33 @@ async function bajarArte(url: unknown): Promise<Uint8Array | null> {
   }
 }
 
+/* El QR, servido desde una URL firmada.
+ *
+ * Qué se rompía: iba incrustado como adjunto en línea (`cid:`). En el teléfono
+ * se ve, pero Gmail en la web no lo dibuja -sale el cuadrito roto-, y ahí es
+ * donde más gente abre el correo. Una URL firmada sí la muestra.
+ *
+ * El bucket es privado y el nombre es un uuid al azar: sin la firma no se
+ * llega al archivo y no se pueden ir probando nombres. Si subir o firmar
+ * falla, el correo sale igual sin la imagen: la entrada de verdad es el PDF
+ * adjunto, que no depende de esto.
+ */
+const DIAS_FIRMA = 60;
+async function qrFirmado(codigo: string): Promise<string | null> {
+  try {
+    const png = await qrPng(codigo);
+    const ruta = `${crypto.randomUUID()}.png`;
+    const subida = await admin.storage.from("aftr-qr")
+      .upload(ruta, png, { contentType: "image/png", upsert: false });
+    if (subida.error) return null;
+    const firma = await admin.storage.from("aftr-qr")
+      .createSignedUrl(ruta, DIAS_FIRMA * 24 * 3600);
+    return firma.data?.signedUrl ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
@@ -66,7 +93,7 @@ type Datos = Record<string, unknown>;
 const nombreCompleto = (d: Datos) =>
   [d.nombre, d.apellido].map((x) => String(x ?? "").trim()).filter(Boolean).join(" ");
 
-function cuerpoEntradas(d: Datos, codigos: string[]) {
+function cuerpoEntradas(d: Datos, codigos: string[], imagenes: (string | null)[]) {
   const nombre = String(d.nombre ?? "").split(" ")[0];
   const persona = nombreCompleto(d) || "Invitado";
   const esMesa = d.tipo === "mesa";
@@ -91,15 +118,17 @@ function cuerpoEntradas(d: Datos, codigos: string[]) {
     ${codigos.map((_c, i) => `
       <div style="border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:20px;margin-bottom:14px;text-align:center">
         ${cuantas > 1 ? `<div style="font-size:12px;letter-spacing:.14em;color:#a1a1aa;margin-bottom:12px">ENTRADA ${i + 1} DE ${cuantas}</div>` : ""}
-        <img src="cid:qr${i}" alt="QR de la entrada" width="220" height="220"
-             style="display:block;margin:0 auto;background:#fff;border-radius:12px">
+        ${imagenes[i]
+          ? `<img src="${esc(imagenes[i])}" alt="QR de la entrada" width="220" height="220"
+                 style="display:block;margin:0 auto;background:#fff;border-radius:12px;padding:10px">`
+          : `<div style="padding:26px 10px;font-size:14px;color:#a1a1aa">Tu QR está en el PDF adjunto.</div>`}
         <div style="margin-top:14px;font-size:12px;color:#a1a1aa">A nombre de</div>
         <div style="margin-top:2px;font-size:17px;font-weight:700">${esc(persona)}</div>
       </div>`).join("")}
 
     <p style="margin:26px 0 0;font-size:13px;color:#71717a">
-      Adjuntamos ${cuantas > 1 ? "las entradas" : "la entrada"} en PDF, para guardar o imprimir.
-      Si no ves el QR acá, abrí el adjunto.
+      ${cuantas > 1 ? "Tus entradas están" : "Tu entrada está"} adjunta${cuantas > 1 ? "s" : ""}
+      en PDF, para guardar o imprimir. Si acá no ves el QR, abrí el adjunto: ahí está siempre.
     </p>
     <p style="margin:14px 0 0;font-size:13px;color:#71717a">
       Cada QR entra una sola vez. Si lo compartís, entra quien lo muestre primero.
@@ -117,12 +146,8 @@ async function mandar(fila: Datos) {
   const codigos = (Array.isArray(d.codigos) ? d.codigos : []).map(String).filter(Boolean);
   if (!codigos.length) throw new Error("El correo no tiene ninguna entrada que mandar.");
 
-  // los QR del cuerpo del correo
-  const adjuntos = await Promise.all(codigos.map(async (c, i) => ({
-    filename: `entrada-${i + 1}.png`,
-    content: base64(await qrPng(c)),
-    content_id: `qr${i}`,
-  })));
+  // los QR del cuerpo, firmados: Gmail en la web no dibuja los `cid:`
+  const imagenes = await Promise.all(codigos.map((c) => qrFirmado(c)));
 
   // y la entrada para descargar: una página por entrada, con el arte de fondo
   const arte = await bajarArte(d.arte);
@@ -134,7 +159,7 @@ async function mandar(fila: Datos) {
     persona: nombreCompleto(d),
     codigo: c,
   })), arte);
-  const todos: Array<Record<string, string>> = [...adjuntos, {
+  const todos = [{
     filename: `entrada${codigos.length > 1 ? "s" : ""}-aftr.pdf`,
     content: base64(pdf),
   }];
@@ -148,7 +173,7 @@ async function mandar(fila: Datos) {
       to: [String(fila.destino)],
       ...(RESPONDER_A ? { reply_to: RESPONDER_A } : {}),
       subject: asunto,
-      html: cuerpoEntradas(d, codigos),
+      html: cuerpoEntradas(d, codigos, imagenes),
       attachments: todos,
     }),
     signal: AbortSignal.timeout(15000),
