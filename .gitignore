@@ -40,3 +40,11 @@ aftr_mobile/android/local.properties
 venue_mobile/android/.kotlin/
 *.env
 !*.env.example
+
+# lo que se publica, armado por tools/armar_web.mjs y aftr_web/armar.mjs
+dist/
+aftr_web/dist/
+
+# enlace local con Vercel
+.vercel
+.env*

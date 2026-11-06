@@ -1,0 +1,4 @@
+# Igual que el de la raíz: lo que se publica lo decide armar.mjs.
+dist
+node_modules
+config.js

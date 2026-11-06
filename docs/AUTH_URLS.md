@@ -83,10 +83,45 @@ esta sesión tocó y podía estar roto en producción sin avisar:
   generar entradas con precio. Se apagó, y la web de Venue aprendió a mandarlo
   para poder volver a prenderlo.
 
-## Lo que NO se está desplegando
+## Por qué las webs no se actualizaban
 
-Las dos webs **no se actualizan solas con el push**: `www.aftrvenue.com` y
-`venue-web-amber.vercel.app` siguen sirviendo código viejo (sin SRI, sin la
-reventa en el inicio, sin el `<meta>` de CSP). Lo de la base y las Edge
-Functions sí está vivo, porque se aplica desde acá. Hay que revisar la conexión
-de los dos proyectos de Vercel con el repo.
+Las dos webs servían el código del **05/11 a las 03:47** mientras la base y las
+Edge Functions ya tenían todo lo nuevo. No era el push: los dos proyectos de
+Vercel **no estaban conectados al repo**. Comprobado por API:
+
+    /v9/projects/venue-web → link: null
+    /v9/projects/aftr-web  → link: null
+
+y los ocho despliegues de cada uno tienen `meta: {}`, sin commit asociado: todos
+eran `vercel deploy` a mano. Un `git push` no tenía forma de llegar a la web.
+
+Tampoco se podían conectar, por tres razones concretas:
+
+1. **El repo está en otra cuenta de GitHub.** Es de `Santiagoavilac`, y la cuenta
+   de GitHub conectada a Vercel es `venuegestion-lab`: Vercel contesta
+   `repo_no_access` al intentar enlazarlo.
+2. **`config.js` no se versiona** (está en `.gitignore`, ver `config.example.js`).
+   Un build desde el repo lo dejaba afuera y la web arrancaba sin base.
+3. **Publicar la raíz publicaría el repo entero**: `db/`, `docs/`, `supabase/`,
+   `tests/` y las dos apps Flutter, en texto plano.
+
+Cómo quedó:
+
+- `tools/armar_web.mjs` y `aftr_web/armar.mjs` arman la carpeta `dist/` que se
+  publica, copiando **sólo** los archivos que la web usa, nombre por nombre; si
+  falta uno, el build falla en vez de publicar una web a medias. Y escriben
+  `config.js` desde `SUPABASE_URL` y `SUPABASE_ANON_KEY`, que ya están cargadas
+  en los dos proyectos (la anon key es pública: viaja al navegador igual y lo
+  que protege los datos es RLS). Sin esas variables usan el `config.js` local,
+  así que un despliegue a mano desde la máquina sigue andando igual.
+- `.github/workflows/publicar-webs.yml` publica las dos en cada push a `main`.
+  **Falta un paso que es tuyo**: cargar el secreto `VERCEL_TOKEN` en el repo
+  (GitHub → Settings → Secrets and variables → Actions), con un token de Vercel
+  del equipo `venue6`. Hasta que esté, el workflow falla a propósito y lo dice.
+- `cleanUrls` en `aftr_web/vercel.json`: `/terminos`, `/privacidad` y `/normas`
+  se enlazan sin extensión y contestaban 404.
+
+Lo mejor sigue siendo la integración de Git de Vercel, porque además trae un
+preview por rama. Para eso hay que darle a `venuegestion-lab` acceso de
+escritura al repo `Santiagoavilac/venue`; con eso hecho, se conecta y el
+workflow se puede borrar.

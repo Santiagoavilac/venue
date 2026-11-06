@@ -1,0 +1,88 @@
+# Publica las dos webs cuando se hace push a main.
+#
+# Qué se rompía: los dos proyectos de Vercel no estaban conectados al repo
+# (`link: null`, y todos los despliegues sin commit asociado), así que un
+# `git push` no publicaba nada. venuebol.com y aftrvenue.com se quedaron con
+# el código del 05/11 a las 03:47 mientras la base y las Edge Functions ya
+# tenían todo lo nuevo, y eso no se notaba desde acá porque los cambios de
+# base sí se aplican a mano.
+#
+# No se puede usar la integración de Git de Vercel: el repo es de la cuenta de
+# GitHub `Santiagoavilac` y la cuenta de GitHub conectada a Vercel es
+# `venuegestion-lab`, así que Vercel contesta `repo_no_access` al intentar
+# enlazarlo. Enlazarlo sería mejor (trae los previews por rama), y para eso hay
+# que darle acceso de escritura a `venuegestion-lab` sobre el repo.
+#
+# Mientras tanto esto hace lo mismo desde el push: le pide a Vercel que
+# construya y publique cada proyecto, igual que un `vercel deploy --prod` a
+# mano. Necesita un único secreto en el repo (Settings → Secrets → Actions):
+#
+#   VERCEL_TOKEN   Vercel → Account Settings → Tokens, con alcance del
+#                  equipo `venue6`.
+#
+# Los identificadores no son secretos: son los del equipo y los proyectos.
+name: Publicar las webs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: publicar-webs
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: team_7HGHMKPfleb1oh7oXOAFZ16p
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    strategy:
+      # Una no cancela a la otra: si falla AFTR, Venue igual se publica.
+      fail-fast: false
+      matrix:
+        include:
+          - nombre: Venue
+            carpeta: .
+            proyecto: prj_7vVOjLy8SxnXcUU4gvgl92gaQxTS
+          - nombre: AFTR
+            carpeta: aftr_web
+            proyecto: prj_SblH4E0U4aByE1IQzznmhKrapfsY
+    name: ${{ matrix.nombre }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Antes de publicar: que el armado no deje la web a medias. Corre con
+      # las variables puestas para no depender del config.js local, que no se
+      # versiona.
+      - name: Probar el armado
+        working-directory: ${{ matrix.carpeta }}
+        env:
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_ANON_KEY: prueba
+        run: |
+          if [ "${{ matrix.carpeta }}" = "." ]; then
+            node tools/armar_web.mjs
+            test -s dist/index.html && test -s dist/app.js && test -s dist/config.js
+          else
+            node armar.mjs
+            test -s dist/index.html && test -s dist/aftr.js && test -s dist/config.js
+          fi
+
+      - name: Publicar
+        working-directory: ${{ matrix.carpeta }}
+        env:
+          VERCEL_PROJECT_ID: ${{ matrix.proyecto }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "Falta el secreto VERCEL_TOKEN en el repo: la web no se publica."
+            echo "GitHub → Settings → Secrets and variables → Actions → New secret."
+            exit 1
+          fi
+          npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"

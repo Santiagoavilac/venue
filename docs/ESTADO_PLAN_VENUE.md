@@ -177,3 +177,39 @@ Nada de esto se puede cerrar sin un proyecto real delante:
 3. **Mirar las pantallas en un teléfono.** Todo lo de acá está verificado con
    `flutter analyze`, 140 pruebas y las de base sobre PostgreSQL descartable,
    pero el contraste y los tamaños reales se ven mirando.
+
+---
+
+## 06/11/2026 · Las webs vuelven a publicarse con el push
+
+Las dos webs servían el código del 05/11 a las 03:47: los proyectos de Vercel
+no estaban conectados al repo (`link: null`, y todos los despliegues sin commit
+asociado). El detalle de por qué y cómo quedó está en `docs/AUTH_URLS.md`.
+
+Hecho:
+
+- `tools/armar_web.mjs` y `aftr_web/armar.mjs` arman la carpeta `dist/` que se
+  publica —sólo los archivos de la web, nombre por nombre— y escriben
+  `config.js` desde `SUPABASE_URL` y `SUPABASE_ANON_KEY`, ya cargadas en los
+  dos proyectos. Sin esas variables usan el `config.js` local, así que
+  desplegar a mano desde la máquina sigue funcionando.
+- `.vercelignore` en la raíz y en `aftr_web/`.
+- `cleanUrls` en `aftr_web/vercel.json`: `/terminos`, `/privacidad` y `/normas`
+  contestaban 404.
+- `.github/workflows/publicar-webs.yml` publica las dos en cada push a `main`.
+- `tests/armar-web.test.mjs`: 6 pruebas que comparan lo que el HTML carga con
+  lo que el armador copia, para que la lista no se quede vieja.
+
+Verificado: las dos webs en vivo con el código de ayer
+(`subirComprobanteEntrada` y `pase_libre` en venuebol.com, `reventaEnInicio` en
+aftrvenue.com), `config.js` servido desde las variables, `/terminos`,
+`/privacidad` y `/normas` en 200, y `db/`, `docs/`, `CLAUDE.md` y `.env.local`
+en 404. 22 pruebas de web en verde (16 de antes + 6 nuevas) y `node --check` de
+los 12 archivos de las dos webs.
+
+**Falta un paso que no puedo hacer yo**: cargar el secreto `VERCEL_TOKEN` en el
+repo (GitHub → Settings → Secrets and variables → Actions), con un token del
+equipo `venue6`. Hasta que esté, el workflow falla a propósito y lo explica.
+Mejor todavía sería la integración de Git de Vercel, que trae previews por
+rama; para eso hay que darle acceso de escritura a `venuegestion-lab` sobre
+`Santiagoavilac/venue`.

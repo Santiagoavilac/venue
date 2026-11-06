@@ -1,0 +1,20 @@
+# Lo que no hace falta para armar la web de Venue. Lo que se publica lo decide
+# tools/armar_web.mjs; esto sólo evita subir el repo entero en cada despliegue.
+venue_mobile
+aftr_mobile
+db
+supabase
+tests
+docs
+outputs
+work
+dist
+node_modules
+*.md
+!README.md
+# config.js lo escribe el build desde las variables del proyecto
+config.js
+aftr_web/config.js
+aftr_web/dist
+.env
+.env.local
