@@ -54,6 +54,10 @@ EXCEPCIONES = {
     # authenticated, asi que el permiso es el grant.
     'correos_tomar': 'cola de correos, solo service_role',
     'correos_resultado': 'cola de correos, solo service_role',
+    # La cola de notificaciones: la toma y la cierra la Edge Function del push,
+    # llamada por el cron. Revocadas de anon y de authenticated.
+    'push_tomar': 'cola de notificaciones, solo service_role',
+    'push_resultado': 'cola de notificaciones, solo service_role',
     'baneco_pasarelas': 'lista las cuentas en uso para el barrido, solo service_role',
     'baneco_finalizar_barrido': 'barrido del banco, solo service_role',
     'ver_invitacion': 'se resuelve por el token del enlace, que es el permiso',

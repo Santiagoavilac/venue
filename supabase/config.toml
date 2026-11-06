@@ -34,3 +34,9 @@ import_map = "../db/functions/correo/import_map.json"
 verify_jwt = false
 entrypoint = "../db/functions/wallet/index.ts"
 import_map = "../db/functions/wallet/import_map.json"
+
+[functions.push]
+# Las notificaciones. Lo llama el cron con su token, nunca un navegador.
+verify_jwt = false
+entrypoint = "../db/functions/push/index.ts"
+import_map = "../db/functions/push/import_map.json"
