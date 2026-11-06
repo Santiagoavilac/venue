@@ -382,3 +382,36 @@ Verificado comprando en los dos como invitado y pidiendo el QR a la Edge
 Function: `pago_qr.pasarela` sale `sitroom` y `sitcom`. Esos QR de prueba se
 anularon; los eventos quedan a la venta para probar pagando de verdad.
 
+
+---
+
+## 06/11/2026 · El pedido deja de retener el cupo doce horas
+
+Hay dos plazos y sólo uno estaba corto:
+
+| | Antes | Ahora |
+|---|---|---|
+| El pedido retiene el cupo | 12 horas | **30 minutos** |
+| El QR se puede pagar | 10 minutos | 10 minutos |
+
+El de diez minutos es del **cobro**, y arranca cuando se pide el QR. Cuando ese
+QR se vence, el barrido lo anula en el banco y eso cancela el pedido y devuelve
+el cupo. Pero eso sólo pasa si la persona llegó a pedir el QR: quien tocaba
+"Comprar" y cerraba la app bloqueaba un lugar **doce horas** sin haber pagado
+nada. En una fiesta que se llena, diez personas así son diez lugares muertos
+toda la noche.
+
+Los dos plazos siguen topeados por el inicio del evento: un pedido nunca vive
+más allá de que la fiesta empiece.
+
+Y para que acortar no rompa al que sí está pagando: **al reservar el cobro, el
+pedido se extiende hasta cubrir los diez minutos del QR**. Sin eso, abrir el
+pago en el minuto 29 daba un QR que moría al minuto siguiente, porque el plazo
+del QR es `least(vence del pedido, 10 minutos)`. No sirve para retener el cupo:
+sólo puede haber un cobro vivo por pedido, y cuando ese muere el pedido se cae.
+
+Las mesas no entran: tienen su propio plazo por boliche (`clubs.horas_reserva`).
+
+Probado con `tests/test_plazos.py`, **5/5**, contra la API real y sin tocar el
+banco: el pedido dura 30 minutos, el QR nace con sus diez aunque al pedido le
+quede uno, y el pedido se extiende para cubrirlo. No deja residuo.
