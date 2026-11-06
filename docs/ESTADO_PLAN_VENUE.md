@@ -359,7 +359,26 @@ Probado de punta a punta contra producción, con las dos cuentas:
 Los cuatro QR de prueba se anularon en el banco al terminar y los eventos de
 prueba quedaron despublicados.
 
-Falta pedirle al banco que **suba el límite del usuario de SitRoom**, que
-figura con *Importe Límite por Transacción: 0.01*. Con un centavo de tope no
-pasa ningún cobro de verdad.
+### El tope de 0.01 no frena el cobro
+
+El usuario de SitRoom figura en el papel con *Importe Límite por Transacción:
+0.01*. Probado: **genera igual un QR de Bs 1**, tanto directo como por la app.
+Tiene sentido: ese límite es de lo que el usuario puede **sacar**, y el QR es
+plata que **entra**. Lo que todavía no se probó es pagarlo de verdad, que es lo
+único que puede demostrar que el banco acredita; eso necesita que alguien pague
+Bs 1 desde su teléfono.
+
+### Los dos boliches demo, a Bs 1
+
+Queda un evento por boliche, de hoy, publicado y visible en AFTR:
+
+| Evento | Boliche | Precio | Cobra a |
+|---|---|---|---|
+| Noche de prueba · SitRoom | SitRoom | Bs 1 | la cuenta de SitRoom |
+| Noche de prueba · Sitcom | Sitcom | Bs 1 | la cuenta de Sitcom |
+
+Cada uno hereda la pasarela de su boliche, sin pasarela propia del evento.
+Verificado comprando en los dos como invitado y pidiendo el QR a la Edge
+Function: `pago_qr.pasarela` sale `sitroom` y `sitcom`. Esos QR de prueba se
+anularon; los eventos quedan a la venta para probar pagando de verdad.
 
