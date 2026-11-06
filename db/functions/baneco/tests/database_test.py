@@ -41,15 +41,34 @@ create table mesas(id uuid primary key, cliente_id uuid, estado text, pagada_por
  updated_at timestamptz, manillas int);
 create function gen_code_evento(uuid) returns text language sql as $$ select gen_random_uuid()::text $$;
 create function impl.aftr_staff_orden(p_orden uuid) returns aftr_ordenes language sql as $$ select * from aftr_ordenes where id=p_orden for update $$;
+-- a qué cuenta cobra cada boliche (20261106280000)
+create table clubs(id text primary key, nombre text);
+create table eventos(id uuid primary key, club_id text references clubs(id), nombre text);
+create table aftr_bar_pedidos(id uuid primary key, mesa_id uuid, cliente_id uuid,
+ total_centavos bigint default 100, estado text default 'pendiente', metodo text default 'qr',
+ vence_at timestamptz default now()+interval '1 hour');
 '''
 base = (Path(ROOT)/'db/44-pagos-banco.sql').read_text()
 fixture += base[base.index('create table if not exists pago_qr'):base.index('-- ── emisión:')]
 sql(fixture)
 sql(Path(MIGRATION).read_text())
+# Una pasarela por boliche. La parte que inyecta la línea en
+# baneco_reservar_destino queda afuera a propósito: ese cuerpo lo reescribió
+# 20261106090000, que acá no se carga, y la migración está hecha para fallar
+# si el cuerpo no es el que espera. Lo que sí se prueba es a quién elige.
+pasarelas = (Path(ROOT)/'supabase/migrations/20261106280000_una_pasarela_por_boliche.sql').read_text()
+sql(pasarelas.split('-- ── el cobro guarda su pasarela')[0])
+sql('-- ' + pasarelas.split('-- ── el barrido, uno por pasarela')[1])
 CLIENTE = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 ORDEN = '11111111-1111-4111-8111-111111111111'
 FASE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 PAGO = {'qrId': 'qr', 'transactionId': 'banco-123', 'amount': 25.50, 'currency': 'BOB'}
+EV_HEREDA = 'cccccccc-cccc-4ccc-8ccc-cccccccccc01'
+EV_PROPIA = 'cccccccc-cccc-4ccc-8ccc-cccccccccc02'
+EV_SIN = 'cccccccc-cccc-4ccc-8ccc-cccccccccc03'
+ORD_HEREDA = 'dddddddd-dddd-4ddd-8ddd-dddddddddd01'
+ORD_PROPIA = 'dddddddd-dddd-4ddd-8ddd-dddddddddd02'
+ORD_SIN = 'dddddddd-dddd-4ddd-8ddd-dddddddddd03'
 def confirmar(pago=None):
     return json.loads(sql("select aftr_pago_confirmado('qr', '%s'::jsonb)" % json.dumps(pago or PAGO)))
 
@@ -142,6 +161,66 @@ class BancoDB(unittest.TestCase):
             self.assertEqual(sql(f"select has_function_privilege('{rol}','baneco_reservar_qr(uuid,uuid,text)','execute')"),'f')
         self.assertEqual(sql("select relrowsecurity from pg_class where relname='baneco_conciliacion'"),'t')
         self.assertEqual(sql("select has_function_privilege('authenticated','impl.aftr_emitir_orden(uuid,uuid)','execute')"),'f')
+
+    # ── a qué cuenta cobra cada boliche ────────────────────────────────
+    # Qué se rompía: había una sola pasarela para toda la plataforma, así que
+    # todo lo cobrado con QR caía en la misma cuenta. Con dos boliches que
+    # traen la suya, la plata de uno terminaría en la del otro.
+    def _boliches(self):
+        sql("""delete from aftr_ordenes; delete from eventos; delete from clubs;
+        insert into clubs(id,nombre,pasarela) values('sitroom','SitRoom','sitroom'),('otro','Otro',null);
+        insert into eventos(id,club_id,nombre,pasarela) values
+         ('%s','sitroom','Hereda',null),
+         ('%s','sitroom','Propia','sitcom'),
+         ('%s','otro','Sin cuenta',null);
+        insert into aftr_ordenes(id,cliente_id,evento_id) values
+         ('%s','%s','%s'),('%s','%s','%s'),('%s','%s','%s');""" % (
+            EV_HEREDA, EV_PROPIA, EV_SIN,
+            ORD_HEREDA, CLIENTE, EV_HEREDA,
+            ORD_PROPIA, CLIENTE, EV_PROPIA,
+            ORD_SIN, CLIENTE, EV_SIN))
+
+    def test_pasarela_del_boliche(self):
+        self._boliches()
+        self.assertEqual(sql("select baneco_pasarela_de('orden','%s')" % ORD_HEREDA), 'sitroom')
+
+    def test_pasarela_propia_del_evento_manda(self):
+        self._boliches()
+        self.assertEqual(sql("select baneco_pasarela_de('orden','%s')" % ORD_PROPIA), 'sitcom')
+
+    def test_sin_cuenta_propia_cobra_la_plataforma(self):
+        self._boliches()
+        self.assertEqual(sql("select baneco_pasarela_de('orden','%s')" % ORD_SIN), '')
+
+    def test_pulse_es_de_la_plataforma(self):
+        # Las recargas no son de ningún boliche: siempre van a la cuenta de la
+        # plataforma, aunque la compra que las use sea de un boliche con cuenta.
+        self._boliches()
+        self.assertEqual(sql("select baneco_pasarela_de('recarga','%s')" % ORD_HEREDA), '')
+
+    def test_las_pasarelas_en_uso_incluyen_la_de_la_plataforma(self):
+        self._boliches()
+        en_uso = sql("select baneco_pasarelas()")
+        self.assertIn('sitroom', en_uso)
+        self.assertIn('sitcom', en_uso)
+        # la vacía siempre: es la que cobra lo que no tiene dueño
+        self.assertTrue(en_uso.startswith('{"",') or en_uso.startswith('{,'), en_uso)
+
+    def test_cada_pasarela_tiene_su_propio_barrido(self):
+        # Qué se rompía: el cursor de conciliación era por ambiente. Cada
+        # cuenta tiene su propia lista de pagados en el banco, así que si una
+        # toma el lease las otras no podrían conciliar ese minuto.
+        sql("delete from baneco_conciliacion")
+        a = json.loads(sql("select baneco_tomar_barrido('certificacion','sitroom')"))
+        b = json.loads(sql("select baneco_tomar_barrido('certificacion','sitcom')"))
+        self.assertTrue(a and b, (a, b))
+        self.assertNotEqual(a['token'], b['token'])
+        # y la misma, dos veces seguidas, sigue siendo una sola a la vez
+        self.assertEqual(sql("select baneco_tomar_barrido('certificacion','sitroom')"), '')
+
+    def test_la_pasarela_del_barrido_se_valida(self):
+        with self.assertRaisesRegex(AssertionError, 'Pasarela inválida'):
+            sql("select baneco_tomar_barrido('certificacion','Mala Pasarela')")
 
 if __name__ == '__main__':
     unittest.main(argv=[sys.argv[0]], verbosity=2)

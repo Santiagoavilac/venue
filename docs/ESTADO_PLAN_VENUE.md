@@ -283,3 +283,86 @@ Verificado:
 Queda: instalar la app nueva en el teléfono (la última es anterior a todo
 esto), y probar `linkIdentity` con una cuenta de Google de verdad, que es lo
 único que no se puede probar sin pasar por el ingreso del proveedor.
+
+---
+
+## 06/11/2026 · Probar las dos pasarelas nuevas (y de paso, una por boliche)
+
+**Lo que se pidió fue probar si sirven las dos pasarelas nuevas. La respuesta
+está al final: el banco las rechaza.** Lo de abajo -que cada boliche pueda
+cobrar a su propia cuenta- salió de esa prueba y es más de lo que se pidió:
+queda apagado, sin ningún boliche ni evento apuntado a ninguna pasarela, así
+que todo cobra a la cuenta de la plataforma exactamente como antes.
+
+### Cada boliche puede cobrar a su propia cuenta (apagado)
+
+Llegaron dos cuentas más del Banco Económico (de André, para SitRoom) y había
+una sola pasarela para toda la plataforma: todo lo cobrado con QR caía en la
+misma cuenta, la que se configuró primero. Con dos boliches más, la plata de
+uno terminaría en la cuenta del otro.
+
+Cómo quedó. La pasarela es un nombre corto —`sitroom`, `sitcom`— y es lo único
+que viaja por la base. Las credenciales siguen en los secretos de la Edge
+Function, con ese nombre como prefijo:
+
+    BANECO_SITROOM_USER, BANECO_SITROOM_ACCOUNT,
+    BANECO_SITROOM_AES_KEY, BANECO_SITROOM_PASSWORD
+
+y lo que un boliche no defina se toma del `BANECO_` de siempre, que pasa a ser
+el de la plataforma. **Ningún número de cuenta ni ninguna llave entra en la
+base**, que es la razón por la que estaban en los secretos desde el principio.
+Un boliche sin pasarela cobra exactamente como hasta ahora.
+
+El evento puede tener la suya, igual que `logistica`: una fiesta de terceros en
+un boliche propio cobra aparte. Vacío = la del boliche. Las recargas de PULSE
+son de la plataforma siempre, no de un boliche.
+
+Lo que hubo que mover:
+
+- `pago_qr.pasarela`: el cobro recuerda con qué cuenta se generó, igual que
+  `ambiente`. Sin eso, un boliche que cambia de cuenta deja sus QR viejos sin
+  nadie que los consulte ni los anule.
+- El cursor de conciliación era por ambiente y ahora es por ambiente y
+  pasarela: cada cuenta tiene su propia lista de pagados en el banco.
+- El barrido corre una vez por pasarela.
+
+Probado en producción: dos eventos de SitRoom, uno heredando la cuenta del
+boliche y el otro con la de Sitcom, comprando como invitado y pidiendo el QR a
+la Edge Function. **El camino funciona**: con la pasarela de la plataforma el
+QR sale (se generó, se verificó y se anuló en el banco al terminar). Con
+`sitroom` y `sitcom` llega a autenticar con esas credenciales y el banco las
+rechaza —ver abajo—, que es justamente la prueba de que no está usando la de
+la plataforma.
+
+Verificado además: 23 pruebas de base de baneco sobre PostgreSQL descartable
+(16 de antes y 7 nuevas), 37 de la Edge Function en Deno (32 y 5 nuevas), 39 de
+base social, 28 de web y `tests/rpc_con_guarda.py` en verde.
+
+### Bloqueado: el banco rechaza las dos credenciales nuevas
+
+    usuario adicional A… (cuenta de SitRoom) → 401 "Credenciales de autenticacion no validas."
+    usuario adicional B… (cuenta de Sitcom)  → 401 "Credenciales de autenticacion no validas."
+
+Los usuarios, las cuentas y las llaves no se escriben acá: están en los
+secretos de Supabase y en el chat con el banco.
+
+Probado con el mismo cliente y el mismo cifrado AES que usa la pasarela que sí
+funciona, contra `apimkt.baneco.com.bo`. Se probó **una vez cada una** y se
+paró ahí: insistir con contraseñas distintas bloquea el usuario en el banco.
+
+Los secretos ya están cargados con lo que mandó el banco, así que cuando se
+aclare la contraseña es cambiar un valor y nada más. Lo que hay que preguntarle
+a Rebeca (Banco Económico):
+
+1. El código de 4 dígitos que mandaron por cada cuenta, ¿es la contraseña de
+   APIMARKET del usuario adicional, o sólo el código de la cuenta? En la
+   pasarela que ya funciona la contraseña también es de 4 dígitos, por eso se
+   probó así.
+2. El primero figura en el correo como "usuario adicional **de consulta**";
+   sólo del segundo dice que se lo habilitó para APIMARKET. ¿Están los dos
+   habilitados para el sistema?
+3. ¿Hace falta una primera activación del usuario adicional antes de que la API
+   lo acepte?
+
+La clave de banca por internet del titular no se usó ni se va a usar: la API
+tiene sus propios usuarios.

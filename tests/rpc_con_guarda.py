@@ -41,6 +41,11 @@ EXCEPCIONES = {
     'aftr_social_borrable': 'helper booleano de la política de borrado',
     'aftr_social_limpieza': 'tarea programada, solo service_role',
     'baneco_tomar_barrido': 'barrido del banco, solo service_role',
+    # A qué cuenta cobra cada boliche. No dicen nada de nadie -devuelven un
+    # nombre corto y una lista de nombres- y estan revocadas de anon y de
+    # authenticated: las llama la Edge Function con la llave de servicio.
+    'baneco_pasarela_de': 'elige la cuenta del cobro, solo service_role',
+    'baneco_pasarelas': 'lista las cuentas en uso para el barrido, solo service_role',
     'baneco_finalizar_barrido': 'barrido del banco, solo service_role',
     'ver_invitacion': 'se resuelve por el token del enlace, que es el permiso',
     'ver_invitacion_rol': 'se resuelve por el token del enlace, que es el permiso',

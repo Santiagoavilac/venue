@@ -56,8 +56,14 @@ async function secretoIgual(a: string | null, b: string | undefined) {
   return diferencia === 0;
 }
 
-export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, ahora = Date.now,
+export function crearHandler(admin: SupabaseClient, banco: Banco | ((pasarela: string) => Banco),
+  env: Entorno, ahora = Date.now,
   registrar: (datos: Datos) => void = (d) => console.error(JSON.stringify(d))) {
+  // Cada boliche puede cobrar a su propia cuenta (migración 20261106280000).
+  // La pasarela es un nombre corto que elige las credenciales; la vacía es la
+  // de la plataforma, que es como funcionaba todo hasta ahora.
+  const bancoDe = typeof banco === "function" ? banco : () => banco;
+  const plataforma = bancoDe("");
   const log = (evento: string, error: unknown) => registrar({ evento,
     ...(error instanceof ErrorBanco ? { paso: error.paso, codigo: error.codigo } : { codigo: "ERROR_INTERNO" }) });
   async function rpc(nombre: string, params: Datos) {
@@ -76,6 +82,9 @@ export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, 
     return r.data as Datos;
   }
   async function confirmar(fila: Datos) {
+    // La del QR y no la del boliche: el boliche pudo cambiar de cuenta
+    // después de generarlo, y este cobro sigue siendo de la cuenta vieja.
+    const banco = bancoDe(String(fila.pasarela ?? ""));
     const r = await banco.estado(String(fila.qr_id));
     const chequeo = await admin.from("pago_qr").update({ ultimo_chequeo: new Date(ahora()).toISOString() }).eq("id", fila.id);
     fallar(chequeo.error);
@@ -88,6 +97,9 @@ export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, 
   }
   async function pedirQr(req: Request, id: unknown, tipo: Tipo) {
     const o = await ordenDe(req, id, tipo);
+    // A qué cuenta cobra esto: la del evento, la del boliche o la de la
+    // plataforma. Lo decide la base, que es la que sabe los enlaces.
+    const banco = bancoDe(String(await rpc("baneco_pasarela_de", { p_tipo: tipo, p_id: o.id }) ?? ""));
     const anterior = await ultimoQr(admin, destinos[tipo].columna, String(o.id));
     fallar(anterior.error);
     // Un QR muerto de otro ambiente es histórico y no estorba; uno vivo sí.
@@ -135,7 +147,7 @@ export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, 
     fallar(r.error);
     if (!r.data) return { pago: null, orden: o.estado };
     const q = r.data;
-    if (vivo(q) && q.ambiente !== banco.config.ambiente) rechazar("Este pedido corresponde a otro ambiente de cobro.", 409);
+    if (vivo(q) && q.ambiente !== plataforma.config.ambiente) rechazar("Este pedido corresponde a otro ambiente de cobro.", 409);
     if (q.estado === "activo" && q.qr_id && (!q.ultimo_chequeo || ahora() - Date.parse(q.ultimo_chequeo) >= 4000)) await confirmar(q);
     const [pago, orden] = await Promise.all([
       admin.from("pago_qr").select("*").eq("id", q.id).single(),
@@ -145,16 +157,34 @@ export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, 
     return { pago: publico(pago.data, false), orden: orden.data?.estado };
   }
   async function barrido() {
+    // Cada cuenta tiene su propia lista de pagados en el banco, así que el
+    // barrido se hace una vez por pasarela y no una sola vez para todas.
+    const lista = await rpc("baneco_pasarelas", {});
+    // Si la base no contesta una lista, cobra la plataforma: el barrido tiene
+    // que correr igual, no quedarse sin hacer nada.
+    const pasarelas = Array.isArray(lista) && lista.length ? lista as string[] : [""];
+    const todo = { revisados: 0, confirmados: 0, anulados: 0, errores: 0, conciliados: 0, ocupado: 0 };
+    for (const pasarela of pasarelas) {
+      const r = await barridoDe(pasarela);
+      if ((r as { ocupado?: boolean }).ocupado) { todo.ocupado++; continue; }
+      for (const k of ["revisados", "confirmados", "anulados", "errores", "conciliados"] as const) {
+        todo[k] += (r as Record<string, number>)[k] ?? 0;
+      }
+    }
+    return todo;
+  }
+  async function barridoDe(pasarela: string) {
+    const banco = bancoDe(pasarela);
     const ambiente = banco.config.ambiente;
-    const trabajo = await rpc("baneco_tomar_barrido", { p_ambiente: ambiente });
+    const trabajo = await rpc("baneco_tomar_barrido", { p_ambiente: ambiente, p_pasarela: pasarela });
     if (!trabajo) return { ocupado: true };
     const inicio = ahora();
     const res = { revisados: 0, confirmados: 0, anulados: 0, errores: 0, conciliados: 0 };
     let diaOk: string | null = null;
     try {
       await rpc("baneco_liberar_sin_qr", {});
-      const activos = await admin.from("pago_qr").select("id, qr_id, orden_id, recarga_id, pedido_id, limite_at, estado, intentos, aftr_ordenes(estado, vence_at)")
-        .eq("ambiente", ambiente).eq("estado", "activo").not("qr_id", "is", null)
+      const activos = await admin.from("pago_qr").select("id, qr_id, orden_id, recarga_id, pedido_id, limite_at, estado, intentos, pasarela, aftr_ordenes(estado, vence_at)")
+        .eq("ambiente", ambiente).eq("pasarela", pasarela).eq("estado", "activo").not("qr_id", "is", null)
         .order("ultimo_chequeo", { ascending: true, nullsFirst: true }).limit(100);
       fallar(activos.error);
       for (const q of activos.data ?? []) {
@@ -186,7 +216,7 @@ export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, 
       for (const p of pagos) {
         if (ahora() - inicio > 42000) { res.errores++; diaCompleto = false; break; }
         if (!p.qrId || !p.transactionId) { res.errores++; diaCompleto = false; continue; }
-        const r = await admin.from("pago_qr").select("id, estado").eq("ambiente", ambiente).eq("qr_id", String(p.qrId)).maybeSingle();
+        const r = await admin.from("pago_qr").select("id, estado, pasarela").eq("ambiente", ambiente).eq("pasarela", pasarela).eq("qr_id", String(p.qrId)).maybeSingle();
         fallar(r.error);
         if (r.data && r.data.estado !== "pagado") {
           const resultado = await rpc("aftr_pago_confirmado", { p_qr: String(p.qrId), p_pago: p });
@@ -197,7 +227,7 @@ export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, 
       if (diaCompleto) diaOk = trabajo.dia;
     } catch (e) { res.errores++; log("conciliacion", e); }
     finally {
-      await rpc("baneco_finalizar_barrido", { p_ambiente: ambiente, p_token: trabajo.token, p_dia_ok: diaOk, p_errores: res.errores });
+      await rpc("baneco_finalizar_barrido", { p_ambiente: ambiente, p_token: trabajo.token, p_dia_ok: diaOk, p_errores: res.errores, p_pasarela: pasarela });
     }
     return res;
   }
@@ -206,7 +236,7 @@ export function crearHandler(admin: SupabaseClient, banco: Banco, env: Entorno, 
     if (!await secretoIgual(req.headers.get("x-baneco-token"), env("BANECO_WEBHOOK_TOKEN"))) rechazar("No autorizado.", 401);
     const p = cuerpo.Payment ?? cuerpo.payment;
     if (!p || typeof p !== "object" || Array.isArray(p) || !(p as Datos).qrId) rechazar("Notificación inválida.", 400);
-    const r = await admin.from("pago_qr").select("id, qr_id, estado").eq("ambiente", banco.config.ambiente)
+    const r = await admin.from("pago_qr").select("id, qr_id, estado, pasarela").eq("ambiente", plataforma.config.ambiente)
       .eq("qr_id", String((p as Datos).qrId)).maybeSingle();
     fallar(r.error);
     // El cuerpo recibido nunca se pasa a la función que emite entradas.
