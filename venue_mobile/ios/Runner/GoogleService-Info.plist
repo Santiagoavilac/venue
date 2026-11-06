@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyDwiA8ekphjmUr-juH6c3S17oiKFhHwv5M</string>
+	<key>GCM_SENDER_ID</key>
+	<string>487590011021</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>app.venue.venueMobile</string>
+	<key>PROJECT_ID</key>
+	<string>venue-f1156</string>
+	<key>STORAGE_BUCKET</key>
+	<string>venue-f1156.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:487590011021:ios:8d37974e4a8e2cfd09c2c4</string>
+</dict>
+</plist>

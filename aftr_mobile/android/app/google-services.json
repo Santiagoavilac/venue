@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "490418702559",
+    "project_id": "aftr-6d08d",
+    "storage_bucket": "aftr-6d08d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:490418702559:android:7d5db7a737df740458416a",
+        "android_client_info": {
+          "package_name": "app.aftr.aftr_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDiPOwEi7AIWTjYmY-L3DaRDPZwCb8Hxso"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
